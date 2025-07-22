@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Dark mode sidebar customizations */
+.sidebar-dark {
+  background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Dark scrollbar for sidebar */
+.sidebar-dark ::-webkit-scrollbar-track {
+  background: #374151;
+}
+
+.sidebar-dark ::-webkit-scrollbar-thumb {
+  background: #6b7280;
+}
+
+.sidebar-dark ::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Animações suaves */
+.transition-all {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Sombras personalizadas */
+.shadow-custom {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.shadow-custom-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Dark mode shadows */
+.shadow-dark {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+}
+
+/* Gradientes personalizados */
+.gradient-primary {
+  background: linear-gradient(135deg, #0053F0 0%, #0041C7 100%);
+}
+
+.gradient-success {
+  background: linear-gradient(135deg, #27AE60 0%, #219A52 100%);
+}
+
+.gradient-danger {
+  background: linear-gradient(135deg, #EB5757 0%, #C53030 100%);
+}
+
+.gradient-warning {
+  background: linear-gradient(135deg, #F2C94C 0%, #D69E2E 100%);
+}
