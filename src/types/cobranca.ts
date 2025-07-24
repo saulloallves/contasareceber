@@ -2,9 +2,13 @@ export interface CobrancaFranqueado {
   id?: string;
   cnpj: string;
   cliente: string;
+  tipo_cobranca?: string;
+  email_cobranca?: string;
+  descricao?: string;
   valor_original: number;
-  valor_recebido: number;
+  valor_recebido?: number;
   data_vencimento: string;
+  data_vencimento_original?: string;
   dias_em_atraso?: number;
   valor_atualizado?: number;
   status: string;
@@ -16,6 +20,18 @@ export interface CobrancaFranqueado {
   nivel_criticidade?: string;
 }
 
+export interface DadosPlanilha {
+  cnpj: string;
+  cliente: string;
+  tipo_cobranca?: string;
+  valor_original: number;
+  data_vencimento: string;
+  data_vencimento_original?: string;
+  descricao?: string;
+  email_cobranca?: string;
+  status: string;
+}
+
 export interface TrativativaCobranca {
   id?: string;
   titulo_id: string;
@@ -25,7 +41,7 @@ export interface TrativativaCobranca {
   usuario_sistema: string;
   descricao: string;
   status_cobranca_resultante?: string;
-  anexos?: any;
+  anexos?: string;
   created_at?: string;
 }
 
@@ -60,6 +76,28 @@ export interface ResultadoEnvioCobranca {
     status: 'sucesso' | 'falha';
     erro?: string;
   }[];
+}
+
+export interface ResultadoImportacao {
+  nome_arquivo?: string;
+  usuario?: string;
+  data_importacao?: string;
+  total_linhas?: number;
+  linhas_processadas?: number;
+  linhas_falha?: number;
+  linhas_sucesso?: number;
+  detalhes_falha?: string[];
+  sucesso: boolean;
+  mensagem?: string;
+  erros: string[];
+  estatisticas?: {
+    total_registros: number;
+    novos_registros: number;
+    registros_atualizados: number;
+    registros_quitados: number;
+    [key: string]: number;
+  };
+  importacao_id?: string;
 }
 
 export interface HistoricoTratativas {
