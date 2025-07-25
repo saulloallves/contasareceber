@@ -62,7 +62,7 @@ export function GestaoCobrancas() {
       console.log("Cobrancas carregadas:", dadosReaisDoBanco); //Debugging
     } catch (error) {
       console.error("Erro ao carregar cobranças:", error);
-      // Em caso de erro, a lista vai ser limpa, e mostrar uma mensagem
+      // Em caso de erro, a lista vai ser limpa e mostrar uma mensagem
       alert("Erro ao carregar cobranças. Tente novamente mais tarde.");
       setCobrancas([]);
     } finally {
@@ -268,7 +268,7 @@ export function GestaoCobrancas() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between p-5">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">
             Gestão de Cobranças
@@ -297,7 +297,7 @@ export function GestaoCobrancas() {
 
       {/* Filtros */}
       <div
-        className="bg-white rounded-xl shadow-lg border border-gray-100" style={{ margin: 15 }}>
+        className="bg-white rounded-xl shadow-lg p-5 border border-gray-100" style={{ margin: 15 }}>
         <div className="flex items-center mb-6">
           <div className="p-2 bg-green-100 rounded-lg mr-3">
             <Filter className="w-5 h-5 text-green-600" />
