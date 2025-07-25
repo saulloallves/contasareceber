@@ -25,6 +25,7 @@ export interface DadosPlanilha {
   cliente: string;
   tipo_cobranca?: string;
   valor_original: number;
+  valor_recebido?: number;
   data_vencimento: string;
   data_vencimento_original?: string;
   descricao?: string;

@@ -14,6 +14,8 @@ import {
   Filter,
   RefreshCw,
   FileText,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { CobrancaFranqueado } from "../../types/cobranca";
 import { cobrancaService } from "../../services/cobrancaService";
@@ -22,6 +24,7 @@ import {
   processarPlanilhaXML,
 } from "../../utils/planilhaProcessor";
 import type { ResultadoImportacao } from "../../types/cobranca";
+import { formatarCNPJCPF } from "../../utils/formatters"; // Importando a função de formatação de CNPJ/CPF
 
 export function GestaoCobrancas() {
   const [cobrancas, setCobrancas] = useState<CobrancaFranqueado[]>([]);
@@ -46,17 +49,22 @@ export function GestaoCobrancas() {
     valorMin: "",
     valorMax: "",
   });
+  const [colunaOrdenacao, setColunaOrdenacao] = useState("data_vencimento"); // Coluna padrão
+  const [direcaoOrdenacao, setDirecaoOrdenacao] = useState("desc"); // 'asc' ou 'desc'
 
   useEffect(() => {
     carregarCobrancas();
-  }, [filtros]);
+  }, [filtros, colunaOrdenacao, direcaoOrdenacao]);
 
   const carregarCobrancas = async () => {
     setCarregando(true);
     try {
-      const dadosReaisDoBanco = await cobrancaService.buscarCobrancas();
+      const dadosReaisDoBanco = await cobrancaService.buscarCobrancas({
+        ...filtros,
+        colunaOrdenacao,
+        direcaoOrdenacao,
+      });
       setCobrancas(dadosReaisDoBanco);
-      console.log("Cobrancas carregadas:", dadosReaisDoBanco); //Debugging
     } catch (error) {
       console.error("Erro ao carregar cobranças:", error);
       // Em caso de erro, a lista vai ser limpa e mostrar uma mensagem
@@ -259,7 +267,29 @@ export function GestaoCobrancas() {
   };
 
   const formatarData = (data: string) => {
-    return new Date(data).toLocaleDateString("pt-BR");
+    if (!data) {
+      return "N/A";
+    }
+    // A string de data (ex: "2024-04-15") é interpretada como UTC.
+    // Adicionamos 'T00:00:00' para garantir que a hora seja meia-noite,
+    // mas o mais importante é que o new Date() vai ajustar para o fuso local.
+    // Para corrigir isso, criamos a data e depois adicionamos o offset do fuso de volta.
+    const dataObj = new Date(`${data}T00:00:00`);
+    const offset = dataObj.getTimezoneOffset(); // Pega a diferença em minutos (ex: 180 para UTC-3)
+    const dataCorrigida = new Date(dataObj.getTime() + offset * 60 * 1000);
+
+    // Agora formata a data já corrigida
+    return dataCorrigida.toLocaleDateString("pt-BR");
+  };
+
+  const handleOrdenacao = (coluna: string) => {
+    // Se clicou na mesma coluna, inverte a direção. Senão, ordena de forma descendente.
+    const novaDirecao =
+      coluna === colunaOrdenacao && direcaoOrdenacao === "desc"
+        ? "asc"
+        : "desc";
+    setColunaOrdenacao(coluna);
+    setDirecaoOrdenacao(novaDirecao);
   };
 
   return (
@@ -370,23 +400,81 @@ export function GestaoCobrancas() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cliente
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleOrdenacao("cliente")}
+                >
+                  <div className="flex items-center">
+                    <span>Cliente</span>
+                    {/* Mostra a seta correspondente se esta for a coluna ativa */}
+                    {colunaOrdenacao === "cliente" &&
+                      (direcaoOrdenacao === "desc" ? (
+                        <ArrowDown className="w-4 h-4 ml-2" />
+                      ) : (
+                        <ArrowUp className="w-4 h-4 ml-2" />
+                      ))}
+                  </div>
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleOrdenacao("valor_original")}
+                >
+                  <div className="flex items-center">
+                    <span>Valor Original</span>
+                    {colunaOrdenacao === "valor_original" &&
+                      (direcaoOrdenacao === "desc" ? (
+                        <ArrowDown className="w-4 h-4 ml-2" />
+                      ) : (
+                        <ArrowUp className="w-4 h-4 ml-2" />
+                      ))}
+                  </div>
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleOrdenacao("valor_atualizado")}
+                >
+                  <div className="flex items-center">
+                    <span>Valor Atualizado</span>
+                    {colunaOrdenacao === "valor_atualizado" &&
+                      (direcaoOrdenacao === "desc" ? (
+                        <ArrowDown className="w-4 h-4 ml-2" />
+                      ) : (
+                        <ArrowUp className="w-4 h-4 ml-2" />
+                      ))}
+                  </div>
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleOrdenacao("data_vencimento")}
+                >
+                  <div className="flex items-center">
+                    <span>Vencimento</span>
+                    {colunaOrdenacao === "data_vencimento" &&
+                      (direcaoOrdenacao === "desc" ? (
+                        <ArrowDown className="w-4 h-4 ml-2" />
+                      ) : (
+                        <ArrowUp className="w-4 h-4 ml-2" />
+                      ))}
+                  </div>
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleOrdenacao("status")}
+                >
+                  <div className="flex items-center">
+                    <span>Status</span>
+                    {colunaOrdenacao === "status" &&
+                      (direcaoOrdenacao === "desc" ? (
+                        <ArrowDown className="w-4 h-4 ml-2" />
+                      ) : (
+                        <ArrowUp className="w-4 h-4 ml-2" />
+                      ))}
+                  </div>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Valor Original
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Valor Atualizado
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Vencimento
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ações
+                  <div className="flex items-center">
+                    <span>Ações</span>
+                  </div>
                 </th>
               </tr>
             </thead>
@@ -418,7 +506,7 @@ export function GestaoCobrancas() {
                           {cobranca.cliente}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {cobranca.cnpj}
+                          {formatarCNPJCPF(cobranca.cnpj)}
                         </div>
                       </div>
                     </td>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as XLSX from "xlsx";
 import { CobrancaFranqueado } from "../types/cobranca";
 
@@ -13,7 +14,7 @@ export function processarPlanilhaExcel(
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
+        const workbook = XLSX.read(data, { type: "array", cellDates: true });
 
         // Pega a primeira planilha
         const sheetName = workbook.SheetNames[0];
@@ -112,6 +113,10 @@ function processarDadosJson(jsonData: any[][]): CobrancaFranqueado[] {
       "VALOR_ORIGINAL",
       "VLR_ORIGINAL",
     ]),
+    valorRecebido: encontrarIndiceColuna(cabecalhos, [
+      "VALOR_RECEBIDO",
+      "VALOR RECEBIDO",
+    ]),
     vencimento: encontrarIndiceColuna(cabecalhos, [
       "DATA_VENCIMENTO",
       "VENCIMENTO",
@@ -184,6 +189,13 @@ function processarDadosJson(jsonData: any[][]): CobrancaFranqueado[] {
         continue;
       }
 
+      // Pega os valores brutos da Planilha
+      const valorOriginalStr = String(linha[indices.valor] || "0");
+      const valorRecebidoStr = String(linha[indices.valorRecebido] || "0");
+
+      const valorOriginal = parseFloat(valorOriginalStr.replace(',', '.'));
+      const valorRecebido = parseFloat(valorRecebidoStr.replace(',', '.'));
+
       // Se a validação passou cria o registro
       const registro: CobrancaFranqueado = {
         cliente: String(linha[indices.cliente] || "").trim(),
@@ -192,14 +204,10 @@ function processarDadosJson(jsonData: any[][]): CobrancaFranqueado[] {
           indices.tipo !== -1
             ? String(linha[indices.tipo] || "royalty").trim()
             : "royalty",
-        valor_original: parseFloat(
-          String(linha[indices.valor] || "0").replace(",", ".")
-        ),
-        data_vencimento: String(linha[indices.vencimento] || "").trim(),
-        data_vencimento_original:
-          indices.vencimentoOriginal !== -1
-            ? String(linha[indices.vencimentoOriginal] || "").trim()
-            : String(linha[indices.vencimento] || "").trim(),
+        valor_original: valorOriginal > 0 ? valorOriginal : 0,
+        valor_recebido: valorRecebido > 0 ? valorRecebido : 0,
+        data_vencimento: linha[indices.vencimento],
+        data_vencimento_original: linha[indices.vencimentoOriginal] || linha[indices.vencimento],
         descricao:
           indices.descricao !== -1
             ? String(linha[indices.descricao] || "").trim()
@@ -221,7 +229,7 @@ function processarDadosJson(jsonData: any[][]): CobrancaFranqueado[] {
         console.warn(
           `Linha ${
             i + 1
-          } ignorada por dados obrigatórios faltando (Cliente, Vencimento ou Valor).`
+          } ignorada por dados obrigatórios faltando (Cliente, Vencimento ou Valor Original).`
         );
         continue;
       }
@@ -335,19 +343,29 @@ export function validarFormatoData(data: string): boolean {
 export function normalizarData(data: string): string {
   if (!data) return "";
 
-  // Se já está no formato ISO
-  if (/^\d{4}-\d{2}-\d{2}$/.test(data)) {
-    return data;
-  }
+  let dataObj: Date;
 
-  // Converte DD/MM/YYYY ou DD-MM-YYYY para YYYY-MM-DD
-  const match = data.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
-  if (match) {
-    const [, dia, mes, ano] = match;
-    return `${ano}-${mes}-${dia}`;
+  if (typeof data === "string") {
+    // Se ainda for uma string, tenta converter (fallback)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+      return data;
+    }
+    // Converte DD/MM/YYYY ou DD-MM-YYYY para YYYY-MM-DD
+    const match = data.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
+    if (match) {
+      const [, dia, mes, ano] = match;
+      return `${ano}-${mes}-${dia}`;
+    }
+    dataObj = new Date(data);
+  } else {
+    dataObj = data;
   }
+  // Ajusta para o fuso horário local para evitar problemas de UTC
+  const offset = dataObj.getTimezoneOffset();
+  dataObj = new Date(dataObj.getTime() - offset * 60 * 1000);
 
-  throw new Error(`Formato de data inválido: ${data}`);
+  // Retorna a data no formato ISO
+  return dataObj.toISOString().split("T")[0];
 }
 
 /**

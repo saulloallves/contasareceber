@@ -8,7 +8,7 @@ import {
   gerarReferenciaLinha,
   normalizarData,
 } from "../utils/planilhaProcessor";
-import { supabase } from "./databaseService"
+import { supabase } from "./databaseService";
 
 export class CobrancaService {
   /**
@@ -235,7 +235,7 @@ export class CobrancaService {
       cnpj: dados.cnpj,
       tipo_cobranca: dados.tipo_cobranca,
       valor_original: dados.valor_original,
-      valor_recebido: 0,
+      valor_recebido: dados.valor_recebido || 0,
       data_vencimento: normalizarData(dados.data_vencimento),
       data_vencimento_original: normalizarData(
         dados.data_vencimento_original || ""
@@ -357,17 +357,18 @@ export class CobrancaService {
    */
   async buscarCobrancas(
     filtros: {
-      unidadeId?: string;
       status?: string;
-      tipo?: string;
+      busca?: string;
       dataInicio?: string;
       dataFim?: string;
+      valorMin?: string;
+      valorMax?: string;
+      colunaOrdenacao?: string;
+      direcaoOrdenacao?: string;
     } = {}
   ) {
-    let query = supabase
-      .from("cobrancas_franqueados")
-      .select(
-        `
+    let query = supabase.from("cobrancas_franqueados").select(
+      `
         *,
         unidades_franqueadas:unidade_id_fk (
           codigo_unidade,
@@ -376,27 +377,39 @@ export class CobrancaService {
           estado
         )
       `
-      )
-      .order("data_vencimento", { ascending: false });
+    );
 
-    if (filtros.unidadeId) {
-      query = query.eq("codigo_unidade", filtros.unidadeId);
-    }
-
+    // Aplica os filtros da interface
     if (filtros.status) {
       query = query.eq("status", filtros.status);
     }
-
-    if (filtros.tipo) {
-      query = query.eq("tipo_cobranca", filtros.tipo);
-    }
-
     if (filtros.dataInicio) {
       query = query.gte("data_vencimento", filtros.dataInicio);
     }
-
     if (filtros.dataFim) {
       query = query.lte("data_vencimento", filtros.dataFim);
+    }
+    if (filtros.valorMin) {
+      query = query.gte("valor_original", parseFloat(filtros.valorMin));
+    }
+    if (filtros.valorMax) {
+      query = query.lte("valor_original", parseFloat(filtros.valorMax));
+    }
+    if (filtros.busca) {
+      // Faz a busca pelo nome do cliente OU pelo CNPJ
+      query = query.or(
+        `cliente.ilike.%${filtros.busca}%,cnpj.ilike.%${filtros.busca}%`
+      );
+    }
+
+    // Aplica a ordenação dinâmica
+    if (filtros.colunaOrdenacao && filtros.direcaoOrdenacao) {
+      query = query.order(filtros.colunaOrdenacao, {
+        ascending: filtros.direcaoOrdenacao === "asc",
+      });
+    } else {
+      // Ordenação padrão caso nenhuma seja especificada
+      query = query.order("data_vencimento", { ascending: false });
     }
 
     const { data, error } = await query;
@@ -405,7 +418,7 @@ export class CobrancaService {
       throw new Error(`Erro ao buscar cobranças: ${error.message}`);
     }
 
-    return data;
+    return data || [];
   }
 
   /**
