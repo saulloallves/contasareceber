@@ -268,7 +268,7 @@ export function GestaoCobrancas() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between p-5">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">
             Gestão de Cobranças
