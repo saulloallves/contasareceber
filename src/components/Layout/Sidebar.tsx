@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { 
-  Home, Building2, DollarSign, Calendar, Scale, Bell, BarChart3, 
-  Settings, Users, ChevronLeft, ChevronRight, Menu, X, FileText, Target,
-  MessageSquare, Zap, Shield, Upload, Download, Eye, Edit, Plus,
-  Filter, Search, RefreshCw, Clock, CheckCircle, XCircle, AlertTriangle
+  Home, Building2, DollarSign, Calendar, Scale, BarChart3, 
+  Settings, Users, ChevronLeft, ChevronRight, Menu, X, FileText, 
+  Zap, Shield, 
+  Receipt, CircleDollarSign
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -34,14 +34,14 @@ export function Sidebar({
     {
       id: "cobrancas",
       label: "Cobranças",
-      icon: DollarSign,
+      icon: CircleDollarSign,
       permissions: ["admin", "financeiro", "cobranca"],
       description: "Kanban visual de cobrança",
     },
     {
       id: "cobrancas-lista",
       label: "Lista de Cobranças",
-      icon: DollarSign,
+      icon: Receipt,
       permissions: ["admin", "financeiro", "cobranca"],
       description: "Gestão em lista de cobranças",
     },
@@ -235,7 +235,7 @@ export function Sidebar({
                 <span>Sistema Online</span>
               </div>
               <p>© 2025 Cresci e Perdi</p>
-              <p>Versão 1.0.0</p>
+              <p className="mt-1">Versão 1.0.0</p>
             </div>
             <div className="flex items-center justify-center space-x-1 text-xs text-gray-500">
               <Shield className="w-3 h-3" />

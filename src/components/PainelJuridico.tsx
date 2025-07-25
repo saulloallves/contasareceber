@@ -1,26 +1,45 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Scale, FileText, AlertTriangle, CheckCircle, XCircle, Clock, 
-  Download, Filter, RefreshCw, Eye, Edit, Mail, Phone, MapPin,
-  Users, DollarSign, TrendingUp, Target, Zap, Settings, Plus,
-  Send, Upload, Trash2, Calendar, User, Building2
-} from 'lucide-react';
-import { JuridicoService } from '../services/juridicoService';
-import { JuridicoLog, NotificacaoExtrajudicial, FiltrosJuridico, EstatisticasJuridico, JuridicoStatus, DocumentoJuridico, TermoAcordo } from '../types/juridico';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect } from "react";
+import {
+  Scale,
+  FileText,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  Download,
+  Filter,
+  RefreshCw,
+  Eye,
+  Edit,
+  Users,
+  Settings,
+  Plus,
+  Send,
+  Upload,
+} from "lucide-react";
+import { JuridicoService } from "../services/juridicoService";
+import { FiltrosJuridico, EstatisticasJuridico } from "../types/juridico";
 
 export function PainelJuridico() {
-  const [abaSelecionada, setAbaSelecionada] = useState<'escalonamentos' | 'notificacoes' | 'documentos' | 'log' | 'configuracao'>('escalonamentos');
+  const [abaSelecionada, setAbaSelecionada] = useState<
+    "escalonamentos" | "notificacoes" | "documentos" | "log" | "configuracao"
+  >("escalonamentos");
   const [escalonamentos, setEscalonamentos] = useState<any[]>([]);
   const [notificacoes, setNotificacoes] = useState<any[]>([]);
   const [documentos, setDocumentos] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [filtros, setFiltros] = useState<FiltrosJuridico>({});
-  const [modalAberto, setModalAberto] = useState<'notificacao' | 'termo' | 'status' | 'resposta' | 'upload' | null>(null);
+  const [modalAberto, setModalAberto] = useState<
+    "notificacao" | "termo" | "status" | "resposta" | "upload" | null
+  >(null);
   const [itemSelecionado, setItemSelecionado] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
   const [processando, setProcessando] = useState(false);
-  const [estatisticas, setEstatisticas] = useState<EstatisticasJuridico | null>(null);
+  const [estatisticas, setEstatisticas] = useState<EstatisticasJuridico | null>(
+    null
+  );
   const [arquivo, setArquivo] = useState<File | null>(null);
 
   const juridicoService = new JuridicoService();
@@ -33,27 +52,33 @@ export function PainelJuridico() {
     setCarregando(true);
     try {
       const [statsData] = await Promise.all([
-        juridicoService.buscarEstatisticas()
+        juridicoService.buscarEstatisticas(),
       ]);
-      
+
       setEstatisticas(statsData);
 
       switch (abaSelecionada) {
-        case 'escalonamentos':
-          const escalonamentosData = await juridicoService.buscarEscalonamentosAtivos(filtros);
+        case "escalonamentos": {
+          const escalonamentosData =
+            await juridicoService.buscarEscalonamentosAtivos(filtros);
           setEscalonamentos(escalonamentosData);
           break;
-        case 'notificacoes':
-          const notificacoesData = await juridicoService.buscarNotificacoes(filtros);
+        }
+        case "notificacoes": {
+          const notificacoesData = await juridicoService.buscarNotificacoes(
+            filtros
+          );
           setNotificacoes(notificacoesData);
           break;
-        case 'log':
+        }
+        case "log": {
           const logsData = await juridicoService.buscarLogJuridico(filtros);
           setLogs(logsData);
           break;
+        }
       }
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      console.error("Erro ao carregar dados:", error);
     } finally {
       setCarregando(false);
     }
@@ -62,51 +87,51 @@ export function PainelJuridico() {
   const abrirModalNotificacao = (unidade?: any) => {
     setItemSelecionado(unidade);
     setFormData({
-      cnpj_unidade: unidade?.codigo_unidade || '',
-      tipo_notificacao: 'extrajudicial',
-      observacoes: ''
+      cnpj_unidade: unidade?.codigo_unidade || "",
+      tipo_notificacao: "extrajudicial",
+      observacoes: "",
     });
-    setModalAberto('notificacao');
+    setModalAberto("notificacao");
   };
 
   const abrirModalTermo = (unidade?: any) => {
     setItemSelecionado(unidade);
     setFormData({
-      cnpj_unidade: unidade?.codigo_unidade || '',
+      cnpj_unidade: unidade?.codigo_unidade || "",
       valor_original: unidade?.valor_total_envolvido || 0,
       valor_acordado: 0,
-      forma_pagamento: 'vista',
-      multa_descumprimento: 10
+      forma_pagamento: "vista",
+      multa_descumprimento: 10,
     });
-    setModalAberto('termo');
+    setModalAberto("termo");
   };
 
   const abrirModalStatus = (unidade: any) => {
     setItemSelecionado(unidade);
     setFormData({
       status: unidade.juridico_status,
-      observacoes: ''
+      observacoes: "",
     });
-    setModalAberto('status');
+    setModalAberto("status");
   };
 
   const abrirModalResposta = (notificacao: any) => {
     setItemSelecionado(notificacao);
     setFormData({
-      observacoes_resposta: ''
+      observacoes_resposta: "",
     });
-    setModalAberto('resposta');
+    setModalAberto("resposta");
   };
 
   const abrirModalUpload = () => {
     setFormData({
-      cnpj_unidade: '',
-      tipo_documento: 'outros',
-      titulo: '',
-      observacoes: ''
+      cnpj_unidade: "",
+      tipo_documento: "outros",
+      titulo: "",
+      observacoes: "",
     });
     setArquivo(null);
-    setModalAberto('upload');
+    setModalAberto("upload");
   };
 
   const fecharModal = () => {
@@ -118,7 +143,7 @@ export function PainelJuridico() {
 
   const gerarNotificacao = async () => {
     if (!formData.cnpj_unidade || !formData.tipo_notificacao) {
-      alert('CNPJ e tipo de notificação são obrigatórios');
+      alert("CNPJ e tipo de notificação são obrigatórios");
       return;
     }
 
@@ -128,11 +153,11 @@ export function PainelJuridico() {
         formData.cnpj_unidade,
         formData.tipo_notificacao,
         formData.observacoes,
-        'usuario_atual'
+        "usuario_atual"
       );
       fecharModal();
       carregarDados();
-      alert('Notificação extrajudicial gerada com sucesso!');
+      alert("Notificação extrajudicial gerada com sucesso!");
     } catch (error) {
       alert(`Erro ao gerar notificação: ${error}`);
     } finally {
@@ -142,7 +167,7 @@ export function PainelJuridico() {
 
   const gerarTermo = async () => {
     if (!formData.cnpj_unidade || !formData.valor_acordado) {
-      alert('CNPJ e valor acordado são obrigatórios');
+      alert("CNPJ e valor acordado são obrigatórios");
       return;
     }
 
@@ -151,11 +176,11 @@ export function PainelJuridico() {
       await juridicoService.gerarTermoAcordo(
         formData.cnpj_unidade,
         formData,
-        'usuario_atual'
+        "usuario_atual"
       );
       fecharModal();
       carregarDados();
-      alert('Termo de acordo gerado com sucesso!');
+      alert("Termo de acordo gerado com sucesso!");
     } catch (error) {
       alert(`Erro ao gerar termo: ${error}`);
     } finally {
@@ -165,7 +190,7 @@ export function PainelJuridico() {
 
   const atualizarStatus = async () => {
     if (!formData.status) {
-      alert('Status é obrigatório');
+      alert("Status é obrigatório");
       return;
     }
 
@@ -175,7 +200,7 @@ export function PainelJuridico() {
         itemSelecionado.codigo_unidade,
         formData.status,
         formData.observacoes,
-        'usuario_atual'
+        "usuario_atual"
       );
       fecharModal();
       carregarDados();
@@ -188,7 +213,7 @@ export function PainelJuridico() {
 
   const marcarRespondida = async () => {
     if (!formData.observacoes_resposta) {
-      alert('Observações da resposta são obrigatórias');
+      alert("Observações da resposta são obrigatórias");
       return;
     }
 
@@ -197,7 +222,7 @@ export function PainelJuridico() {
       await juridicoService.marcarNotificacaoRespondida(
         itemSelecionado.id,
         formData.observacoes_resposta,
-        'usuario_atual'
+        "usuario_atual"
       );
       fecharModal();
       carregarDados();
@@ -209,12 +234,18 @@ export function PainelJuridico() {
   };
 
   const encaminharParaJudicial = async (cnpjUnidade: string) => {
-    const observacoes = prompt('Observações sobre o encaminhamento para ação judicial:');
+    const observacoes = prompt(
+      "Observações sobre o encaminhamento para ação judicial:"
+    );
     if (!observacoes) return;
 
     try {
-      await juridicoService.encaminharParaAcaoJudicial(cnpjUnidade, observacoes, 'usuario_atual');
-      alert('Unidade encaminhada para ação judicial!');
+      await juridicoService.encaminharParaAcaoJudicial(
+        cnpjUnidade,
+        observacoes,
+        "usuario_atual"
+      );
+      alert("Unidade encaminhada para ação judicial!");
       carregarDados();
     } catch (error) {
       alert(`Erro ao encaminhar: ${error}`);
@@ -225,7 +256,7 @@ export function PainelJuridico() {
     try {
       const blob = await juridicoService.gerarDocumentoPDF(notificacao.id);
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = `notificacao-extrajudicial-${notificacao.cnpj_unidade}.html`;
       document.body.appendChild(a);
@@ -233,56 +264,60 @@ export function PainelJuridico() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      alert('Erro ao baixar PDF');
+      alert("Erro ao baixar PDF");
     }
   };
 
   const enviarNotificacao = async (notificacao: any) => {
     try {
-      const sucesso = await juridicoService.enviarNotificacaoEmail(notificacao.id);
+      const sucesso = await juridicoService.enviarNotificacaoEmail(
+        notificacao.id
+      );
       if (sucesso) {
-        alert('Notificação enviada com sucesso!');
+        alert("Notificação enviada com sucesso!");
         carregarDados();
       } else {
-        alert('Erro ao enviar notificação');
+        alert("Erro ao enviar notificação");
       }
     } catch (error) {
-      alert('Erro ao enviar notificação');
+      alert("Erro ao enviar notificação");
     }
   };
 
   const exportarDados = async () => {
     try {
       const csv = await juridicoService.exportarDadosJuridicos(filtros);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `dados-juridicos-${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `dados-juridicos-${
+        new Date().toISOString().split("T")[0]
+      }.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      alert('Erro ao exportar dados');
+      alert("Erro ao exportar dados");
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'regular':
+      case "regular":
         return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case 'pendente_grave':
+      case "pendente_grave":
         return <AlertTriangle className="w-5 h-5 text-yellow-600" />;
-      case 'notificado':
+      case "notificado":
         return <FileText className="w-5 h-5 text-orange-600" />;
-      case 'em_analise':
+      case "em_analise":
         return <Eye className="w-5 h-5 text-blue-600" />;
-      case 'pre_processo':
+      case "pre_processo":
         return <AlertTriangle className="w-5 h-5 text-red-600" />;
-      case 'acionado':
+      case "acionado":
         return <Scale className="w-5 h-5 text-red-700" />;
-      case 'resolvido':
+      case "resolvido":
         return <CheckCircle className="w-5 h-5 text-green-700" />;
       default:
         return <Clock className="w-5 h-5 text-gray-600" />;
@@ -291,33 +326,33 @@ export function PainelJuridico() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'regular':
-        return 'bg-green-100 text-green-800';
-      case 'pendente_grave':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'notificado':
-        return 'bg-orange-100 text-orange-800';
-      case 'em_analise':
-        return 'bg-blue-100 text-blue-800';
-      case 'pre_processo':
-        return 'bg-red-100 text-red-800';
-      case 'acionado':
-        return 'bg-red-100 text-red-800';
-      case 'resolvido':
-        return 'bg-green-100 text-green-800';
+      case "regular":
+        return "bg-green-100 text-green-800";
+      case "pendente_grave":
+        return "bg-yellow-100 text-yellow-800";
+      case "notificado":
+        return "bg-orange-100 text-orange-800";
+      case "em_analise":
+        return "bg-blue-100 text-blue-800";
+      case "pre_processo":
+        return "bg-red-100 text-red-800";
+      case "acionado":
+        return "bg-red-100 text-red-800";
+      case "resolvido":
+        return "bg-green-100 text-green-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const formatarData = (data: string) => {
-    return new Date(data).toLocaleString('pt-BR');
+    return new Date(data).toLocaleString("pt-BR");
   };
 
   const formatarMoeda = (valor: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(valor);
   };
 
@@ -326,13 +361,19 @@ export function PainelJuridico() {
       <div className="bg-white rounded-lg shadow-lg p-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
-            <Scale className="w-8 h-8 text-red-600 mr-3" />
+            <div className="w-12 h-12 bg-gradient-to-br from-red-600 to-orange-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
+              <Scale className="w-7 h-7 text-white" />
+            </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">Painel Jurídico</h1>
-              <p className="text-gray-600">Escalonamentos, ações e documentos jurídicos</p>
+              <h1 className="text-2xl font-bold text-gray-800">
+                Painel Jurídico
+              </h1>
+              <p className="text-gray-600">
+                Escalonamentos, ações e documentos jurídicos
+              </p>
             </div>
           </div>
-          
+
           <div className="flex space-x-3">
             <button
               onClick={abrirModalNotificacao}
@@ -362,23 +403,33 @@ export function PainelJuridico() {
         {estatisticas && (
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <div className="bg-orange-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-orange-600">{estatisticas.total_notificados}</div>
+              <div className="text-2xl font-bold text-orange-600">
+                {estatisticas.total_notificados}
+              </div>
               <div className="text-sm text-orange-800">Notificados</div>
             </div>
             <div className="bg-blue-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-blue-600">{estatisticas.total_em_analise}</div>
+              <div className="text-2xl font-bold text-blue-600">
+                {estatisticas.total_em_analise}
+              </div>
               <div className="text-sm text-blue-800">Em Análise</div>
             </div>
             <div className="bg-green-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-green-600">{estatisticas.total_resolvidos}</div>
+              <div className="text-2xl font-bold text-green-600">
+                {estatisticas.total_resolvidos}
+              </div>
               <div className="text-sm text-green-800">Resolvidos</div>
             </div>
             <div className="bg-red-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-red-600">{formatarMoeda(estatisticas.valor_total_acionado)}</div>
+              <div className="text-2xl font-bold text-red-600">
+                {formatarMoeda(estatisticas.valor_total_acionado)}
+              </div>
               <div className="text-sm text-red-800">Valor Acionado</div>
             </div>
             <div className="bg-purple-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-purple-600">{estatisticas.taxa_resposta_notificacoes.toFixed(1)}%</div>
+              <div className="text-2xl font-bold text-purple-600">
+                {estatisticas.taxa_resposta_notificacoes.toFixed(1)}%
+              </div>
               <div className="text-sm text-purple-800">Taxa Resposta</div>
             </div>
           </div>
@@ -388,11 +439,15 @@ export function PainelJuridico() {
         <div className="border-b border-gray-200 mb-8">
           <nav className="-mb-px flex space-x-8">
             {[
-              { id: 'escalonamentos', label: 'Escalonamentos Ativos', icon: Users },
-              { id: 'notificacoes', label: 'Notificações', icon: FileText },
-              { id: 'documentos', label: 'Documentos', icon: Upload },
-              { id: 'log', label: 'Log de Ações', icon: Clock },
-              { id: 'configuracao', label: 'Configuração', icon: Settings }
+              {
+                id: "escalonamentos",
+                label: "Escalonamentos Ativos",
+                icon: Users,
+              },
+              { id: "notificacoes", label: "Notificações", icon: FileText },
+              { id: "documentos", label: "Documentos", icon: Upload },
+              { id: "log", label: "Log de Ações", icon: Clock },
+              { id: "configuracao", label: "Configuração", icon: Settings },
             ].map((aba) => {
               const Icon = aba.icon;
               return (
@@ -401,8 +456,8 @@ export function PainelJuridico() {
                   onClick={() => setAbaSelecionada(aba.id as any)}
                   className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
                     abaSelecionada === aba.id
-                      ? 'border-red-500 text-red-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? "border-red-500 text-red-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                   }`}
                 >
                   <Icon className="w-4 h-4 mr-2" />
@@ -419,12 +474,14 @@ export function PainelJuridico() {
             <Filter className="w-5 h-5 text-gray-600 mr-2" />
             <h3 className="text-lg font-semibold text-gray-800">Filtros</h3>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            {abaSelecionada === 'escalonamentos' && (
+            {abaSelecionada === "escalonamentos" && (
               <select
-                value={filtros.juridico_status || ''}
-                onChange={(e) => setFiltros({...filtros, juridico_status: e.target.value})}
+                value={filtros.juridico_status || ""}
+                onChange={(e) =>
+                  setFiltros({ ...filtros, juridico_status: e.target.value })
+                }
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
               >
                 <option value="">Todos os Status</option>
@@ -436,29 +493,33 @@ export function PainelJuridico() {
                 <option value="resolvido">Resolvido</option>
               </select>
             )}
-            
+
             <input
               type="text"
-              value={filtros.cnpj || ''}
-              onChange={(e) => setFiltros({...filtros, cnpj: e.target.value})}
+              value={filtros.cnpj || ""}
+              onChange={(e) => setFiltros({ ...filtros, cnpj: e.target.value })}
               placeholder="CNPJ"
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
             />
-            
+
             <input
               type="date"
-              value={filtros.dataInicio || ''}
-              onChange={(e) => setFiltros({...filtros, dataInicio: e.target.value})}
+              value={filtros.dataInicio || ""}
+              onChange={(e) =>
+                setFiltros({ ...filtros, dataInicio: e.target.value })
+              }
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
             />
-            
+
             <input
               type="date"
-              value={filtros.dataFim || ''}
-              onChange={(e) => setFiltros({...filtros, dataFim: e.target.value})}
+              value={filtros.dataFim || ""}
+              onChange={(e) =>
+                setFiltros({ ...filtros, dataFim: e.target.value })
+              }
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
             />
-            
+
             <button
               onClick={() => setFiltros({})}
               className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
@@ -469,7 +530,7 @@ export function PainelJuridico() {
         </div>
 
         {/* Conteúdo das abas */}
-        {abaSelecionada === 'escalonamentos' && (
+        {abaSelecionada === "escalonamentos" && (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -503,25 +564,43 @@ export function PainelJuridico() {
                   </tr>
                 ) : escalonamentos.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    <td
+                      colSpan={6}
+                      className="px-6 py-4 text-center text-gray-500"
+                    >
                       Nenhum escalonamento ativo
                     </td>
                   </tr>
                 ) : (
                   escalonamentos.map((unidade) => (
-                    <tr key={unidade.codigo_unidade} className="hover:bg-gray-50">
+                    <tr
+                      key={unidade.codigo_unidade}
+                      className="hover:bg-gray-50"
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{unidade.nome_franqueado}</div>
-                          <div className="text-sm text-gray-500">{unidade.codigo_unidade}</div>
-                          <div className="text-sm text-gray-500">{unidade.cidade}/{unidade.estado}</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {unidade.nome_franqueado}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {unidade.codigo_unidade}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {unidade.cidade}/{unidade.estado}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           {getStatusIcon(unidade.juridico_status)}
-                          <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(unidade.juridico_status)}`}>
-                            {unidade.juridico_status.replace('_', ' ').toUpperCase()}
+                          <span
+                            className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
+                              unidade.juridico_status
+                            )}`}
+                          >
+                            {unidade.juridico_status
+                              .replace("_", " ")
+                              .toUpperCase()}
                           </span>
                         </div>
                       </td>
@@ -535,11 +614,13 @@ export function PainelJuridico() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          {unidade.tipos_cobranca.join(', ')}
+                          {unidade.tipos_cobranca.join(", ")}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {unidade.data_ultimo_acionamento ? formatarData(unidade.data_ultimo_acionamento) : '-'}
+                        {unidade.data_ultimo_acionamento
+                          ? formatarData(unidade.data_ultimo_acionamento)
+                          : "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-2">
@@ -557,9 +638,11 @@ export function PainelJuridico() {
                           >
                             <FileText className="w-4 h-4" />
                           </button>
-                          {unidade.juridico_status === 'em_analise' && (
+                          {unidade.juridico_status === "em_analise" && (
                             <button
-                              onClick={() => encaminharParaJudicial(unidade.codigo_unidade)}
+                              onClick={() =>
+                                encaminharParaJudicial(unidade.codigo_unidade)
+                              }
                               className="text-red-600 hover:text-red-900"
                               title="Encaminhar para ação judicial"
                             >
@@ -576,7 +659,7 @@ export function PainelJuridico() {
           </div>
         )}
 
-        {abaSelecionada === 'notificacoes' && (
+        {abaSelecionada === "notificacoes" && (
           <div className="space-y-4">
             {carregando ? (
               <div className="text-center py-8">
@@ -588,47 +671,66 @@ export function PainelJuridico() {
               </div>
             ) : (
               notificacoes.map((notificacao) => (
-                <div key={notificacao.id} className="border border-gray-200 rounded-lg p-6">
+                <div
+                  key={notificacao.id}
+                  className="border border-gray-200 rounded-lg p-6"
+                >
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <h3 className="text-lg font-semibold text-gray-800">
                         {notificacao.unidades_franqueadas?.nome_franqueado}
                       </h3>
-                      <p className="text-sm text-gray-600">CNPJ: {notificacao.cnpj_unidade}</p>
                       <p className="text-sm text-gray-600">
-                        Tipo: {notificacao.tipo_notificacao.replace('_', ' ').toUpperCase()}
+                        CNPJ: {notificacao.cnpj_unidade}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Tipo:{" "}
+                        {notificacao.tipo_notificacao
+                          .replace("_", " ")
+                          .toUpperCase()}
                       </p>
                       <p className="text-sm text-gray-600">
                         Enviada em: {formatarData(notificacao.data_envio)}
                       </p>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        notificacao.respondido ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {notificacao.respondido ? 'Respondida' : 'Aguardando'}
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          notificacao.respondido
+                            ? "bg-green-100 text-green-800"
+                            : "bg-yellow-100 text-yellow-800"
+                        }`}
+                      >
+                        {notificacao.respondido ? "Respondida" : "Aguardando"}
                       </span>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        notificacao.status_envio === 'enviado' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                      }`}>
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          notificacao.status_envio === "enviado"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
                         {notificacao.status_envio.toUpperCase()}
                       </span>
                     </div>
                   </div>
-                  
+
                   <div className="bg-gray-50 rounded-lg p-4 mb-4">
                     <p className="text-sm text-gray-700 whitespace-pre-line">
                       {notificacao.conteudo_notificacao.substring(0, 300)}...
                     </p>
                   </div>
-                  
+
                   {notificacao.data_prazo_resposta && (
                     <div className="mb-4 text-sm text-gray-600">
                       <Clock className="w-4 h-4 inline mr-1" />
-                      Prazo de resposta: {new Date(notificacao.data_prazo_resposta).toLocaleDateString('pt-BR')}
+                      Prazo de resposta:{" "}
+                      {new Date(
+                        notificacao.data_prazo_resposta
+                      ).toLocaleDateString("pt-BR")}
                     </div>
                   )}
-                  
+
                   <div className="flex space-x-3">
                     <button
                       onClick={() => baixarPDF(notificacao)}
@@ -637,7 +739,7 @@ export function PainelJuridico() {
                       <Download className="w-4 h-4 mr-1" />
                       PDF
                     </button>
-                    {notificacao.status_envio === 'pendente' && (
+                    {notificacao.status_envio === "pendente" && (
                       <button
                         onClick={() => enviarNotificacao(notificacao)}
                         className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
@@ -662,10 +764,12 @@ export function PainelJuridico() {
           </div>
         )}
 
-        {abaSelecionada === 'documentos' && (
+        {abaSelecionada === "documentos" && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">Documentos Jurídicos</h3>
+              <h3 className="text-lg font-semibold text-gray-800">
+                Documentos Jurídicos
+              </h3>
               <button
                 onClick={abrirModalUpload}
                 className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -674,7 +778,7 @@ export function PainelJuridico() {
                 Upload Documento
               </button>
             </div>
-            
+
             <div className="text-center py-8 text-gray-500">
               <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <p>Funcionalidade de documentos em desenvolvimento</p>
@@ -682,7 +786,7 @@ export function PainelJuridico() {
           </div>
         )}
 
-        {abaSelecionada === 'log' && (
+        {abaSelecionada === "log" && (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -716,7 +820,10 @@ export function PainelJuridico() {
                   </tr>
                 ) : logs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    <td
+                      colSpan={6}
+                      className="px-6 py-4 text-center text-gray-500"
+                    >
                       Nenhum log encontrado
                     </td>
                   </tr>
@@ -731,7 +838,9 @@ export function PainelJuridico() {
                           <div className="text-sm font-medium text-gray-900">
                             {log.unidades_franqueadas?.nome_franqueado}
                           </div>
-                          <div className="text-sm text-gray-500">{log.cnpj_unidade}</div>
+                          <div className="text-sm text-gray-500">
+                            {log.cnpj_unidade}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -739,7 +848,9 @@ export function PainelJuridico() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
-                          {log.motivo_acionamento.replace('_', ' ').toUpperCase()}
+                          {log.motivo_acionamento
+                            .replace("_", " ")
+                            .toUpperCase()}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">
@@ -756,15 +867,19 @@ export function PainelJuridico() {
           </div>
         )}
 
-        {abaSelecionada === 'configuracao' && (
+        {abaSelecionada === "configuracao" && (
           <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-800">Configurações Jurídicas</h3>
-            
+            <h3 className="text-lg font-semibold text-gray-800">
+              Configurações Jurídicas
+            </h3>
+
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
               <div className="flex items-center">
                 <AlertTriangle className="w-6 h-6 text-yellow-600 mr-3" />
                 <div>
-                  <h4 className="font-semibold text-yellow-800">Critérios de Acionamento Automático</h4>
+                  <h4 className="font-semibold text-yellow-800">
+                    Critérios de Acionamento Automático
+                  </h4>
                   <ul className="text-yellow-700 text-sm mt-2 space-y-1">
                     <li>• Valor em aberto superior a R$ 5.000</li>
                     <li>• 3 ou mais cobranças ignoradas em 15 dias</li>
@@ -778,7 +893,9 @@ export function PainelJuridico() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h4 className="font-semibold text-gray-800 mb-4">Templates de Notificação</h4>
+                <h4 className="font-semibold text-gray-800 mb-4">
+                  Templates de Notificação
+                </h4>
                 <ul className="space-y-2 text-sm text-gray-600">
                   <li>• Notificação Extrajudicial</li>
                   <li>• Notificação Formal</li>
@@ -789,7 +906,9 @@ export function PainelJuridico() {
               </div>
 
               <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h4 className="font-semibold text-gray-800 mb-4">Prazos Padrão</h4>
+                <h4 className="font-semibold text-gray-800 mb-4">
+                  Prazos Padrão
+                </h4>
                 <ul className="space-y-2 text-sm text-gray-600">
                   <li>• Resposta a notificação: 5 dias úteis</li>
                   <li>• Análise de resposta: 3 dias úteis</li>
@@ -803,31 +922,49 @@ export function PainelJuridico() {
       </div>
 
       {/* Modal de Notificação */}
-      {modalAberto === 'notificacao' && (
+      {modalAberto === "notificacao" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold">Gerar Notificação Extrajudicial</h3>
-              <button onClick={fecharModal} className="text-gray-500 hover:text-gray-700">✕</button>
+              <h3 className="text-lg font-semibold">
+                Gerar Notificação Extrajudicial
+              </h3>
+              <button
+                onClick={fecharModal}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
             </div>
-            
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ da Unidade</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  CNPJ da Unidade
+                </label>
                 <input
                   type="text"
-                  value={formData.cnpj_unidade || ''}
-                  onChange={(e) => setFormData({...formData, cnpj_unidade: e.target.value})}
+                  value={formData.cnpj_unidade || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cnpj_unidade: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
                   placeholder="00.000.000/0000-00"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Notificação</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tipo de Notificação
+                </label>
                 <select
-                  value={formData.tipo_notificacao || ''}
-                  onChange={(e) => setFormData({...formData, tipo_notificacao: e.target.value})}
+                  value={formData.tipo_notificacao || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      tipo_notificacao: e.target.value,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
                 >
                   <option value="extrajudicial">Extrajudicial</option>
@@ -837,26 +974,30 @@ export function PainelJuridico() {
                   <option value="judicial">Judicial</option>
                 </select>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Observações
+                </label>
                 <textarea
-                  value={formData.observacoes || ''}
-                  onChange={(e) => setFormData({...formData, observacoes: e.target.value})}
+                  value={formData.observacoes || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, observacoes: e.target.value })
+                  }
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
                   placeholder="Observações específicas..."
                 />
               </div>
             </div>
-            
+
             <div className="flex space-x-3 mt-6">
               <button
                 onClick={gerarNotificacao}
                 disabled={processando}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
-                {processando ? 'Gerando...' : 'Gerar Notificação'}
+                {processando ? "Gerando..." : "Gerar Notificação"}
               </button>
               <button
                 onClick={fecharModal}
@@ -870,113 +1011,171 @@ export function PainelJuridico() {
       )}
 
       {/* Modal de Termo de Acordo */}
-      {modalAberto === 'termo' && (
+      {modalAberto === "termo" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold">Gerar Termo de Acordo</h3>
-              <button onClick={fecharModal} className="text-gray-500 hover:text-gray-700">✕</button>
+              <button
+                onClick={fecharModal}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ da Unidade</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  CNPJ da Unidade
+                </label>
                 <input
                   type="text"
-                  value={formData.cnpj_unidade || ''}
-                  onChange={(e) => setFormData({...formData, cnpj_unidade: e.target.value})}
+                  value={formData.cnpj_unidade || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cnpj_unidade: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Valor Original</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Valor Original
+                </label>
                 <input
                   type="number"
                   step="0.01"
-                  value={formData.valor_original || ''}
-                  onChange={(e) => setFormData({...formData, valor_original: parseFloat(e.target.value) || 0})}
+                  value={formData.valor_original || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      valor_original: parseFloat(e.target.value) || 0,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Valor Acordado</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Valor Acordado
+                </label>
                 <input
                   type="number"
                   step="0.01"
-                  value={formData.valor_acordado || ''}
-                  onChange={(e) => setFormData({...formData, valor_acordado: parseFloat(e.target.value) || 0})}
+                  value={formData.valor_acordado || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      valor_acordado: parseFloat(e.target.value) || 0,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Forma de Pagamento</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Forma de Pagamento
+                </label>
                 <select
-                  value={formData.forma_pagamento || ''}
-                  onChange={(e) => setFormData({...formData, forma_pagamento: e.target.value})}
+                  value={formData.forma_pagamento || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      forma_pagamento: e.target.value,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="vista">À Vista</option>
                   <option value="parcelado">Parcelado</option>
                 </select>
               </div>
-              
-              {formData.forma_pagamento === 'parcelado' && (
+
+              {formData.forma_pagamento === "parcelado" && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade de Parcelas</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Quantidade de Parcelas
+                    </label>
                     <input
                       type="number"
-                      value={formData.quantidade_parcelas || ''}
-                      onChange={(e) => setFormData({...formData, quantidade_parcelas: parseInt(e.target.value) || 0})}
+                      value={formData.quantidade_parcelas || ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          quantidade_parcelas: parseInt(e.target.value) || 0,
+                        })
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                  
+
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Primeiro Vencimento</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Primeiro Vencimento
+                    </label>
                     <input
                       type="date"
-                      value={formData.data_primeiro_vencimento || ''}
-                      onChange={(e) => setFormData({...formData, data_primeiro_vencimento: e.target.value})}
+                      value={formData.data_primeiro_vencimento || ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          data_primeiro_vencimento: e.target.value,
+                        })
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </>
               )}
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Multa por Descumprimento (%)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Multa por Descumprimento (%)
+                </label>
                 <input
                   type="number"
                   step="0.1"
-                  value={formData.multa_descumprimento || ''}
-                  onChange={(e) => setFormData({...formData, multa_descumprimento: parseFloat(e.target.value) || 0})}
+                  value={formData.multa_descumprimento || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      multa_descumprimento: parseFloat(e.target.value) || 0,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
-            
+
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Condições Especiais</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Condições Especiais
+              </label>
               <textarea
-                value={formData.condicoes_especiais || ''}
-                onChange={(e) => setFormData({...formData, condicoes_especiais: e.target.value})}
+                value={formData.condicoes_especiais || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    condicoes_especiais: e.target.value,
+                  })
+                }
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Condições específicas do acordo..."
               />
             </div>
-            
+
             <div className="flex space-x-3">
               <button
                 onClick={gerarTermo}
                 disabled={processando}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                {processando ? 'Gerando...' : 'Gerar Termo'}
+                {processando ? "Gerando..." : "Gerar Termo"}
               </button>
               <button
                 onClick={fecharModal}
@@ -990,20 +1189,31 @@ export function PainelJuridico() {
       )}
 
       {/* Modal de Status */}
-      {modalAberto === 'status' && (
+      {modalAberto === "status" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold">Atualizar Status Jurídico</h3>
-              <button onClick={fecharModal} className="text-gray-500 hover:text-gray-700">✕</button>
+              <h3 className="text-lg font-semibold">
+                Atualizar Status Jurídico
+              </h3>
+              <button
+                onClick={fecharModal}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
             </div>
-            
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
                 <select
-                  value={formData.status || ''}
-                  onChange={(e) => setFormData({...formData, status: e.target.value})}
+                  value={formData.status || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, status: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
                 >
                   <option value="pendente_grave">Pendente Grave</option>
@@ -1014,25 +1224,29 @@ export function PainelJuridico() {
                   <option value="resolvido">Resolvido</option>
                 </select>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Observações
+                </label>
                 <textarea
-                  value={formData.observacoes || ''}
-                  onChange={(e) => setFormData({...formData, observacoes: e.target.value})}
+                  value={formData.observacoes || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, observacoes: e.target.value })
+                  }
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
                 />
               </div>
             </div>
-            
+
             <div className="flex space-x-3 mt-6">
               <button
                 onClick={atualizarStatus}
                 disabled={processando}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
-                {processando ? 'Salvando...' : 'Salvar'}
+                {processando ? "Salvando..." : "Salvar"}
               </button>
               <button
                 onClick={fecharModal}
@@ -1046,34 +1260,46 @@ export function PainelJuridico() {
       )}
 
       {/* Modal de Resposta */}
-      {modalAberto === 'resposta' && (
+      {modalAberto === "resposta" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold">Marcar como Respondida</h3>
-              <button onClick={fecharModal} className="text-gray-500 hover:text-gray-700">✕</button>
+              <button
+                onClick={fecharModal}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
             </div>
-            
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Observações da Resposta</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Observações da Resposta
+                </label>
                 <textarea
-                  value={formData.observacoes_resposta || ''}
-                  onChange={(e) => setFormData({...formData, observacoes_resposta: e.target.value})}
+                  value={formData.observacoes_resposta || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      observacoes_resposta: e.target.value,
+                    })
+                  }
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
                   placeholder="Descreva a resposta recebida..."
                 />
               </div>
             </div>
-            
+
             <div className="flex space-x-3 mt-6">
               <button
                 onClick={marcarRespondida}
                 disabled={processando || !formData.observacoes_resposta}
                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
               >
-                {processando ? 'Salvando...' : 'Marcar Respondida'}
+                {processando ? "Salvando..." : "Marcar Respondida"}
               </button>
               <button
                 onClick={fecharModal}

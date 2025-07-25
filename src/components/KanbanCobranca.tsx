@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   DragDropContext, Droppable, Draggable, DropResult 
 } from 'react-beautiful-dnd';
 import { 
-  MessageSquare, Calendar, Scale, Phone, Mail, Eye, 
+  MessageSquare, Calendar, Scale, Mail, 
   Clock, DollarSign, AlertTriangle, CheckCircle, User,
-  Filter, Download, RefreshCw, Plus, Edit, X, Save
+  Filter, Download, RefreshCw, Edit, X, Save, CircleDollarSign
 } from 'lucide-react';
 import { KanbanService } from '../services/kanbanService';
 import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban } from '../types/kanban';
@@ -166,7 +166,7 @@ export function KanbanCobranca() {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
-              <DollarSign className="w-6 h-6 text-white" />
+              <CircleDollarSign className="w-7 h-7 text-white" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-800">Kanban de Cobrança</h1>

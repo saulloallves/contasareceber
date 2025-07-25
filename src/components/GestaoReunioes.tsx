@@ -1,27 +1,56 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Calendar, Users, Clock, CheckCircle, XCircle, AlertTriangle, 
-  Plus, Edit, Filter, Download, Video, Phone, MapPin, MessageSquare,
-  FileText, Eye, Mail, User, Target, TrendingUp
-} from 'lucide-react';
-import { ReunioesService } from '../services/reunioesService';
-import { UnidadesService } from '../services/unidadesService';
-import { ReuniaoNegociacao, RegistroInteracao, FiltrosReunioes, FiltrosInteracoes, EstatisticasReunioes, EstatisticasInteracoes } from '../types/unidades';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect } from "react";
+import {
+  Calendar,
+  Users,
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Plus,
+  Edit,
+  Filter,
+  Download,
+  Video,
+  Phone,
+  MapPin,
+  MessageSquare,
+  Mail,
+  User,
+  Target,
+} from "lucide-react";
+import { ReunioesService } from "../services/reunioesService";
+import { UnidadesService } from "../services/unidadesService";
+import {
+  FiltrosReunioes,
+  FiltrosInteracoes,
+  EstatisticasReunioes,
+  EstatisticasInteracoes,
+} from "../types/unidades";
 
 export function GestaoReunioes() {
-  const [abaSelecionada, setAbaSelecionada] = useState<'reunioes' | 'interacoes' | 'timeline'>('reunioes');
+  const [abaSelecionada, setAbaSelecionada] = useState<
+    "reunioes" | "interacoes" | "timeline"
+  >("reunioes");
   const [reunioes, setReunioes] = useState<any[]>([]);
   const [interacoes, setInteracoes] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [filtrosReunioes, setFiltrosReunioes] = useState<FiltrosReunioes>({});
-  const [filtrosInteracoes, setFiltrosInteracoes] = useState<FiltrosInteracoes>({});
-  const [modalAberto, setModalAberto] = useState<'agendar' | 'resultado' | 'interacao' | 'timeline' | null>(null);
+  const [filtrosInteracoes, setFiltrosInteracoes] = useState<FiltrosInteracoes>(
+    {}
+  );
+  const [modalAberto, setModalAberto] = useState<
+    "agendar" | "resultado" | "interacao" | "timeline" | null
+  >(null);
   const [itemSelecionado, setItemSelecionado] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
   const [processando, setProcessando] = useState(false);
-  const [estatisticasReunioes, setEstatisticasReunioes] = useState<EstatisticasReunioes | null>(null);
-  const [estatisticasInteracoes, setEstatisticasInteracoes] = useState<EstatisticasInteracoes | null>(null);
-  const [codigoUnidadeTimeline, setCodigoUnidadeTimeline] = useState('');
+  const [estatisticasReunioes, setEstatisticasReunioes] =
+    useState<EstatisticasReunioes | null>(null);
+  const [estatisticasInteracoes, setEstatisticasInteracoes] =
+    useState<EstatisticasInteracoes | null>(null);
+  const [codigoUnidadeTimeline, setCodigoUnidadeTimeline] = useState("");
 
   const reunioesService = new ReunioesService();
   const unidadesService = new UnidadesService();
@@ -33,23 +62,23 @@ export function GestaoReunioes() {
   const carregarDados = async () => {
     setCarregando(true);
     try {
-      if (abaSelecionada === 'reunioes') {
+      if (abaSelecionada === "reunioes") {
         const [reunioesData, statsReunioes] = await Promise.all([
           reunioesService.buscarReunioes(filtrosReunioes),
-          reunioesService.buscarEstatisticasReunioes(filtrosReunioes)
+          reunioesService.buscarEstatisticasReunioes(filtrosReunioes),
         ]);
         setReunioes(reunioesData);
         setEstatisticasReunioes(statsReunioes);
-      } else if (abaSelecionada === 'interacoes') {
+      } else if (abaSelecionada === "interacoes") {
         const [interacoesData, statsInteracoes] = await Promise.all([
           reunioesService.buscarInteracoes(filtrosInteracoes),
-          reunioesService.buscarEstatisticasInteracoes(filtrosInteracoes)
+          reunioesService.buscarEstatisticasInteracoes(filtrosInteracoes),
         ]);
         setInteracoes(interacoesData);
         setEstatisticasInteracoes(statsInteracoes);
       }
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      console.error("Erro ao carregar dados:", error);
     } finally {
       setCarregando(false);
     }
@@ -57,43 +86,43 @@ export function GestaoReunioes() {
 
   const abrirModalAgendar = () => {
     setFormData({
-      titulo_id: '',
-      data_agendada: '',
-      responsavel_reuniao: 'usuario_atual',
-      link_reuniao: '',
-      observacoes: ''
+      titulo_id: "",
+      data_agendada: "",
+      responsavel_reuniao: "usuario_atual",
+      link_reuniao: "",
+      observacoes: "",
     });
-    setModalAberto('agendar');
+    setModalAberto("agendar");
   };
 
   const abrirModalInteracao = () => {
     setFormData({
-      codigo_unidade: '',
-      cnpj_unidade: '',
-      nome_franqueado: '',
+      codigo_unidade: "",
+      cnpj_unidade: "",
+      nome_franqueado: "",
       data_interacao: new Date().toISOString().slice(0, 16),
-      canal_contato: 'ligacao',
-      motivo_contato: 'lembrete_vencimento',
-      resultado_contato: 'compareceu',
-      resumo_conversa: '',
-      colaborador_responsavel: 'usuario_atual'
+      canal_contato: "ligacao",
+      motivo_contato: "lembrete_vencimento",
+      resultado_contato: "compareceu",
+      resumo_conversa: "",
+      colaborador_responsavel: "usuario_atual",
     });
-    setModalAberto('interacao');
+    setModalAberto("interacao");
   };
 
   const abrirModalResultado = (reuniao: any) => {
     setItemSelecionado(reuniao);
     setFormData({
-      decisao_final: '',
-      resumo_resultado: '',
-      observacoes: ''
+      decisao_final: "",
+      resumo_resultado: "",
+      observacoes: "",
     });
-    setModalAberto('resultado');
+    setModalAberto("resultado");
   };
 
   const abrirModalTimeline = () => {
-    setCodigoUnidadeTimeline('');
-    setModalAberto('timeline');
+    setCodigoUnidadeTimeline("");
+    setModalAberto("timeline");
   };
 
   const fecharModal = () => {
@@ -104,7 +133,7 @@ export function GestaoReunioes() {
 
   const agendarReuniao = async () => {
     if (!formData.titulo_id || !formData.data_agendada) {
-      alert('Cobrança e data são obrigatórios');
+      alert("Cobrança e data são obrigatórios");
       return;
     }
 
@@ -122,7 +151,7 @@ export function GestaoReunioes() {
 
   const registrarInteracao = async () => {
     if (!formData.codigo_unidade || !formData.resumo_conversa) {
-      alert('Código da unidade e resumo são obrigatórios');
+      alert("Código da unidade e resumo são obrigatórios");
       return;
     }
 
@@ -140,7 +169,7 @@ export function GestaoReunioes() {
 
   const registrarResultado = async () => {
     if (!formData.decisao_final || !formData.resumo_resultado) {
-      alert('Decisão e resumo são obrigatórios');
+      alert("Decisão e resumo são obrigatórios");
       return;
     }
 
@@ -162,12 +191,15 @@ export function GestaoReunioes() {
   };
 
   const marcarNaoCompareceu = async (reuniao: any) => {
-    if (!confirm('Confirma que o franqueado não compareceu à reunião?')) {
+    if (!confirm("Confirma que o franqueado não compareceu à reunião?")) {
       return;
     }
 
     try {
-      await reunioesService.atualizarStatusReuniao(reuniao.id, 'nao_compareceu');
+      await reunioesService.atualizarStatusReuniao(
+        reuniao.id,
+        "nao_compareceu"
+      );
       carregarDados();
     } catch (error) {
       alert(`Erro ao atualizar status: ${error}`);
@@ -175,13 +207,17 @@ export function GestaoReunioes() {
   };
 
   const remarcarReuniao = async (reuniao: any) => {
-    const novaData = prompt('Nova data e hora (YYYY-MM-DD HH:MM):');
+    const novaData = prompt("Nova data e hora (YYYY-MM-DD HH:MM):");
     if (!novaData) return;
 
-    const motivo = prompt('Motivo da remarcação (opcional):');
+    const motivo = prompt("Motivo da remarcação (opcional):");
 
     try {
-      await reunioesService.remarcarReuniao(reuniao.id, novaData, motivo);
+      await reunioesService.remarcarReuniao(
+        reuniao.id,
+        novaData,
+        motivo === null ? undefined : motivo
+      );
       carregarDados();
     } catch (error) {
       alert(`Erro ao remarcar reunião: ${error}`);
@@ -190,38 +226,40 @@ export function GestaoReunioes() {
 
   const exportarDados = async () => {
     try {
-      let csv = '';
-      if (abaSelecionada === 'reunioes') {
+      let csv = "";
+      if (abaSelecionada === "reunioes") {
         csv = await reunioesService.exportarReunioes(filtrosReunioes);
       } else {
         csv = await reunioesService.exportarInteracoes(filtrosInteracoes);
       }
-      
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `${abaSelecionada}-${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `${abaSelecionada}-${
+        new Date().toISOString().split("T")[0]
+      }.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      alert('Erro ao exportar dados');
+      alert("Erro ao exportar dados");
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'agendada':
+      case "agendada":
         return <Clock className="w-5 h-5 text-blue-600" />;
-      case 'realizada':
+      case "realizada":
         return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case 'nao_compareceu':
+      case "nao_compareceu":
         return <XCircle className="w-5 h-5 text-red-600" />;
-      case 'remarcada':
+      case "remarcada":
         return <AlertTriangle className="w-5 h-5 text-yellow-600" />;
-      case 'cancelada':
+      case "cancelada":
         return <XCircle className="w-5 h-5 text-gray-600" />;
       default:
         return <Clock className="w-5 h-5 text-gray-600" />;
@@ -230,32 +268,32 @@ export function GestaoReunioes() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'agendada':
-        return 'bg-blue-100 text-blue-800';
-      case 'realizada':
-        return 'bg-green-100 text-green-800';
-      case 'nao_compareceu':
-        return 'bg-red-100 text-red-800';
-      case 'remarcada':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'cancelada':
-        return 'bg-gray-100 text-gray-800';
+      case "agendada":
+        return "bg-blue-100 text-blue-800";
+      case "realizada":
+        return "bg-green-100 text-green-800";
+      case "nao_compareceu":
+        return "bg-red-100 text-red-800";
+      case "remarcada":
+        return "bg-yellow-100 text-yellow-800";
+      case "cancelada":
+        return "bg-gray-100 text-gray-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getCanalIcon = (canal: string) => {
     switch (canal) {
-      case 'ligacao':
+      case "ligacao":
         return <Phone className="w-4 h-4 text-blue-600" />;
-      case 'whatsapp':
+      case "whatsapp":
         return <MessageSquare className="w-4 h-4 text-green-600" />;
-      case 'email':
+      case "email":
         return <Mail className="w-4 h-4 text-purple-600" />;
-      case 'presencial':
+      case "presencial":
         return <MapPin className="w-4 h-4 text-red-600" />;
-      case 'videoconferencia':
+      case "videoconferencia":
         return <Video className="w-4 h-4 text-orange-600" />;
       default:
         return <User className="w-4 h-4 text-gray-600" />;
@@ -264,23 +302,23 @@ export function GestaoReunioes() {
 
   const getResultadoColor = (resultado: string) => {
     switch (resultado) {
-      case 'compareceu':
-      case 'negociacao_aceita':
-      case 'acordo_formalizado':
-        return 'bg-green-100 text-green-800';
-      case 'nao_compareceu':
-      case 'negociacao_recusada':
-        return 'bg-red-100 text-red-800';
-      case 'remarcado':
-      case 'sem_resposta':
-        return 'bg-yellow-100 text-yellow-800';
+      case "compareceu":
+      case "negociacao_aceita":
+      case "acordo_formalizado":
+        return "bg-green-100 text-green-800";
+      case "nao_compareceu":
+      case "negociacao_recusada":
+        return "bg-red-100 text-red-800";
+      case "remarcado":
+      case "sem_resposta":
+        return "bg-yellow-100 text-yellow-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const formatarData = (data: string) => {
-    return new Date(data).toLocaleString('pt-BR');
+    return new Date(data).toLocaleString("pt-BR");
   };
 
   return (
@@ -288,13 +326,19 @@ export function GestaoReunioes() {
       <div className="bg-white rounded-lg shadow-lg p-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
-            <Calendar className="w-8 h-8 text-blue-600 mr-3" />
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
+              <Calendar className="w-7 h-7 text-white" />
+            </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">Registro de Reuniões e Comunicação</h1>
-              <p className="text-gray-600">Controle completo de interações com unidades</p>
+              <h1 className="text-2xl font-bold text-gray-800">
+                Registro de Reuniões e Comunicação
+              </h1>
+              <p className="text-gray-600">
+                Controle completo de interações com unidades
+              </p>
             </div>
           </div>
-          
+
           <div className="flex space-x-3">
             <button
               onClick={exportarDados}
@@ -303,7 +347,7 @@ export function GestaoReunioes() {
               <Download className="w-4 h-4 mr-2" />
               Exportar
             </button>
-            {abaSelecionada === 'reunioes' && (
+            {abaSelecionada === "reunioes" && (
               <button
                 onClick={abrirModalAgendar}
                 className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -312,7 +356,7 @@ export function GestaoReunioes() {
                 Agendar Reunião
               </button>
             )}
-            {abaSelecionada === 'interacoes' && (
+            {abaSelecionada === "interacoes" && (
               <button
                 onClick={abrirModalInteracao}
                 className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
@@ -321,7 +365,7 @@ export function GestaoReunioes() {
                 Registrar Interação
               </button>
             )}
-            {abaSelecionada === 'timeline' && (
+            {abaSelecionada === "timeline" && (
               <button
                 onClick={abrirModalTimeline}
                 className="flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
@@ -337,9 +381,9 @@ export function GestaoReunioes() {
         <div className="border-b border-gray-200 mb-8">
           <nav className="-mb-px flex space-x-8">
             {[
-              { id: 'reunioes', label: 'Reuniões', icon: Calendar },
-              { id: 'interacoes', label: 'Interações', icon: MessageSquare },
-              { id: 'timeline', label: 'Timeline por Unidade', icon: Target }
+              { id: "reunioes", label: "Reuniões", icon: Calendar },
+              { id: "interacoes", label: "Interações", icon: MessageSquare },
+              { id: "timeline", label: "Timeline por Unidade", icon: Target },
             ].map((aba) => {
               const Icon = aba.icon;
               return (
@@ -348,8 +392,8 @@ export function GestaoReunioes() {
                   onClick={() => setAbaSelecionada(aba.id as any)}
                   className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
                     abaSelecionada === aba.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                   }`}
                 >
                   <Icon className="w-4 h-4 mr-2" />
@@ -361,43 +405,59 @@ export function GestaoReunioes() {
         </div>
 
         {/* Estatísticas */}
-        {abaSelecionada === 'reunioes' && estatisticasReunioes && (
+        {abaSelecionada === "reunioes" && estatisticasReunioes && (
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <div className="bg-blue-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-blue-600">{estatisticasReunioes.total_agendadas}</div>
+              <div className="text-2xl font-bold text-blue-600">
+                {estatisticasReunioes.total_agendadas}
+              </div>
               <div className="text-sm text-blue-800">Agendadas</div>
             </div>
             <div className="bg-green-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-green-600">{estatisticasReunioes.total_realizadas}</div>
+              <div className="text-2xl font-bold text-green-600">
+                {estatisticasReunioes.total_realizadas}
+              </div>
               <div className="text-sm text-green-800">Realizadas</div>
             </div>
             <div className="bg-red-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-red-600">{estatisticasReunioes.total_nao_compareceu}</div>
+              <div className="text-2xl font-bold text-red-600">
+                {estatisticasReunioes.total_nao_compareceu}
+              </div>
               <div className="text-sm text-red-800">Não Compareceu</div>
             </div>
             <div className="bg-yellow-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-yellow-600">{estatisticasReunioes.reunioes_pendentes}</div>
+              <div className="text-2xl font-bold text-yellow-600">
+                {estatisticasReunioes.reunioes_pendentes}
+              </div>
               <div className="text-sm text-yellow-800">Pendentes</div>
             </div>
             <div className="bg-purple-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-purple-600">{estatisticasReunioes.taxa_comparecimento.toFixed(1)}%</div>
+              <div className="text-2xl font-bold text-purple-600">
+                {estatisticasReunioes.taxa_comparecimento.toFixed(1)}%
+              </div>
               <div className="text-sm text-purple-800">Taxa Comparecimento</div>
             </div>
           </div>
         )}
 
-        {abaSelecionada === 'interacoes' && estatisticasInteracoes && (
+        {abaSelecionada === "interacoes" && estatisticasInteracoes && (
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <div className="bg-blue-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-blue-600">{estatisticasInteracoes.total_interacoes}</div>
+              <div className="text-2xl font-bold text-blue-600">
+                {estatisticasInteracoes.total_interacoes}
+              </div>
               <div className="text-sm text-blue-800">Total Interações</div>
             </div>
             <div className="bg-green-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-green-600">{estatisticasInteracoes.taxa_sucesso.toFixed(1)}%</div>
+              <div className="text-2xl font-bold text-green-600">
+                {estatisticasInteracoes.taxa_sucesso.toFixed(1)}%
+              </div>
               <div className="text-sm text-green-800">Taxa de Sucesso</div>
             </div>
             <div className="bg-purple-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-purple-600">{estatisticasInteracoes.interacoes_mes_atual}</div>
+              <div className="text-2xl font-bold text-purple-600">
+                {estatisticasInteracoes.interacoes_mes_atual}
+              </div>
               <div className="text-sm text-purple-800">Este Mês</div>
             </div>
             <div className="bg-yellow-50 rounded-lg p-4">
@@ -421,12 +481,17 @@ export function GestaoReunioes() {
             <Filter className="w-5 h-5 text-gray-600 mr-2" />
             <h3 className="text-lg font-semibold text-gray-800">Filtros</h3>
           </div>
-          
-          {abaSelecionada === 'reunioes' && (
+
+          {abaSelecionada === "reunioes" && (
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <select
-                value={filtrosReunioes.status_reuniao || ''}
-                onChange={(e) => setFiltrosReunioes({...filtrosReunioes, status_reuniao: e.target.value})}
+                value={filtrosReunioes.status_reuniao || ""}
+                onChange={(e) =>
+                  setFiltrosReunioes({
+                    ...filtrosReunioes,
+                    status_reuniao: e.target.value,
+                  })
+                }
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Todos os Status</option>
@@ -436,32 +501,52 @@ export function GestaoReunioes() {
                 <option value="remarcada">Remarcada</option>
                 <option value="cancelada">Cancelada</option>
               </select>
-              
+
               <input
                 type="text"
-                value={filtrosReunioes.responsavel || ''}
-                onChange={(e) => setFiltrosReunioes({...filtrosReunioes, responsavel: e.target.value})}
+                value={filtrosReunioes.responsavel || ""}
+                onChange={(e) =>
+                  setFiltrosReunioes({
+                    ...filtrosReunioes,
+                    responsavel: e.target.value,
+                  })
+                }
                 placeholder="Responsável"
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
-              
+
               <input
                 type="date"
-                value={filtrosReunioes.dataInicio || ''}
-                onChange={(e) => setFiltrosReunioes({...filtrosReunioes, dataInicio: e.target.value})}
+                value={filtrosReunioes.dataInicio || ""}
+                onChange={(e) =>
+                  setFiltrosReunioes({
+                    ...filtrosReunioes,
+                    dataInicio: e.target.value,
+                  })
+                }
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
-              
+
               <input
                 type="date"
-                value={filtrosReunioes.dataFim || ''}
-                onChange={(e) => setFiltrosReunioes({...filtrosReunioes, dataFim: e.target.value})}
+                value={filtrosReunioes.dataFim || ""}
+                onChange={(e) =>
+                  setFiltrosReunioes({
+                    ...filtrosReunioes,
+                    dataFim: e.target.value,
+                  })
+                }
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
-              
+
               <select
-                value={filtrosReunioes.decisao_final || ''}
-                onChange={(e) => setFiltrosReunioes({...filtrosReunioes, decisao_final: e.target.value})}
+                value={filtrosReunioes.decisao_final || ""}
+                onChange={(e) =>
+                  setFiltrosReunioes({
+                    ...filtrosReunioes,
+                    decisao_final: e.target.value,
+                  })
+                }
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Todas as Decisões</option>
@@ -473,11 +558,16 @@ export function GestaoReunioes() {
             </div>
           )}
 
-          {abaSelecionada === 'interacoes' && (
+          {abaSelecionada === "interacoes" && (
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
               <select
-                value={filtrosInteracoes.canal_contato || ''}
-                onChange={(e) => setFiltrosInteracoes({...filtrosInteracoes, canal_contato: e.target.value})}
+                value={filtrosInteracoes.canal_contato || ""}
+                onChange={(e) =>
+                  setFiltrosInteracoes({
+                    ...filtrosInteracoes,
+                    canal_contato: e.target.value,
+                  })
+                }
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
               >
                 <option value="">Todos os Canais</option>
@@ -487,10 +577,15 @@ export function GestaoReunioes() {
                 <option value="presencial">Presencial</option>
                 <option value="videoconferencia">Videoconferência</option>
               </select>
-              
+
               <select
-                value={filtrosInteracoes.motivo_contato || ''}
-                onChange={(e) => setFiltrosInteracoes({...filtrosInteracoes, motivo_contato: e.target.value})}
+                value={filtrosInteracoes.motivo_contato || ""}
+                onChange={(e) =>
+                  setFiltrosInteracoes({
+                    ...filtrosInteracoes,
+                    motivo_contato: e.target.value,
+                  })
+                }
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
               >
                 <option value="">Todos os Motivos</option>
@@ -501,40 +596,60 @@ export function GestaoReunioes() {
                 <option value="acordo_descumprido">Acordo Descumprido</option>
                 <option value="escalonamento_juridico">Escalonamento</option>
               </select>
-              
+
               <input
                 type="text"
-                value={filtrosInteracoes.colaborador || ''}
-                onChange={(e) => setFiltrosInteracoes({...filtrosInteracoes, colaborador: e.target.value})}
+                value={filtrosInteracoes.colaborador || ""}
+                onChange={(e) =>
+                  setFiltrosInteracoes({
+                    ...filtrosInteracoes,
+                    colaborador: e.target.value,
+                  })
+                }
                 placeholder="Colaborador"
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
               />
-              
+
               <input
                 type="text"
-                value={filtrosInteracoes.codigo_unidade || ''}
-                onChange={(e) => setFiltrosInteracoes({...filtrosInteracoes, codigo_unidade: e.target.value})}
+                value={filtrosInteracoes.codigo_unidade || ""}
+                onChange={(e) =>
+                  setFiltrosInteracoes({
+                    ...filtrosInteracoes,
+                    codigo_unidade: e.target.value,
+                  })
+                }
                 placeholder="Código Unidade"
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
               />
-              
+
               <input
                 type="date"
-                value={filtrosInteracoes.dataInicio || ''}
-                onChange={(e) => setFiltrosInteracoes({...filtrosInteracoes, dataInicio: e.target.value})}
+                value={filtrosInteracoes.dataInicio || ""}
+                onChange={(e) =>
+                  setFiltrosInteracoes({
+                    ...filtrosInteracoes,
+                    dataInicio: e.target.value,
+                  })
+                }
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
               />
-              
+
               <input
                 type="date"
-                value={filtrosInteracoes.dataFim || ''}
-                onChange={(e) => setFiltrosInteracoes({...filtrosInteracoes, dataFim: e.target.value})}
+                value={filtrosInteracoes.dataFim || ""}
+                onChange={(e) =>
+                  setFiltrosInteracoes({
+                    ...filtrosInteracoes,
+                    dataFim: e.target.value,
+                  })
+                }
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
               />
             </div>
           )}
 
-          {abaSelecionada === 'timeline' && (
+          {abaSelecionada === "timeline" && (
             <div className="max-w-md">
               <input
                 type="text"
@@ -548,7 +663,7 @@ export function GestaoReunioes() {
         </div>
 
         {/* Conteúdo das abas */}
-        {abaSelecionada === 'reunioes' && (
+        {abaSelecionada === "reunioes" && (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -585,7 +700,10 @@ export function GestaoReunioes() {
                   </tr>
                 ) : reunioes.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    <td
+                      colSpan={6}
+                      className="px-6 py-4 text-center text-gray-500"
+                    >
                       Nenhuma reunião encontrada
                     </td>
                   </tr>
@@ -623,15 +741,23 @@ export function GestaoReunioes() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           {getStatusIcon(reuniao.status_reuniao)}
-                          <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(reuniao.status_reuniao)}`}>
-                            {reuniao.status_reuniao.replace('_', ' ').toUpperCase()}
+                          <span
+                            className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
+                              reuniao.status_reuniao
+                            )}`}
+                          >
+                            {reuniao.status_reuniao
+                              .replace("_", " ")
+                              .toUpperCase()}
                           </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {reuniao.decisao_final ? (
                           <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
-                            {reuniao.decisao_final.replace('_', ' ').toUpperCase()}
+                            {reuniao.decisao_final
+                              .replace("_", " ")
+                              .toUpperCase()}
                           </span>
                         ) : (
                           <span className="text-gray-400">-</span>
@@ -639,7 +765,7 @@ export function GestaoReunioes() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-2">
-                          {reuniao.status_reuniao === 'agendada' && (
+                          {reuniao.status_reuniao === "agendada" && (
                             <>
                               <button
                                 onClick={() => abrirModalResultado(reuniao)}
@@ -685,7 +811,7 @@ export function GestaoReunioes() {
           </div>
         )}
 
-        {abaSelecionada === 'interacoes' && (
+        {abaSelecionada === "interacoes" && (
           <div className="space-y-4">
             {carregando ? (
               <div className="text-center py-8">
@@ -698,46 +824,69 @@ export function GestaoReunioes() {
               </div>
             ) : (
               interacoes.map((interacao) => (
-                <div key={interacao.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                <div
+                  key={interacao.id}
+                  className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+                >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center">
                       {getCanalIcon(interacao.canal_contato)}
                       <div className="ml-3">
                         <h3 className="text-lg font-semibold text-gray-800">
-                          {interacao.nome_franqueado} ({interacao.codigo_unidade})
+                          {interacao.nome_franqueado} (
+                          {interacao.codigo_unidade})
                         </h3>
-                        <p className="text-sm text-gray-600">CNPJ: {interacao.cnpj_unidade}</p>
+                        <p className="text-sm text-gray-600">
+                          CNPJ: {interacao.cnpj_unidade}
+                        </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm text-gray-500">{formatarData(interacao.data_interacao)}</div>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getResultadoColor(interacao.resultado_contato)}`}>
-                        {interacao.resultado_contato.replace('_', ' ').toUpperCase()}
+                      <div className="text-sm text-gray-500">
+                        {formatarData(interacao.data_interacao)}
+                      </div>
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${getResultadoColor(
+                          interacao.resultado_contato
+                        )}`}
+                      >
+                        {interacao.resultado_contato
+                          .replace("_", " ")
+                          .toUpperCase()}
                       </span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm text-gray-600">
                     <div>
-                      <span className="font-medium">Motivo:</span> {interacao.motivo_contato.replace('_', ' ')}
+                      <span className="font-medium">Motivo:</span>{" "}
+                      {interacao.motivo_contato.replace("_", " ")}
                     </div>
                     <div>
-                      <span className="font-medium">Canal:</span> {interacao.canal_contato}
+                      <span className="font-medium">Canal:</span>{" "}
+                      {interacao.canal_contato}
                     </div>
                     <div>
-                      <span className="font-medium">Responsável:</span> {interacao.colaborador_responsavel}
+                      <span className="font-medium">Responsável:</span>{" "}
+                      {interacao.colaborador_responsavel}
                     </div>
                   </div>
 
                   <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    <h4 className="font-medium text-gray-800 mb-2">Resumo da Conversa:</h4>
+                    <h4 className="font-medium text-gray-800 mb-2">
+                      Resumo da Conversa:
+                    </h4>
                     <p className="text-gray-700">{interacao.resumo_conversa}</p>
                   </div>
 
                   {interacao.comentarios_internos && (
                     <div className="bg-blue-50 rounded-lg p-3 mb-4">
-                      <h4 className="font-medium text-blue-800 mb-1">Comentários Internos:</h4>
-                      <p className="text-blue-700 text-sm">{interacao.comentarios_internos}</p>
+                      <h4 className="font-medium text-blue-800 mb-1">
+                        Comentários Internos:
+                      </h4>
+                      <p className="text-blue-700 text-sm">
+                        {interacao.comentarios_internos}
+                      </p>
                     </div>
                   )}
 
@@ -753,12 +902,15 @@ export function GestaoReunioes() {
           </div>
         )}
 
-        {abaSelecionada === 'timeline' && (
+        {abaSelecionada === "timeline" && (
           <div className="text-center py-8">
             <Target className="w-16 h-16 text-orange-600 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">Timeline da Unidade</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">
+              Timeline da Unidade
+            </h3>
             <p className="text-gray-600 mb-6">
-              Digite o código da unidade para visualizar o histórico completo de interações
+              Digite o código da unidade para visualizar o histórico completo de
+              interações
             </p>
             <div className="max-w-md mx-auto">
               <input
@@ -780,14 +932,19 @@ export function GestaoReunioes() {
       </div>
 
       {/* Modal de Agendamento */}
-      {modalAberto === 'agendar' && (
+      {modalAberto === "agendar" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold">Agendar Reunião</h3>
-              <button onClick={fecharModal} className="text-gray-500 hover:text-gray-700">✕</button>
+              <button
+                onClick={fecharModal}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
             </div>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -795,58 +952,66 @@ export function GestaoReunioes() {
                 </label>
                 <input
                   type="text"
-                  value={formData.titulo_id || ''}
-                  onChange={(e) => setFormData({...formData, titulo_id: e.target.value})}
+                  value={formData.titulo_id || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, titulo_id: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="UUID da cobrança"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Data e Hora *
                 </label>
                 <input
                   type="datetime-local"
-                  value={formData.data_agendada || ''}
-                  onChange={(e) => setFormData({...formData, data_agendada: e.target.value})}
+                  value={formData.data_agendada || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, data_agendada: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Link da Reunião
                 </label>
                 <input
                   type="url"
-                  value={formData.link_reuniao || ''}
-                  onChange={(e) => setFormData({...formData, link_reuniao: e.target.value})}
+                  value={formData.link_reuniao || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, link_reuniao: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="https://meet.google.com/..."
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Observações
                 </label>
                 <textarea
-                  value={formData.observacoes || ''}
-                  onChange={(e) => setFormData({...formData, observacoes: e.target.value})}
+                  value={formData.observacoes || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, observacoes: e.target.value })
+                  }
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
-            
+
             <div className="flex space-x-3 mt-6">
               <button
                 onClick={agendarReuniao}
                 disabled={processando}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                {processando ? 'Agendando...' : 'Agendar'}
+                {processando ? "Agendando..." : "Agendar"}
               </button>
               <button
                 onClick={fecharModal}
@@ -860,14 +1025,19 @@ export function GestaoReunioes() {
       )}
 
       {/* Modal de Interação */}
-      {modalAberto === 'interacao' && (
+      {modalAberto === "interacao" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold">Registrar Interação</h3>
-              <button onClick={fecharModal} className="text-gray-500 hover:text-gray-700">✕</button>
+              <button
+                onClick={fecharModal}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -875,58 +1045,71 @@ export function GestaoReunioes() {
                 </label>
                 <input
                   type="text"
-                  value={formData.codigo_unidade || ''}
-                  onChange={(e) => setFormData({...formData, codigo_unidade: e.target.value})}
+                  value={formData.codigo_unidade || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, codigo_unidade: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                   placeholder="Ex: 0137"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   CNPJ da Unidade *
                 </label>
                 <input
                   type="text"
-                  value={formData.cnpj_unidade || ''}
-                  onChange={(e) => setFormData({...formData, cnpj_unidade: e.target.value})}
+                  value={formData.cnpj_unidade || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cnpj_unidade: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                   placeholder="00.000.000/0000-00"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Nome do Franqueado *
                 </label>
                 <input
                   type="text"
-                  value={formData.nome_franqueado || ''}
-                  onChange={(e) => setFormData({...formData, nome_franqueado: e.target.value})}
+                  value={formData.nome_franqueado || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      nome_franqueado: e.target.value,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                   placeholder="Nome completo"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Data e Hora *
                 </label>
                 <input
                   type="datetime-local"
-                  value={formData.data_interacao || ''}
-                  onChange={(e) => setFormData({...formData, data_interacao: e.target.value})}
+                  value={formData.data_interacao || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, data_interacao: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Canal de Contato *
                 </label>
                 <select
-                  value={formData.canal_contato || ''}
-                  onChange={(e) => setFormData({...formData, canal_contato: e.target.value})}
+                  value={formData.canal_contato || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, canal_contato: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="ligacao">Ligação</option>
@@ -937,33 +1120,46 @@ export function GestaoReunioes() {
                   <option value="outro">Outro</option>
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Motivo do Contato *
                 </label>
                 <select
-                  value={formData.motivo_contato || ''}
-                  onChange={(e) => setFormData({...formData, motivo_contato: e.target.value})}
+                  value={formData.motivo_contato || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, motivo_contato: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                 >
-                  <option value="lembrete_vencimento">Lembrete de Vencimento</option>
+                  <option value="lembrete_vencimento">
+                    Lembrete de Vencimento
+                  </option>
                   <option value="proposta_acordo">Proposta de Acordo</option>
                   <option value="negociacao">Negociação</option>
-                  <option value="notificacao_inadimplencia">Notificação de Inadimplência</option>
+                  <option value="notificacao_inadimplencia">
+                    Notificação de Inadimplência
+                  </option>
                   <option value="acordo_descumprido">Acordo Descumprido</option>
-                  <option value="escalonamento_juridico">Escalonamento Jurídico</option>
+                  <option value="escalonamento_juridico">
+                    Escalonamento Jurídico
+                  </option>
                   <option value="outro">Outro</option>
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Resultado *
                 </label>
                 <select
-                  value={formData.resultado_contato || ''}
-                  onChange={(e) => setFormData({...formData, resultado_contato: e.target.value})}
+                  value={formData.resultado_contato || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      resultado_contato: e.target.value,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="compareceu">Compareceu</option>
@@ -971,61 +1167,78 @@ export function GestaoReunioes() {
                   <option value="remarcado">Remarcado</option>
                   <option value="sem_resposta">Sem Resposta</option>
                   <option value="negociacao_aceita">Negociação Aceita</option>
-                  <option value="negociacao_recusada">Negociação Recusada</option>
+                  <option value="negociacao_recusada">
+                    Negociação Recusada
+                  </option>
                   <option value="acordo_formalizado">Acordo Formalizado</option>
                   <option value="outro">Outro</option>
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Próximo Contato
                 </label>
                 <input
                   type="text"
-                  value={formData.proximo_contato || ''}
-                  onChange={(e) => setFormData({...formData, proximo_contato: e.target.value})}
+                  value={formData.proximo_contato || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      proximo_contato: e.target.value,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                   placeholder="Ex: Retornar em 7 dias"
                 />
               </div>
             </div>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Resumo da Conversa *
                 </label>
                 <textarea
-                  value={formData.resumo_conversa || ''}
-                  onChange={(e) => setFormData({...formData, resumo_conversa: e.target.value})}
+                  value={formData.resumo_conversa || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      resumo_conversa: e.target.value,
+                    })
+                  }
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                   placeholder="Descreva detalhadamente o que foi conversado..."
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Comentários Internos
                 </label>
                 <textarea
-                  value={formData.comentarios_internos || ''}
-                  onChange={(e) => setFormData({...formData, comentarios_internos: e.target.value})}
+                  value={formData.comentarios_internos || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      comentarios_internos: e.target.value,
+                    })
+                  }
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                   placeholder="Observações internas (não visíveis ao franqueado)"
                 />
               </div>
             </div>
-            
+
             <div className="flex space-x-3 mt-6">
               <button
                 onClick={registrarInteracao}
                 disabled={processando}
                 className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
               >
-                {processando ? 'Registrando...' : 'Registrar Interação'}
+                {processando ? "Registrando..." : "Registrar Interação"}
               </button>
               <button
                 onClick={fecharModal}
@@ -1039,22 +1252,29 @@ export function GestaoReunioes() {
       )}
 
       {/* Modal de Resultado */}
-      {modalAberto === 'resultado' && itemSelecionado && (
+      {modalAberto === "resultado" && itemSelecionado && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold">Registrar Resultado</h3>
-              <button onClick={fecharModal} className="text-gray-500 hover:text-gray-700">✕</button>
+              <button
+                onClick={fecharModal}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
             </div>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Decisão Final *
                 </label>
                 <select
-                  value={formData.decisao_final || ''}
-                  onChange={(e) => setFormData({...formData, decisao_final: e.target.value})}
+                  value={formData.decisao_final || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, decisao_final: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Selecione...</option>
@@ -1064,40 +1284,47 @@ export function GestaoReunioes() {
                   <option value="rever">Rever</option>
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Resumo do Resultado *
                 </label>
                 <textarea
-                  value={formData.resumo_resultado || ''}
-                  onChange={(e) => setFormData({...formData, resumo_resultado: e.target.value})}
+                  value={formData.resumo_resultado || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      resumo_resultado: e.target.value,
+                    })
+                  }
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="Descreva o resultado da reunião..."
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Observações
                 </label>
                 <textarea
-                  value={formData.observacoes || ''}
-                  onChange={(e) => setFormData({...formData, observacoes: e.target.value})}
+                  value={formData.observacoes || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, observacoes: e.target.value })
+                  }
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
-            
+
             <div className="flex space-x-3 mt-6">
               <button
                 onClick={registrarResultado}
                 disabled={processando}
                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
               >
-                {processando ? 'Salvando...' : 'Salvar Resultado'}
+                {processando ? "Salvando..." : "Salvar Resultado"}
               </button>
               <button
                 onClick={fecharModal}

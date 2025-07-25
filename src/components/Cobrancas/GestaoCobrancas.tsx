@@ -1,20 +1,17 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect } from "react";
 import {
-  DollarSign,
   Plus,
   Edit,
-  Trash2,
   Eye,
-  Download,
   Upload,
   MessageSquare,
-  Calendar,
+  Receipt,
   CheckCircle,
   XCircle,
   Clock,
   Filter,
-  Search,
   RefreshCw,
   FileText,
 } from "lucide-react";
@@ -266,101 +263,109 @@ export function GestaoCobrancas() {
   };
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">
-            Gestão de Cobranças
-          </h1>
-          <p className="text-gray-600">
-            Controle completo de débitos e recebimentos
-          </p>
-        </div>
-        <div className="flex space-x-3">
-          <button
-            onClick={() => setModalAberto("upload")}
-            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            Upload Planilha
-          </button>
-          <button
-            onClick={abrirModalCriar}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Cobrança
-          </button>
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <div
-        className="bg-white rounded-xl shadow-lg p-5 border border-gray-100">
-        <div className="flex items-center mb-6">
-          <div className="p-2 bg-green-100 rounded-lg mr-3">
-            <Filter className="w-5 h-5 text-green-600" />
+    <div className="max-w-7xl mx-auto p-6">
+      {/* Fundo Branco */}
+      <div className="bg-white rounded-lg shadow-lg p-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          {/* Ícone e Título */}
+          <div className="flex items-center">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
+              <Receipt className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">
+                Gestão de Cobranças
+              </h1>
+              <p className="text-gray-600">
+                Controle completo de débitos e recebimentos
+              </p>
+            </div>
           </div>
-          <h3 className="text-xl font-bold text-gray-800">Filtros</h3>
+          {/* Botões de Ação */}
+          <div className="flex space-x-3">
+            <button
+              onClick={() => setModalAberto("upload")}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Upload Planilha
+            </button>
+            <button
+              onClick={abrirModalCriar}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Cobrança
+            </button>
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-          <select
-            value={filtros.status}
-            onChange={(e) => setFiltros({ ...filtros, status: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Todos os Status</option>
-            <option value="em_aberto">Em Aberto</option>
-            <option value="negociando">Negociando</option>
-            <option value="quitado">Quitado</option>
-          </select>
-          <input
-            type="text"
-            value={filtros.busca}
-            onChange={(e) => setFiltros({ ...filtros, busca: e.target.value })}
-            placeholder="Buscar cliente/CNPJ"
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="date"
-            value={filtros.dataInicio}
-            onChange={(e) =>
-              setFiltros({ ...filtros, dataInicio: e.target.value })
-            }
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="date"
-            value={filtros.dataFim}
-            onChange={(e) =>
-              setFiltros({ ...filtros, dataFim: e.target.value })
-            }
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="number"
-            value={filtros.valorMin}
-            onChange={(e) =>
-              setFiltros({ ...filtros, valorMin: e.target.value })
-            }
-            placeholder="Valor mínimo"
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="number"
-            value={filtros.valorMax}
-            onChange={(e) =>
-              setFiltros({ ...filtros, valorMax: e.target.value })
-            }
-            placeholder="Valor máximo"
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
+        {/* Filtros */}
+        <div className="bg-gray-50 rounded-lg p-6 mb-6">
+          <div className="flex items-center mb-4">
+            <Filter className="w-5 h-5 text-gray-600 mr-2" />
+            <h3 className="text-lg font-demibold text-gray-800">Filtros</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            <select
+              value={filtros.status}
+              onChange={(e) =>
+                setFiltros({ ...filtros, status: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos os Status</option>
+              <option value="em_aberto">Em Aberto</option>
+              <option value="negociando">Negociando</option>
+              <option value="quitado">Quitado</option>
+            </select>
+            <input
+              type="text"
+              value={filtros.busca}
+              onChange={(e) =>
+                setFiltros({ ...filtros, busca: e.target.value })
+              }
+              placeholder="Buscar cliente/CNPJ"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              type="date"
+              value={filtros.dataInicio}
+              onChange={(e) =>
+                setFiltros({ ...filtros, dataInicio: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              type="date"
+              value={filtros.dataFim}
+              onChange={(e) =>
+                setFiltros({ ...filtros, dataFim: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              type="number"
+              value={filtros.valorMin}
+              onChange={(e) =>
+                setFiltros({ ...filtros, valorMin: e.target.value })
+              }
+              placeholder="Valor mínimo"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              type="number"
+              value={filtros.valorMax}
+              onChange={(e) =>
+                setFiltros({ ...filtros, valorMax: e.target.value })
+              }
+              placeholder="Valor máximo"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
         </div>
-      </div>
 
-      {/* Tabela de Cobranças */}
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
+        {/* Tabela de Cobranças */}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">

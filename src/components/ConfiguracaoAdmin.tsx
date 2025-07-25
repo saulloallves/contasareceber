@@ -1,34 +1,56 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Settings, Save, RotateCcw, Download, Upload, CheckCircle, AlertCircle, 
-  Info, DollarSign, Calendar, Clock, MessageSquare, Link, Bug, Users, Shield
-} from 'lucide-react';
-import { ConfiguracaoService } from '../services/configuracaoService';
-import { ConfiguracaoCobranca, LogSistema } from '../types/configuracao';
-import { GestaoUsuarios } from './Usuarios/GestaoUsuarios';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useState, useEffect } from "react";
+import {
+  Settings,
+  Save,
+  RotateCcw,
+  Download,
+  Upload,
+  CheckCircle,
+  AlertCircle,
+  Info,
+  DollarSign,
+  Calendar,
+  Clock,
+  MessageSquare,
+  Link,
+  Bug,
+  Users,
+  Shield,
+} from "lucide-react";
+import { ConfiguracaoService } from "../services/configuracaoService";
+import { ConfiguracaoCobranca, LogSistema } from "../types/configuracao";
+import { GestaoUsuarios } from "./Usuarios/GestaoUsuarios";
 
 export function ConfiguracaoAdmin() {
-  const [abaSelecionada, setAbaSelecionada] = useState<'configuracoes' | 'usuarios' | 'logs' | 'seguranca'>('configuracoes');
+  const [abaSelecionada, setAbaSelecionada] = useState<
+    "configuracoes" | "usuarios" | "logs" | "seguranca"
+  >("configuracoes");
   const [config, setConfig] = useState<ConfiguracaoCobranca | null>(null);
-  const [configOriginal, setConfigOriginal] = useState<ConfiguracaoCobranca | null>(null);
+  const [configOriginal, setConfigOriginal] =
+    useState<ConfiguracaoCobranca | null>(null);
   const [logs, setLogs] = useState<LogSistema[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
-  const [mensagem, setMensagem] = useState<{tipo: 'sucesso' | 'erro' | 'info', texto: string} | null>(null);
+  const [mensagem, setMensagem] = useState<{
+    tipo: "sucesso" | "erro" | "info";
+    texto: string;
+  } | null>(null);
   const [alteracoesPendentes, setAlteracoesPendentes] = useState(false);
   const [filtrosLogs, setFiltrosLogs] = useState({
-    usuario: '',
-    acao: '',
-    dataInicio: '',
-    dataFim: ''
+    usuario: "",
+    acao: "",
+    dataInicio: "",
+    dataFim: "",
   });
 
   const configuracaoService = new ConfiguracaoService();
 
   useEffect(() => {
-    if (abaSelecionada === 'configuracoes') {
+    if (abaSelecionada === "configuracoes") {
       carregarConfiguracao();
-    } else if (abaSelecionada === 'logs') {
+    } else if (abaSelecionada === "logs") {
       carregarLogs();
     }
   }, [abaSelecionada]);
@@ -36,7 +58,8 @@ export function ConfiguracaoAdmin() {
   useEffect(() => {
     // Verifica se há alterações pendentes
     if (config && configOriginal) {
-      const temAlteracoes = JSON.stringify(config) !== JSON.stringify(configOriginal);
+      const temAlteracoes =
+        JSON.stringify(config) !== JSON.stringify(configOriginal);
       setAlteracoesPendentes(temAlteracoes);
     }
   }, [config, configOriginal]);
@@ -50,7 +73,7 @@ export function ConfiguracaoAdmin() {
         setConfigOriginal(JSON.parse(JSON.stringify(dados))); // Deep copy
       }
     } catch (error) {
-      mostrarMensagem('erro', 'Erro ao carregar configurações');
+      mostrarMensagem("erro", "Erro ao carregar configurações");
     } finally {
       setCarregando(false);
     }
@@ -62,7 +85,7 @@ export function ConfiguracaoAdmin() {
       const dados = await configuracaoService.buscarLogs(filtrosLogs);
       setLogs(dados);
     } catch (error) {
-      mostrarMensagem('erro', 'Erro ao carregar logs');
+      mostrarMensagem("erro", "Erro ao carregar logs");
     } finally {
       setCarregando(false);
     }
@@ -73,18 +96,22 @@ export function ConfiguracaoAdmin() {
 
     setSalvando(true);
     try {
-      await configuracaoService.atualizarConfiguracao(config, 'usuario_atual');
+      await configuracaoService.atualizarConfiguracao(config, "usuario_atual");
       setConfigOriginal(JSON.parse(JSON.stringify(config))); // Atualiza original
-      mostrarMensagem('sucesso', 'Configurações salvas com sucesso!');
+      mostrarMensagem("sucesso", "Configurações salvas com sucesso!");
     } catch (error) {
-      mostrarMensagem('erro', `Erro ao salvar: ${error}`);
+      mostrarMensagem("erro", `Erro ao salvar: ${error}`);
     } finally {
       setSalvando(false);
     }
   };
 
   const resetarConfiguracao = async () => {
-    if (!confirm('Tem certeza que deseja resetar todas as configurações para os valores padrão?')) {
+    if (
+      !confirm(
+        "Tem certeza que deseja resetar todas as configurações para os valores padrão?"
+      )
+    ) {
       return;
     }
 
@@ -92,9 +119,9 @@ export function ConfiguracaoAdmin() {
     try {
       await configuracaoService.resetarConfiguracao();
       await carregarConfiguracao();
-      mostrarMensagem('info', 'Configurações resetadas para valores padrão');
+      mostrarMensagem("info", "Configurações resetadas para valores padrão");
     } catch (error) {
-      mostrarMensagem('erro', 'Erro ao resetar configurações');
+      mostrarMensagem("erro", "Erro ao resetar configurações");
     } finally {
       setSalvando(false);
     }
@@ -104,20 +131,25 @@ export function ConfiguracaoAdmin() {
     try {
       const blob = await configuracaoService.exportarConfiguracao();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `configuracao-cobranca-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `configuracao-cobranca-${
+        new Date().toISOString().split("T")[0]
+      }.json`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      mostrarMensagem('sucesso', 'Configuração exportada com sucesso!');
+      mostrarMensagem("sucesso", "Configuração exportada com sucesso!");
     } catch (error) {
-      mostrarMensagem('erro', 'Erro ao exportar configuração');
+      mostrarMensagem("erro", "Erro ao exportar configuração");
     }
   };
 
-  const mostrarMensagem = (tipo: 'sucesso' | 'erro' | 'info', texto: string) => {
+  const mostrarMensagem = (
+    tipo: "sucesso" | "erro" | "info",
+    texto: string
+  ) => {
     setMensagem({ tipo, texto });
     setTimeout(() => setMensagem(null), 5000);
   };
@@ -128,21 +160,24 @@ export function ConfiguracaoAdmin() {
   };
 
   const previewMensagem = () => {
-    if (!config) return '';
-    
-    return configuracaoService.aplicarTemplateMensagem(config.texto_padrao_mensagem, {
-      cliente: 'João da Silva',
-      data_vencimento: '15/01/2024',
-      valor_atualizado: 'R$ 1.250,00',
-      link_negociacao: config.link_base_agendamento
-    });
+    if (!config) return "";
+
+    return configuracaoService.aplicarTemplateMensagem(
+      config.texto_padrao_mensagem,
+      {
+        cliente: "João da Silva",
+        data_vencimento: "15/01/2024",
+        valor_atualizado: "R$ 1.250,00",
+        link_negociacao: config.link_base_agendamento,
+      }
+    );
   };
 
   const formatarData = (data: string) => {
-    return new Date(data).toLocaleString('pt-BR');
+    return new Date(data).toLocaleString("pt-BR");
   };
 
-  if (carregando && abaSelecionada === 'configuracoes') {
+  if (carregando && abaSelecionada === "configuracoes") {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -158,16 +193,20 @@ export function ConfiguracaoAdmin() {
       <div className="bg-white rounded-lg shadow-lg p-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
-            <Settings className="w-8 h-8 text-blue-600 mr-3" />
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
+              <Settings className="w-7 h-7 text-white" />
+            </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-800">
                 Configurações Gerais e Controle de Acessos
               </h1>
-              <p className="text-gray-600">Gestão completa do sistema e permissões</p>
+              <p className="text-gray-600">
+                Gestão completa do sistema e permissões
+              </p>
             </div>
           </div>
-          
-          {abaSelecionada === 'configuracoes' && (
+
+          {abaSelecionada === "configuracoes" && (
             <div className="flex space-x-3">
               <button
                 onClick={exportarConfiguracao}
@@ -190,7 +229,7 @@ export function ConfiguracaoAdmin() {
                 className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="w-4 h-4 mr-2" />
-                {salvando ? 'Salvando...' : 'Salvar Alterações'}
+                {salvando ? "Salvando..." : "Salvar Alterações"}
               </button>
             </div>
           )}
@@ -198,16 +237,18 @@ export function ConfiguracaoAdmin() {
 
         {/* Mensagem de feedback */}
         {mensagem && (
-          <div className={`mb-6 p-4 rounded-lg flex items-center ${
-            mensagem.tipo === 'sucesso' 
-              ? 'bg-green-50 border border-green-200 text-green-800' 
-              : mensagem.tipo === 'erro'
-              ? 'bg-red-50 border border-red-200 text-red-800'
-              : 'bg-blue-50 border border-blue-200 text-blue-800'
-          }`}>
-            {mensagem.tipo === 'sucesso' ? (
+          <div
+            className={`mb-6 p-4 rounded-lg flex items-center ${
+              mensagem.tipo === "sucesso"
+                ? "bg-green-50 border border-green-200 text-green-800"
+                : mensagem.tipo === "erro"
+                ? "bg-red-50 border border-red-200 text-red-800"
+                : "bg-blue-50 border border-blue-200 text-blue-800"
+            }`}
+          >
+            {mensagem.tipo === "sucesso" ? (
               <CheckCircle className="w-5 h-5 mr-2" />
-            ) : mensagem.tipo === 'erro' ? (
+            ) : mensagem.tipo === "erro" ? (
               <AlertCircle className="w-5 h-5 mr-2" />
             ) : (
               <Info className="w-5 h-5 mr-2" />
@@ -220,10 +261,14 @@ export function ConfiguracaoAdmin() {
         <div className="border-b border-gray-200 mb-8">
           <nav className="-mb-px flex space-x-8">
             {[
-              { id: 'configuracoes', label: 'Configurações do Sistema', icon: Settings },
-              { id: 'usuarios', label: 'Gestão de Usuários', icon: Users },
-              { id: 'logs', label: 'Logs e Auditoria', icon: Shield },
-              { id: 'seguranca', label: 'Segurança', icon: Shield }
+              {
+                id: "configuracoes",
+                label: "Configurações do Sistema",
+                icon: Settings,
+              },
+              { id: "usuarios", label: "Gestão de Usuários", icon: Users },
+              { id: "logs", label: "Logs e Auditoria", icon: Shield },
+              { id: "seguranca", label: "Segurança", icon: Shield },
             ].map((aba) => {
               const Icon = aba.icon;
               return (
@@ -232,8 +277,8 @@ export function ConfiguracaoAdmin() {
                   onClick={() => setAbaSelecionada(aba.id as any)}
                   className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
                     abaSelecionada === aba.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                   }`}
                 >
                   <Icon className="w-4 h-4 mr-2" />
@@ -245,14 +290,16 @@ export function ConfiguracaoAdmin() {
         </div>
 
         {/* Conteúdo das abas */}
-        {abaSelecionada === 'configuracoes' && config && (
+        {abaSelecionada === "configuracoes" && config && (
           <div>
             {/* Indicador de alterações pendentes */}
             {alteracoesPendentes && (
               <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <div className="flex items-center text-yellow-800">
                   <AlertCircle className="w-5 h-5 mr-2" />
-                  <span className="font-medium">Você tem alterações não salvas</span>
+                  <span className="font-medium">
+                    Você tem alterações não salvas
+                  </span>
                 </div>
               </div>
             )}
@@ -262,7 +309,9 @@ export function ConfiguracaoAdmin() {
               <div className="space-y-6">
                 <div className="flex items-center mb-4">
                   <DollarSign className="w-6 h-6 text-green-600 mr-2" />
-                  <h3 className="text-lg font-semibold text-gray-800">Parâmetros Financeiros</h3>
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Parâmetros Financeiros
+                  </h3>
                 </div>
 
                 <div>
@@ -275,7 +324,12 @@ export function ConfiguracaoAdmin() {
                     min="0"
                     max="100"
                     value={config.percentual_multa}
-                    onChange={(e) => atualizarCampo('percentual_multa', parseFloat(e.target.value) || 0)}
+                    onChange={(e) =>
+                      atualizarCampo(
+                        "percentual_multa",
+                        parseFloat(e.target.value) || 0
+                      )
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <p className="text-sm text-gray-500 mt-1">
@@ -293,7 +347,12 @@ export function ConfiguracaoAdmin() {
                     min="0"
                     max="10"
                     value={config.percentual_juros_dia}
-                    onChange={(e) => atualizarCampo('percentual_juros_dia', parseFloat(e.target.value) || 0)}
+                    onChange={(e) =>
+                      atualizarCampo(
+                        "percentual_juros_dia",
+                        parseFloat(e.target.value) || 0
+                      )
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <p className="text-sm text-gray-500 mt-1">
@@ -310,7 +369,12 @@ export function ConfiguracaoAdmin() {
                     min="0"
                     max="30"
                     value={config.tempo_tolerancia_dias}
-                    onChange={(e) => atualizarCampo('tempo_tolerancia_dias', parseInt(e.target.value) || 0)}
+                    onChange={(e) =>
+                      atualizarCampo(
+                        "tempo_tolerancia_dias",
+                        parseInt(e.target.value) || 0
+                      )
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <p className="text-sm text-gray-500 mt-1">
@@ -323,7 +387,9 @@ export function ConfiguracaoAdmin() {
               <div className="space-y-6">
                 <div className="flex items-center mb-4">
                   <MessageSquare className="w-6 h-6 text-blue-600 mr-2" />
-                  <h3 className="text-lg font-semibold text-gray-800">Parâmetros de Envio</h3>
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Parâmetros de Envio
+                  </h3>
                 </div>
 
                 <div>
@@ -335,7 +401,12 @@ export function ConfiguracaoAdmin() {
                     min="1"
                     max="31"
                     value={config.dia_disparo_mensal}
-                    onChange={(e) => atualizarCampo('dia_disparo_mensal', parseInt(e.target.value) || 1)}
+                    onChange={(e) =>
+                      atualizarCampo(
+                        "dia_disparo_mensal",
+                        parseInt(e.target.value) || 1
+                      )
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <p className="text-sm text-gray-500 mt-1">
@@ -349,7 +420,9 @@ export function ConfiguracaoAdmin() {
                   </label>
                   <select
                     value={config.canal_envio}
-                    onChange={(e) => atualizarCampo('canal_envio', e.target.value)}
+                    onChange={(e) =>
+                      atualizarCampo("canal_envio", e.target.value)
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="whatsapp">WhatsApp</option>
@@ -365,7 +438,9 @@ export function ConfiguracaoAdmin() {
                   <input
                     type="url"
                     value={config.link_base_agendamento}
-                    onChange={(e) => atualizarCampo('link_base_agendamento', e.target.value)}
+                    onChange={(e) =>
+                      atualizarCampo("link_base_agendamento", e.target.value)
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="https://calendly.com/sua-empresa/negociacao"
                   />
@@ -379,10 +454,15 @@ export function ConfiguracaoAdmin() {
                     type="checkbox"
                     id="modo_debug"
                     checked={config.modo_debug}
-                    onChange={(e) => atualizarCampo('modo_debug', e.target.checked)}
+                    onChange={(e) =>
+                      atualizarCampo("modo_debug", e.target.checked)
+                    }
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
-                  <label htmlFor="modo_debug" className="ml-2 text-sm font-medium text-gray-700">
+                  <label
+                    htmlFor="modo_debug"
+                    className="ml-2 text-sm font-medium text-gray-700"
+                  >
                     Modo Debug
                   </label>
                   <Bug className="w-4 h-4 text-gray-400 ml-2" />
@@ -394,7 +474,9 @@ export function ConfiguracaoAdmin() {
             <div className="mt-8">
               <div className="flex items-center mb-4">
                 <MessageSquare className="w-6 h-6 text-purple-600 mr-2" />
-                <h3 className="text-lg font-semibold text-gray-800">Template da Mensagem</h3>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Template da Mensagem
+                </h3>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -404,7 +486,9 @@ export function ConfiguracaoAdmin() {
                   </label>
                   <textarea
                     value={config.texto_padrao_mensagem}
-                    onChange={(e) => atualizarCampo('texto_padrao_mensagem', e.target.value)}
+                    onChange={(e) =>
+                      atualizarCampo("texto_padrao_mensagem", e.target.value)
+                    }
                     rows={8}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Digite o template da mensagem..."
@@ -412,10 +496,18 @@ export function ConfiguracaoAdmin() {
                   <div className="mt-2 text-sm text-gray-500">
                     <p className="font-medium mb-1">Variáveis disponíveis:</p>
                     <div className="flex flex-wrap gap-2">
-                      <code className="bg-gray-100 px-2 py-1 rounded">{'{{cliente}}'}</code>
-                      <code className="bg-gray-100 px-2 py-1 rounded">{'{{valor_atualizado}}'}</code>
-                      <code className="bg-gray-100 px-2 py-1 rounded">{'{{data_vencimento}}'}</code>
-                      <code className="bg-gray-100 px-2 py-1 rounded">{'{{link_negociacao}}'}</code>
+                      <code className="bg-gray-100 px-2 py-1 rounded">
+                        {"{{cliente}}"}
+                      </code>
+                      <code className="bg-gray-100 px-2 py-1 rounded">
+                        {"{{valor_atualizado}}"}
+                      </code>
+                      <code className="bg-gray-100 px-2 py-1 rounded">
+                        {"{{data_vencimento}}"}
+                      </code>
+                      <code className="bg-gray-100 px-2 py-1 rounded">
+                        {"{{link_negociacao}}"}
+                      </code>
                     </div>
                   </div>
                 </div>
@@ -442,29 +534,42 @@ export function ConfiguracaoAdmin() {
             <div className="mt-8 bg-gray-50 rounded-lg p-6">
               <div className="flex items-center mb-4">
                 <Info className="w-6 h-6 text-gray-600 mr-2" />
-                <h3 className="text-lg font-semibold text-gray-800">Informações do Sistema</h3>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Informações do Sistema
+                </h3>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                 <div>
-                  <span className="font-medium text-gray-700">Última Atualização:</span>
+                  <span className="font-medium text-gray-700">
+                    Última Atualização:
+                  </span>
                   <p className="text-gray-600">
-                    {config.updated_at ? new Date(config.updated_at).toLocaleString('pt-BR') : 'N/A'}
+                    {config.updated_at
+                      ? new Date(config.updated_at).toLocaleString("pt-BR")
+                      : "N/A"}
                   </p>
                 </div>
                 <div>
-                  <span className="font-medium text-gray-700">Última Importação:</span>
+                  <span className="font-medium text-gray-700">
+                    Última Importação:
+                  </span>
                   <p className="text-gray-600">
-                    {config.ultima_data_importacao 
-                      ? new Date(config.ultima_data_importacao).toLocaleString('pt-BR') 
-                      : 'Nenhuma importação realizada'
-                    }
+                    {config.ultima_data_importacao
+                      ? new Date(config.ultima_data_importacao).toLocaleString(
+                          "pt-BR"
+                        )
+                      : "Nenhuma importação realizada"}
                   </p>
                 </div>
                 <div>
                   <span className="font-medium text-gray-700">Status:</span>
-                  <p className={`font-medium ${config.modo_debug ? 'text-yellow-600' : 'text-green-600'}`}>
-                    {config.modo_debug ? 'Modo Debug Ativo' : 'Produção'}
+                  <p
+                    className={`font-medium ${
+                      config.modo_debug ? "text-yellow-600" : "text-green-600"
+                    }`}
+                  >
+                    {config.modo_debug ? "Modo Debug Ativo" : "Produção"}
                   </p>
                 </div>
               </div>
@@ -472,35 +577,44 @@ export function ConfiguracaoAdmin() {
           </div>
         )}
 
-        {abaSelecionada === 'usuarios' && (
-          <GestaoUsuarios />
-        )}
+        {abaSelecionada === "usuarios" && <GestaoUsuarios />}
 
-        {abaSelecionada === 'logs' && (
+        {abaSelecionada === "logs" && (
           <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-800">Logs de Auditoria</h3>
-            
+            <h3 className="text-lg font-semibold text-gray-800">
+              Logs de Auditoria
+            </h3>
+
             {/* Filtros de Logs */}
             <div className="bg-gray-50 rounded-lg p-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <input
                   type="text"
                   value={filtrosLogs.usuario}
-                  onChange={(e) => setFiltrosLogs({...filtrosLogs, usuario: e.target.value})}
+                  onChange={(e) =>
+                    setFiltrosLogs({ ...filtrosLogs, usuario: e.target.value })
+                  }
                   placeholder="Usuário"
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
                 <input
                   type="text"
                   value={filtrosLogs.acao}
-                  onChange={(e) => setFiltrosLogs({...filtrosLogs, acao: e.target.value})}
+                  onChange={(e) =>
+                    setFiltrosLogs({ ...filtrosLogs, acao: e.target.value })
+                  }
                   placeholder="Ação"
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
                 <input
                   type="date"
                   value={filtrosLogs.dataInicio}
-                  onChange={(e) => setFiltrosLogs({...filtrosLogs, dataInicio: e.target.value})}
+                  onChange={(e) =>
+                    setFiltrosLogs({
+                      ...filtrosLogs,
+                      dataInicio: e.target.value,
+                    })
+                  }
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
                 <button
@@ -543,7 +657,10 @@ export function ConfiguracaoAdmin() {
                     </tr>
                   ) : logs.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                      <td
+                        colSpan={5}
+                        className="px-6 py-4 text-center text-gray-500"
+                      >
                         Nenhum log encontrado
                       </td>
                     </tr>
@@ -554,16 +671,17 @@ export function ConfiguracaoAdmin() {
                           {formatarData(log.data_acao!)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {(log as any).usuarios_sistema?.nome_completo || log.usuario_id}
+                          {(log as any).usuarios_sistema?.nome_completo ||
+                            log.usuario_id}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {log.acao}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {log.tabela_afetada || '-'}
+                          {log.tabela_afetada || "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {log.ip_origem || '-'}
+                          {log.ip_origem || "-"}
                         </td>
                       </tr>
                     ))
@@ -574,17 +692,23 @@ export function ConfiguracaoAdmin() {
           </div>
         )}
 
-        {abaSelecionada === 'seguranca' && (
+        {abaSelecionada === "seguranca" && (
           <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-800">Configurações de Segurança</h3>
-            
+            <h3 className="text-lg font-semibold text-gray-800">
+              Configurações de Segurança
+            </h3>
+
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
               <div className="flex items-center">
                 <Shield className="w-6 h-6 text-yellow-600 mr-3" />
                 <div>
-                  <h4 className="font-semibold text-yellow-800">Recursos de Segurança Implementados</h4>
+                  <h4 className="font-semibold text-yellow-800">
+                    Recursos de Segurança Implementados
+                  </h4>
                   <ul className="text-yellow-700 text-sm mt-2 space-y-1">
-                    <li>• Row Level Security (RLS) ativo em todas as tabelas</li>
+                    <li>
+                      • Row Level Security (RLS) ativo em todas as tabelas
+                    </li>
                     <li>• Logs de auditoria para todas as ações</li>
                     <li>• Controle granular de permissões por usuário</li>
                     <li>• Validação de dados antes de salvar</li>
@@ -596,7 +720,9 @@ export function ConfiguracaoAdmin() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h4 className="font-semibold text-gray-800 mb-4">Políticas de Senha</h4>
+                <h4 className="font-semibold text-gray-800 mb-4">
+                  Políticas de Senha
+                </h4>
                 <ul className="space-y-2 text-sm text-gray-600">
                   <li>• Mínimo 8 caracteres</li>
                   <li>• Pelo menos 1 letra maiúscula</li>
@@ -606,7 +732,9 @@ export function ConfiguracaoAdmin() {
               </div>
 
               <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h4 className="font-semibold text-gray-800 mb-4">Controle de Sessão</h4>
+                <h4 className="font-semibold text-gray-800 mb-4">
+                  Controle de Sessão
+                </h4>
                 <ul className="space-y-2 text-sm text-gray-600">
                   <li>• Timeout automático em 2 horas</li>
                   <li>• Logout em múltiplas abas</li>
