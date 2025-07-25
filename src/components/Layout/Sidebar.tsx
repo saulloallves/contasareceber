@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import { 
   Home, Building2, DollarSign, Calendar, Scale, Bell, BarChart3, 
   Settings, Users, ChevronLeft, ChevronRight, Menu, X, FileText, Target,
@@ -10,125 +10,136 @@ interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   userPermissions?: string[];
+  collapsed: boolean;
+  setCollapsed: (collapsed: boolean) => void;
 }
 
-export function Sidebar({ activeTab, onTabChange, userPermissions = ['admin'] }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+export function Sidebar({
+  activeTab,
+  onTabChange,
+  userPermissions = ["admin"],
+  collapsed,
+  setCollapsed,
+}: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const menuItems = [
-    { 
-      id: 'dashboard', 
-      label: 'Dashboard', 
-      icon: Home, 
-      permissions: ['admin', 'financeiro', 'cobranca', 'juridico', 'leitura'],
-      description: 'Resumo geral e indicadores'
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      icon: Home,
+      permissions: ["admin", "financeiro", "cobranca", "juridico", "leitura"],
+      description: "Resumo geral e indicadores",
     },
-    { 
-      id: 'cobrancas', 
-      label: 'Cobranças', 
-      icon: DollarSign, 
-      permissions: ['admin', 'financeiro', 'cobranca'],
-      description: 'Kanban visual de cobrança'
+    {
+      id: "cobrancas",
+      label: "Cobranças",
+      icon: DollarSign,
+      permissions: ["admin", "financeiro", "cobranca"],
+      description: "Kanban visual de cobrança",
     },
-    { 
-      id: 'cobrancas-lista', 
-      label: 'Lista de Cobranças', 
-      icon: DollarSign, 
-      permissions: ['admin', 'financeiro', 'cobranca'],
-      description: 'Gestão em lista de cobranças'
+    {
+      id: "cobrancas-lista",
+      label: "Lista de Cobranças",
+      icon: DollarSign,
+      permissions: ["admin", "financeiro", "cobranca"],
+      description: "Gestão em lista de cobranças",
     },
-    { 
-      id: 'operacional', 
-      label: 'Painel Operacional', 
-      icon: DollarSign, 
-      permissions: ['admin', 'financeiro', 'cobranca'],
-      description: 'Operações diárias de cobrança'
+    {
+      id: "operacional",
+      label: "Painel Operacional",
+      icon: DollarSign,
+      permissions: ["admin", "financeiro", "cobranca"],
+      description: "Operações diárias de cobrança",
     },
-    { 
-      id: 'unidades', 
-      label: 'Unidades', 
-      icon: Building2, 
-      permissions: ['admin', 'financeiro'],
-      description: 'Cadastro e gestão de unidades'
+    {
+      id: "unidades",
+      label: "Unidades",
+      icon: Building2,
+      permissions: ["admin", "financeiro"],
+      description: "Cadastro e gestão de unidades",
     },
-    { 
-      id: 'reunioes', 
-      label: 'Reuniões', 
-      icon: Calendar, 
-      permissions: ['admin', 'financeiro', 'cobranca'],
-      description: 'Agenda e negociações'
+    {
+      id: "reunioes",
+      label: "Reuniões",
+      icon: Calendar,
+      permissions: ["admin", "financeiro", "cobranca"],
+      description: "Agenda e negociações",
     },
-    { 
-      id: 'documentos', 
-      label: 'Notificações', 
-      icon: FileText, 
-      permissions: ['admin', 'financeiro', 'juridico'],
-      description: 'Documentos e comunicações'
+    {
+      id: "documentos",
+      label: "Notificações",
+      icon: FileText,
+      permissions: ["admin", "financeiro", "juridico"],
+      description: "Documentos e comunicações",
     },
-    { 
-      id: 'juridico', 
-      label: 'Jurídico', 
-      icon: Scale, 
-      permissions: ['admin', 'juridico'],
-      description: 'Escalonamentos e ações legais'
+    {
+      id: "juridico",
+      label: "Jurídico",
+      icon: Scale,
+      permissions: ["admin", "juridico"],
+      description: "Escalonamentos e ações legais",
     },
-    { 
-      id: 'templates-juridicos', 
-      label: 'Templates Jurídicos', 
-      icon: FileText, 
-      permissions: ['admin', 'juridico'],
-      description: 'Templates e gatilhos automáticos'
+    {
+      id: "templates-juridicos",
+      label: "Templates Jurídicos",
+      icon: FileText,
+      permissions: ["admin", "juridico"],
+      description: "Templates e gatilhos automáticos",
     },
-    { 
-      id: 'relatorios', 
-      label: 'Relatórios', 
-      icon: BarChart3, 
-      permissions: ['admin', 'financeiro', 'juridico', 'leitura'],
-      description: 'Análises e indicadores'
+    {
+      id: "relatorios",
+      label: "Relatórios",
+      icon: BarChart3,
+      permissions: ["admin", "financeiro", "juridico", "leitura"],
+      description: "Análises e indicadores",
     },
-    { 
-      id: 'indicadores', 
-      label: 'Indicadores Estratégicos', 
-      icon: BarChart3, 
-      permissions: ['admin', 'financeiro', 'juridico', 'leitura'],
-      description: 'Métricas e KPIs estratégicos'
+    {
+      id: "indicadores",
+      label: "Indicadores Estratégicos",
+      icon: BarChart3,
+      permissions: ["admin", "financeiro", "juridico", "leitura"],
+      description: "Métricas e KPIs estratégicos",
     },
-    { 
-      id: 'usuarios', 
-      label: 'Usuários', 
-      icon: Users, 
-      permissions: ['admin'],
-      description: 'Controle de acesso'
+    {
+      id: "usuarios",
+      label: "Usuários",
+      icon: Users,
+      permissions: ["admin"],
+      description: "Controle de acesso",
     },
-    { 
-      id: 'integracoes', 
-      label: 'Integrações', 
-      icon: Zap, 
-      permissions: ['admin'],
-      description: 'APIs e automações'
+    {
+      id: "integracoes",
+      label: "Integrações",
+      icon: Zap,
+      permissions: ["admin"],
+      description: "APIs e automações",
     },
-    { 
-      id: 'auditoria', 
-      label: 'Auditoria e Logs', 
-      icon: Shield, 
-      permissions: ['admin', 'juridico'],
-      description: 'Rastreamento de ações'
+    {
+      id: "auditoria",
+      label: "Auditoria e Logs",
+      icon: Shield,
+      permissions: ["admin", "juridico"],
+      description: "Rastreamento de ações",
     },
-    { 
-      id: 'admin', 
-      label: 'Configurações', 
-      icon: Settings, 
-      permissions: ['admin'],
-      description: 'Parâmetros do sistema'
-    }
+    {
+      id: "admin",
+      label: "Configurações",
+      icon: Settings,
+      permissions: ["admin"],
+      description: "Parâmetros do sistema",
+    },
   ];
 
   const hasPermission = (itemPermissions: string[]) => {
-    return userPermissions.some(permission => itemPermissions.includes(permission));
+    return userPermissions.some((permission) =>
+      itemPermissions.includes(permission)
+    );
   };
 
-  const filteredMenuItems = menuItems.filter(item => hasPermission(item.permissions));
+  const filteredMenuItems = menuItems.filter((item) =>
+    hasPermission(item.permissions)
+  );
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-gray-900 text-white">
@@ -158,11 +169,11 @@ export function Sidebar({ activeTab, onTabChange, userPermissions = ['admin'] }:
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto overflow-x-hidden">
         {filteredMenuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
-          
+
           return (
             <div key={item.id} className="relative group">
               <button
@@ -172,30 +183,40 @@ export function Sidebar({ activeTab, onTabChange, userPermissions = ['admin'] }:
                 }}
                 className={`w-full flex items-center px-3 py-3 rounded-xl text-left transition-all duration-200 ${
                   isActive
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25 transform scale-[1.02]'
-                    : 'text-gray-300 hover:bg-gray-800 hover:text-white hover:transform hover:scale-[1.01]'
+                    ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25 transform scale-[1.02]"
+                    : "text-gray-300 hover:bg-gray-800 hover:text-white hover:transform hover:scale-[1.01]"
                 }`}
                 title={collapsed ? item.label : undefined}
               >
-                <div className={`p-2 rounded-lg ${isActive ? 'bg-white/10' : 'bg-gray-700/50'} ${collapsed ? 'mx-auto' : 'mr-3'}`}>
+                <div
+                  className={`p-2 rounded-lg ${
+                    isActive ? "bg-white/10" : "bg-gray-700/50"
+                  } ${collapsed ? "mx-auto" : "mr-3"}`}
+                >
                   <Icon className="w-5 h-5" />
                 </div>
                 {!collapsed && (
                   <div className="flex-1 min-w-0">
-                    <span className="font-medium text-sm block truncate">{item.label}</span>
-                    <span className="text-xs text-gray-400 block truncate">{item.description}</span>
+                    <span className="font-medium text-sm block truncate">
+                      {item.label}
+                    </span>
+                    <span className="text-xs text-gray-400 block truncate">
+                      {item.description}
+                    </span>
                   </div>
                 )}
                 {!collapsed && isActive && (
                   <div className="w-2 h-2 bg-white rounded-full opacity-75"></div>
                 )}
               </button>
-              
+
               {/* Tooltip for collapsed state */}
               {collapsed && (
                 <div className="absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
                   <div className="font-medium">{item.label}</div>
-                  <div className="text-xs text-gray-300">{item.description}</div>
+                  <div className="text-xs text-gray-300">
+                    {item.description}
+                  </div>
                   <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-800"></div>
                 </div>
               )}
@@ -233,9 +254,11 @@ export function Sidebar({ activeTab, onTabChange, userPermissions = ['admin'] }:
   return (
     <>
       {/* Desktop Sidebar */}
-      <div className={`hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:z-50 transition-all duration-300 ${
-        collapsed ? 'lg:w-20' : 'lg:w-72'
-      }`}>
+      <div
+        className={`hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:z-50 transition-all duration-300 ${
+          collapsed ? "lg:w-20" : "lg:w-72"
+        }`}
+      >
         <SidebarContent />
       </div>
 
@@ -252,7 +275,10 @@ export function Sidebar({ activeTab, onTabChange, userPermissions = ['admin'] }:
       {/* Mobile Sidebar */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
           <div className="relative flex flex-col w-80 max-w-sm">
             <div className="bg-gray-900 text-white h-full">
               <div className="flex items-center justify-between p-4 border-b border-gray-700">
@@ -261,7 +287,9 @@ export function Sidebar({ activeTab, onTabChange, userPermissions = ['admin'] }:
                     <DollarSign className="w-6 h-6 text-white" />
                   </div>
                   <div className="ml-3">
-                    <h1 className="text-lg font-bold text-white">Cresci e Perdi</h1>
+                    <h1 className="text-lg font-bold text-white">
+                      Cresci e Perdi
+                    </h1>
                     <p className="text-xs text-gray-400">Sistema de Cobrança</p>
                   </div>
                 </div>
@@ -276,7 +304,7 @@ export function Sidebar({ activeTab, onTabChange, userPermissions = ['admin'] }:
                 {filteredMenuItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
-                  
+
                   return (
                     <button
                       key={item.id}
@@ -286,16 +314,24 @@ export function Sidebar({ activeTab, onTabChange, userPermissions = ['admin'] }:
                       }}
                       className={`w-full flex items-center px-3 py-3 rounded-xl text-left transition-all duration-200 ${
                         isActive
-                          ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg'
-                          : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                          ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg"
+                          : "text-gray-300 hover:bg-gray-800 hover:text-white"
                       }`}
                     >
-                      <div className={`p-2 rounded-lg mr-3 ${isActive ? 'bg-white/10' : 'bg-gray-700/50'}`}>
+                      <div
+                        className={`p-2 rounded-lg mr-3 ${
+                          isActive ? "bg-white/10" : "bg-gray-700/50"
+                        }`}
+                      >
                         <Icon className="w-5 h-5" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <span className="font-medium text-sm block truncate">{item.label}</span>
-                        <span className="text-xs text-gray-400 block truncate">{item.description}</span>
+                        <span className="font-medium text-sm block truncate">
+                          {item.label}
+                        </span>
+                        <span className="text-xs text-gray-400 block truncate">
+                          {item.description}
+                        </span>
                       </div>
                       {isActive && (
                         <div className="w-2 h-2 bg-white rounded-full opacity-75"></div>
