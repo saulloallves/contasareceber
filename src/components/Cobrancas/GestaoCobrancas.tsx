@@ -57,35 +57,6 @@ export function GestaoCobrancas() {
   const carregarCobrancas = async () => {
     setCarregando(true);
     try {
-      // Simula carregamento de cobranças
-      // const cobrancasMock: CobrancaFranqueado[] = [
-      //   {
-      //     id: '1',
-      //     cnpj: '12345678000199',
-      //     cliente: 'Franquia Centro SP',
-      //     valor_original: 2500.00,
-      //     valor_recebido: 0,
-      //     data_vencimento: '2025-01-15',
-      //     dias_em_atraso: 6,
-      //     valor_atualizado: 2650.00,
-      //     status: 'em_aberto',
-      //     telefone: '11999999999'
-      //   },
-      //   {
-      //     id: '2',
-      //     cnpj: '98765432000188',
-      //     cliente: 'Franquia Norte RJ',
-      //     valor_original: 1800.00,
-      //     valor_recebido: 1800.00,
-      //     data_vencimento: '2025-01-10',
-      //     dias_em_atraso: 0,
-      //     valor_atualizado: 1800.00,
-      //     status: 'quitado'
-      //   },
-      // ];
-      // //setCobrancas(cobrancasMock);
-
-      // A função buscarCobrancas pode receber filtros, mas por enquanto a chamamos sem nada para trazer tudo.
       const dadosReaisDoBanco = await cobrancaService.buscarCobrancas();
 
       setCobrancas(dadosReaisDoBanco);
