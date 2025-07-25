@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect } from 'react';
 import { 
-  TrendingUp, TrendingDown, DollarSign, Users, Calendar, AlertTriangle,
+  TrendingUp, Users, Calendar, AlertTriangle,
   CheckCircle, Clock, RefreshCw, Filter, Download
 } from 'lucide-react';
 import { DashboardService } from '../../services/dashboardService';
@@ -123,8 +124,8 @@ export function DashboardGeral() {
                 {dados?.visaoGeral?.totalEmAberto ? formatarMoeda(dados.visaoGeral.totalEmAberto) : 'R$ 0,00'}
               </p>
             </div>
-            <div className="p-3 bg-red-500 rounded-full">
-              <TrendingUp className="w-8 h-8 text-white" />
+            <div className="p-2 bg-red-500 rounded-full">
+              <TrendingUp className="w-7 h-7 text-white" />
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
@@ -141,8 +142,8 @@ export function DashboardGeral() {
                 {dados?.visaoGeral?.totalQuitado ? formatarMoeda(dados.visaoGeral.totalQuitado) : 'R$ 0,00'}
               </p>
             </div>
-            <div className="p-3 bg-green-500 rounded-full">
-              <CheckCircle className="w-8 h-8 text-white" />
+            <div className="p-2 bg-green-500 rounded-full">
+              <CheckCircle className="w-7 h-7 text-white" />
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
@@ -159,8 +160,8 @@ export function DashboardGeral() {
                 {dados?.visaoGeral?.totalNegociando ? formatarMoeda(dados.visaoGeral.totalNegociando) : 'R$ 0,00'}
               </p>
             </div>
-            <div className="p-3 bg-yellow-500 rounded-full">
-              <Clock className="w-8 h-8 text-white" />
+            <div className="p-2 bg-yellow-500 rounded-full">
+              <Clock className="w-7 h-7 text-white" />
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
@@ -175,8 +176,8 @@ export function DashboardGeral() {
               <p className="text-sm font-medium text-blue-700">Unidades Ativas</p>
               <p className="text-3xl font-bold text-blue-600">247</p>
             </div>
-            <div className="p-3 bg-blue-500 rounded-full">
-              <Users className="w-8 h-8 text-white" />
+            <div className="p-2 bg-blue-500 rounded-full">
+              <Users className="w-7 h-7 text-white" />
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
