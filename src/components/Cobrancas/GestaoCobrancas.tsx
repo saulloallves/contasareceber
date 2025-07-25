@@ -62,7 +62,7 @@ export function GestaoCobrancas() {
       console.log("Cobrancas carregadas:", dadosReaisDoBanco); //Debugging
     } catch (error) {
       console.error("Erro ao carregar cobranças:", error);
-      // Em caso de erro, podemos limpar a lista e mostrar uma mensagem
+      // Em caso de erro, a lista vai ser limpa, e mostrar uma mensagem
       alert("Erro ao carregar cobranças. Tente novamente mais tarde.");
       setCobrancas([]);
     } finally {
