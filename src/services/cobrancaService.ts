@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   CobrancaFranqueado,
   ResultadoImportacao,
@@ -7,7 +8,7 @@ import {
   gerarReferenciaLinha,
   normalizarData,
 } from "../utils/planilhaProcessor";
-import supabase from "../lib/supabaseClient";
+import { supabase } from "./databaseService"
 
 export class CobrancaService {
   /**
@@ -162,24 +163,25 @@ export class CobrancaService {
   /**
    * Busca configurações do sistema
    */
-  private async buscarConfiguracoes() {
-    const { data, error } = await supabase
-      .from("configuracoes_cobranca")
-      .select("*")
-      .eq("id", "default")
-      .single();
+  // Desabilitado por enquanto, pois não há tabela de configurações padronizadas
+  // private async buscarConfiguracoes() {
+  //   const { data, error } = await supabase
+  //     .from("configuracoes_cobranca")
+  //     .select("*")
+  //     .eq("id", "default")
+  //     .single();
 
-    if (error || !data) {
-      // Retorna configurações padrão
-      return {
-        juros_mensal: 2.5,
-        multa_atraso: 5.0,
-        limite_dias_para_acionamento: 30,
-      };
-    }
+  //   if (error || !data) {
+  //     // Retorna configurações padrão
+  //     return {
+  //       juros_mensal: 2.5,
+  //       multa_atraso: 5.0,
+  //       limite_dias_para_acionamento: 30,
+  //     };
+  //   }
 
-    return data;
-  }
+  //   return data;
+  // }
 
   /**
    * Calcula valor atualizado com juros e multa
@@ -230,6 +232,7 @@ export class CobrancaService {
     const novaCobranca = {
       unidade_id_fk: unidadeId,
       cliente: dados.cliente,
+      cnpj: dados.cnpj,
       tipo_cobranca: dados.tipo_cobranca,
       valor_original: dados.valor_original,
       valor_recebido: 0,
