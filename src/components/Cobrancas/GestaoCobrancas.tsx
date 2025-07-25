@@ -58,7 +58,6 @@ export function GestaoCobrancas() {
     setCarregando(true);
     try {
       const dadosReaisDoBanco = await cobrancaService.buscarCobrancas();
-
       setCobrancas(dadosReaisDoBanco);
       console.log("Cobrancas carregadas:", dadosReaisDoBanco); //Debugging
     } catch (error) {
