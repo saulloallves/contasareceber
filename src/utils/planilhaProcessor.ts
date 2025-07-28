@@ -162,24 +162,37 @@ function processarDadosJson(jsonData: any[][]): CobrancaFranqueado[] {
     if (!linha || linha.every((cell) => !cell)) continue;
 
     try {
-      // Variáveis de controle para CNPJ e CPF
-      const valorCNPJ = String(linha[indices.cnpj] || "").trim();
-      const valorCPF =
-        indices.cpf !== -1 ? String(linha[indices.cpf] || "").trim() : "";
+      // Processa CNPJ e CPF com tratamento de formatação do Excel
+      const valorCNPJ = indices.cnpj !== -1 ? String(linha[indices.cnpj] || "").trim() : "";
+      const valorCPF = indices.cpf !== -1 ? String(linha[indices.cpf] || "").trim() : "";
+
+      // Limpa formatação do Excel para CNPJ
+      const cnpjLimpo = limparFormatacaoDocumento(valorCNPJ);
+      const cpfLimpo = limparFormatacaoDocumento(valorCPF);
 
       // Decide qual documento usar
-      let documentoFinal = valorCNPJ;
-      if (documentoFinal === "0" || documentoFinal === "") {
-        documentoFinal = valorCPF;
+      let documentoFinal = "";
+      
+      // Se CNPJ existe e não é zero, usa CNPJ
+      if (cnpjLimpo && cnpjLimpo !== "0" && cnpjLimpo.length === 14) {
+        documentoFinal = cnpjLimpo;
+      }
+      // Senão, se CPF existe e é válido, usa CPF
+      else if (cpfLimpo && cpfLimpo !== "0" && cpfLimpo.length === 11) {
+        documentoFinal = cpfLimpo;
+      }
+      // Se nenhum documento válido, tenta usar o que tiver
+      else if (cnpjLimpo && cnpjLimpo !== "0") {
+        documentoFinal = cnpjLimpo;
+      }
+      else if (cpfLimpo && cpfLimpo !== "0") {
+        documentoFinal = cpfLimpo;
       }
 
-      // Limpa o documento (remove caracteres não numéricos)
-      const documentoLimpo = documentoFinal.replace(/\D/g, "");
-
-      // Valida se o documento é um CPF ou CNPJ válido
-      if (documentoLimpo.length !== 11 && documentoLimpo.length !== 14) {
+      // Valida se tem documento válido
+      if (!documentoFinal || documentoFinal === "0") {
         console.warn(
-          `Linha ${i + 1} ignorada: Documento "${documentoFinal}" é inválido.`
+          `Linha ${i + 1} ignorada: Nenhum documento válido encontrado (CNPJ: "${valorCNPJ}", CPF: "${valorCPF}").`
         );
         continue;
       }
@@ -188,8 +201,9 @@ function processarDadosJson(jsonData: any[][]): CobrancaFranqueado[] {
       const valorOriginalStr = String(linha[indices.valor] || "0");
       const valorRecebidoStr = String(linha[indices.valorRecebido] || "0");
 
-      const valorOriginal = parseFloat(valorOriginalStr.replace(",", "."));
-      const valorRecebido = parseFloat(valorRecebidoStr.replace(",", "."));
+      // Limpa formatação do Excel para valores monetários
+      const valorOriginal = limparFormatacaoValor(valorOriginalStr);
+      const valorRecebido = limparFormatacaoValor(valorRecebidoStr);
 
       // Se a validação passou cria o registro
       const registro: CobrancaFranqueado = {
@@ -374,4 +388,63 @@ export function gerarReferenciaLinha(dados: CobrancaFranqueado): string {
   const valorFormatado = dados.valor_original.toFixed(2);
 
   return `${cnpjLimpo}_${dados.tipo_cobranca}_${dataFormatada}_${valorFormatado}`;
+}
+
+/**
+ * Limpa formatação de documento (CNPJ/CPF) vinda do Excel
+ */
+function limparFormatacaoDocumento(valor: string): string {
+  if (!valor) return "";
+  
+  // Remove todos os caracteres não numéricos
+  let limpo = valor.toString().replace(/\D/g, "");
+  
+  // Remove zeros à esquerda desnecessários, mas mantém pelo menos um dígito
+  limpo = limpo.replace(/^0+/, "") || "0";
+  
+  return limpo;
+}
+
+/**
+ * Limpa formatação de valor monetário vinda do Excel
+ */
+function limparFormatacaoValor(valor: string): number {
+  if (!valor) return 0;
+  
+  // Converte para string se não for
+  const valorStr = valor.toString();
+  
+  // Remove espaços
+  let limpo = valorStr.trim();
+  
+  // Remove símbolos de moeda (R$, $, etc.)
+  limpo = limpo.replace(/[R$\s]/g, "");
+  
+  // Se tem ponto e vírgula, assume formato brasileiro (1.234,56)
+  if (limpo.includes(".") && limpo.includes(",")) {
+    // Remove pontos (separadores de milhares) e troca vírgula por ponto
+    limpo = limpo.replace(/\./g, "").replace(",", ".");
+  }
+  // Se tem apenas vírgula, assume que é decimal brasileiro (1234,56)
+  else if (limpo.includes(",") && !limpo.includes(".")) {
+    limpo = limpo.replace(",", ".");
+  }
+  // Se tem apenas ponto, pode ser decimal americano (1234.56) ou separador de milhares (1.234)
+  else if (limpo.includes(".") && !limpo.includes(",")) {
+    // Se tem mais de um ponto, remove todos exceto o último (separadores de milhares)
+    const pontos = limpo.split(".");
+    if (pontos.length > 2) {
+      limpo = pontos.slice(0, -1).join("") + "." + pontos[pontos.length - 1];
+    }
+    // Se o último segmento tem mais de 2 dígitos, provavelmente é separador de milhares
+    else if (pontos.length === 2 && pontos[1].length > 2) {
+      limpo = limpo.replace(".", "");
+    }
+  }
+  
+  // Converte para número
+  const numero = parseFloat(limpo);
+  
+  // Retorna 0 se não conseguiu converter
+  return isNaN(numero) ? 0 : numero;
 }

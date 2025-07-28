@@ -58,7 +58,7 @@ export class CobrancaService {
         const unidadeId = await this.buscarUnidadePorCNPJ(dados.cnpj);
         if (!unidadeId) {
           erros.push(
-            `Linha ${index + 2}: Unidade com CNPJ/CPF '${
+            `Linha ${index + 2}: Unidade com documento '${
               dados.cnpj
             }' não encontrada.`
           );
@@ -197,14 +197,23 @@ export class CobrancaService {
   /**
    * Busca unidade pelo CNPJ
    */
-  private async buscarUnidadePorCNPJ(cnpj: string): Promise<string | null> {
+  private async buscarUnidadePorCNPJ(documento: string): Promise<string | null> {
+    // Limpa o documento para busca (remove formatação)
+    const documentoLimpo = documento.replace(/\D/g, "");
+    
+    // Tenta buscar por CNPJ primeiro
     const { data, error } = await supabase
       .from("unidades_franqueadas")
       .select("id")
-      .eq("cnpj", cnpj)
+      .eq("codigo_unidade", documentoLimpo)
       .maybeSingle();
 
-    if (error || !data) return null;
+    if (error || !data) {
+      // Se não encontrou por CNPJ, tenta buscar por outro campo se necessário
+      // Por enquanto retorna null, mas pode ser expandido conforme necessário
+      return null;
+    }
+    
     return data.id;
   }
 
