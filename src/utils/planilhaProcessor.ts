@@ -85,16 +85,16 @@ function processarDadosJson(jsonData: any[][]): CobrancaFranqueado[] {
 
   // Mapeia índices das colunas importantes
   const indices = {
-    cliente: encontrarIndiceColuna(cabecalhos, [
-      "CLIENTE",
-      "CLIENTE_DE_COBRANCA",
-      "NOME",
-      "RAZAO_SOCIAL",
+    clienteNome: encontrarIndiceColuna(cabecalhos, [
+      "UNIDADE_NOME",
+      "UNIDADE NOME",
+    ]),
+    clienteCodigo: encontrarIndiceColuna(cabecalhos, [
+      "ID_DO_CLIENTE",
+      "ID DO CLIENTE",
     ]),
     cnpj: encontrarIndiceColuna(cabecalhos, [
       "CNPJ",
-      "CPF_CNPJ",
-      "DOCUMENTO",
       "CNPJ_CLIENTE",
       "CNPJ CLIENTE",
     ]),
@@ -108,11 +108,7 @@ function processarDadosJson(jsonData: any[][]): CobrancaFranqueado[] {
       "TIPO_COBRANCA",
       "CATEGORIA",
     ]),
-    valor: encontrarIndiceColuna(cabecalhos, [
-      "VALOR",
-      "VALOR_ORIGINAL",
-      "VLR_ORIGINAL",
-    ]),
+    valor: encontrarIndiceColuna(cabecalhos, ["VALOR", "VALOR_ORIGINAL"]),
     valorRecebido: encontrarIndiceColuna(cabecalhos, [
       "VALOR_RECEBIDO",
       "VALOR RECEBIDO",
@@ -146,10 +142,9 @@ function processarDadosJson(jsonData: any[][]): CobrancaFranqueado[] {
   };
 
   // Valida se encontrou todas as colunas necessárias
-  const colunasObrigatorias = ["cliente", "cnpj", "valor", "vencimento"];
+  const colunasObrigatorias = ["clienteNome", "cnpj", "valor", "vencimento"];
   for (const coluna of colunasObrigatorias) {
     if (indices[coluna as keyof typeof indices] === -1) {
-      if (coluna === "cnpj" && indices.cpf !== -1) continue; // Se CPF está presente, CNPJ é opcional
       throw new Error(
         `Coluna obrigatória não encontrada: ${coluna.toUpperCase()}`
       );
@@ -193,12 +188,13 @@ function processarDadosJson(jsonData: any[][]): CobrancaFranqueado[] {
       const valorOriginalStr = String(linha[indices.valor] || "0");
       const valorRecebidoStr = String(linha[indices.valorRecebido] || "0");
 
-      const valorOriginal = parseFloat(valorOriginalStr.replace(',', '.'));
-      const valorRecebido = parseFloat(valorRecebidoStr.replace(',', '.'));
+      const valorOriginal = parseFloat(valorOriginalStr.replace(",", "."));
+      const valorRecebido = parseFloat(valorRecebidoStr.replace(",", "."));
 
       // Se a validação passou cria o registro
       const registro: CobrancaFranqueado = {
-        cliente: String(linha[indices.cliente] || "").trim(),
+        cliente: String(linha[indices.clienteNome] || "").trim(),
+        cliente_codigo: String(linha[indices.clienteCodigo] || "").trim(),
         cnpj: documentoFinal,
         tipo_cobranca:
           indices.tipo !== -1
@@ -207,7 +203,8 @@ function processarDadosJson(jsonData: any[][]): CobrancaFranqueado[] {
         valor_original: valorOriginal > 0 ? valorOriginal : 0,
         valor_recebido: valorRecebido > 0 ? valorRecebido : 0,
         data_vencimento: linha[indices.vencimento],
-        data_vencimento_original: linha[indices.vencimentoOriginal] || linha[indices.vencimento],
+        data_vencimento_original:
+          linha[indices.vencimentoOriginal] || linha[indices.vencimento],
         descricao:
           indices.descricao !== -1
             ? String(linha[indices.descricao] || "").trim()

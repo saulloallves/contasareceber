@@ -162,8 +162,8 @@ export class CobrancaService {
 
   /**
    * Busca configurações do sistema
+   * (Desabilitado por enquanto, pois não há tabela de configurações padronizadas)
    */
-  // Desabilitado por enquanto, pois não há tabela de configurações padronizadas
   // private async buscarConfiguracoes() {
   //   const { data, error } = await supabase
   //     .from("configuracoes_cobranca")
@@ -217,7 +217,7 @@ export class CobrancaService {
    * Insere nova cobrança no banco
    */
   private async inserirNovaCobranca(
-    dados: DadosPlanilha,
+    dados: CobrancaFranqueado,
     unidadeId: string,
     configuracoes: any,
     referenciaLinha: string,
@@ -232,6 +232,7 @@ export class CobrancaService {
     const novaCobranca = {
       unidade_id_fk: unidadeId,
       cliente: dados.cliente,
+      cliente_codigo: dados.cliente_codigo || "",
       cnpj: dados.cnpj,
       tipo_cobranca: dados.tipo_cobranca,
       valor_original: dados.valor_original,

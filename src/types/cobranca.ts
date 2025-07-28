@@ -2,6 +2,7 @@ export interface CobrancaFranqueado {
   id?: string;
   cnpj: string;
   cliente: string;
+  cliente_codigo?: string;
   tipo_cobranca?: string;
   email_cobranca?: string;
   descricao?: string;
@@ -23,6 +24,7 @@ export interface CobrancaFranqueado {
 export interface DadosPlanilha {
   cnpj: string;
   cliente: string;
+  cliente_codigo?: string;
   tipo_cobranca?: string;
   valor_original: number;
   valor_recebido?: number;
