@@ -46,7 +46,8 @@ export function GestaoCobrancas() {
   ); //Linha adicionada para 'guardar' o arquivo selecionado
   const [processando, setProcessando] = useState(false); // Linha adicionada para controlar o estado de processamento do upload
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null); // Linha adicionada para armazenar o resultado do processamento da planilha
-  const [resultadoComparacao, setResultadoComparacao] = useState<ResultadoComparacao | null>(null);
+  const [resultadoComparacao, setResultadoComparacao] =
+    useState<ResultadoComparacao | null>(null);
   const [modalComparacaoAberto, setModalComparacaoAberto] = useState(false);
   const [usuario] = useState("admin"); // Em produção, pegar do contexto de autenticação
   const [formData, setFormData] = useState<Partial<CobrancaFranqueado>>({});
@@ -229,13 +230,16 @@ export function GestaoCobrancas() {
         throw new Error("Não foi possível extrair dados da planilha.");
       }
 
-      console.log(`${dadosDaPlanilha.length} registros extraídos. Comparando...`);
+      console.log(
+        `${dadosDaPlanilha.length} registros extraídos. Comparando...`
+      );
 
       // Chama o serviço de comparação
-      const resultadoComp = await cobrancaService.compararComUltimaPlanilha(dadosDaPlanilha);
+      const resultadoComp = await cobrancaService.compararComUltimaPlanilha(
+        dadosDaPlanilha
+      );
       setResultadoComparacao(resultadoComp);
       setModalComparacaoAberto(true);
-
     } catch (error: any) {
       console.error("ERRO ao comparar planilhas:", error);
       alert(`Erro ao comparar planilhas: ${error.message}`);
@@ -1006,7 +1010,8 @@ export function GestaoCobrancas() {
                         Diferenças Encontradas
                       </h4>
                       <p className="text-yellow-700">
-                        {resultadoComparacao.total_diferencas} diferenças encontradas em relação à última importação
+                        {resultadoComparacao.total_diferencas} diferenças
+                        encontradas em relação à última importação
                       </p>
                     </div>
                   </div>
@@ -1031,16 +1036,23 @@ export function GestaoCobrancas() {
             {/* Informações da Última Importação */}
             {resultadoComparacao.ultima_importacao && (
               <div className="mb-6 bg-gray-50 rounded-lg p-4">
-                <h4 className="font-semibold text-gray-800 mb-2">Última Importação:</h4>
+                <h4 className="font-semibold text-gray-800 mb-2">
+                  Última Importação:
+                </h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
                   <div>
-                    <span className="font-medium">Data:</span> {new Date(resultadoComparacao.ultima_importacao.data).toLocaleString('pt-BR')}
+                    <span className="font-medium">Data:</span>{" "}
+                    {new Date(
+                      resultadoComparacao.ultima_importacao.data
+                    ).toLocaleString("pt-BR")}
                   </div>
                   <div>
-                    <span className="font-medium">Arquivo:</span> {resultadoComparacao.ultima_importacao.arquivo}
+                    <span className="font-medium">Arquivo:</span>{" "}
+                    {resultadoComparacao.ultima_importacao.arquivo}
                   </div>
                   <div>
-                    <span className="font-medium">Usuário:</span> {resultadoComparacao.ultima_importacao.usuario}
+                    <span className="font-medium">Usuário:</span>{" "}
+                    {resultadoComparacao.ultima_importacao.usuario}
                   </div>
                 </div>
               </div>
@@ -1049,15 +1061,23 @@ export function GestaoCobrancas() {
             {/* Estatísticas */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="bg-green-50 rounded-lg p-4">
-                <div className="text-2xl font-bold text-green-600">{resultadoComparacao.resumo.novos}</div>
+                <div className="text-2xl font-bold text-green-600">
+                  {resultadoComparacao.resumo.novos}
+                </div>
                 <div className="text-sm text-green-800">Novos Registros</div>
               </div>
               <div className="bg-yellow-50 rounded-lg p-4">
-                <div className="text-2xl font-bold text-yellow-600">{resultadoComparacao.resumo.alterados}</div>
-                <div className="text-sm text-yellow-800">Registros Alterados</div>
+                <div className="text-2xl font-bold text-yellow-600">
+                  {resultadoComparacao.resumo.alterados}
+                </div>
+                <div className="text-sm text-yellow-800">
+                  Registros Alterados
+                </div>
               </div>
               <div className="bg-red-50 rounded-lg p-4">
-                <div className="text-2xl font-bold text-red-600">{resultadoComparacao.resumo.removidos}</div>
+                <div className="text-2xl font-bold text-red-600">
+                  {resultadoComparacao.resumo.removidos}
+                </div>
                 <div className="text-sm text-red-800">Registros Removidos</div>
               </div>
             </div>
@@ -1065,33 +1085,43 @@ export function GestaoCobrancas() {
             {/* Lista de Diferenças */}
             {resultadoComparacao.tem_diferencas && (
               <div className="mb-6">
-                <h4 className="font-semibold text-gray-800 mb-4">Detalhes das Diferenças:</h4>
+                <h4 className="font-semibold text-gray-800 mb-4">
+                  Detalhes das Diferenças:
+                </h4>
                 <div className="max-h-96 overflow-y-auto">
                   <div className="space-y-3">
                     {resultadoComparacao.diferencas.map((diff, index) => (
                       <div
                         key={index}
                         className={`p-4 rounded-lg border-l-4 ${
-                          diff.tipo === 'novo' ? 'border-green-500 bg-green-50' :
-                          diff.tipo === 'alterado' ? 'border-yellow-500 bg-yellow-50' :
-                          'border-red-500 bg-red-50'
+                          diff.tipo === "novo"
+                            ? "border-green-500 bg-green-50"
+                            : diff.tipo === "alterado"
+                            ? "border-yellow-500 bg-yellow-50"
+                            : "border-red-500 bg-red-50"
                         }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center mb-2">
-                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                diff.tipo === 'novo' ? 'bg-green-100 text-green-800' :
-                                diff.tipo === 'alterado' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-red-100 text-red-800'
-                              }`}>
+                              <span
+                                className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                  diff.tipo === "novo"
+                                    ? "bg-green-100 text-green-800"
+                                    : diff.tipo === "alterado"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                              >
                                 {diff.tipo.toUpperCase()}
                               </span>
                               <span className="ml-3 font-medium text-gray-800">
                                 {diff.cliente} ({formatarCNPJCPF(diff.cnpj)})
                               </span>
                             </div>
-                            <p className="text-sm text-gray-700">{diff.detalhes}</p>
+                            <p className="text-sm text-gray-700">
+                              {diff.detalhes}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -1107,12 +1137,19 @@ export function GestaoCobrancas() {
                 <button
                   onClick={() => {
                     // Gera e baixa relatório de comparação
-                    const relatorio = comparacaoPlanilhaService.gerarRelatorioComparacao(resultadoComparacao);
-                    const blob = new Blob([relatorio], { type: 'text/plain;charset=utf-8' });
+                    const relatorio =
+                      comparacaoPlanilhaService.gerarRelatorioComparacao(
+                        resultadoComparacao
+                      );
+                    const blob = new Blob([relatorio], {
+                      type: "text/plain;charset=utf-8",
+                    });
                     const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
+                    const a = document.createElement("a");
                     a.href = url;
-                    a.download = `comparacao-planilha-${new Date().toISOString().split('T')[0]}.txt`;
+                    a.download = `comparacao-planilha-${
+                      new Date().toISOString().split("T")[0]
+                    }.txt`;
                     document.body.appendChild(a);
                     a.click();
                     window.URL.revokeObjectURL(url);
