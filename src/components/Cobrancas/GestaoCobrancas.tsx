@@ -16,6 +16,7 @@ import {
   FileText,
   ArrowUp,
   ArrowDown,
+  AlertTriangle,
 } from "lucide-react";
 import { CobrancaFranqueado } from "../../types/cobranca";
 import { cobrancaService } from "../../services/cobrancaService";
@@ -56,7 +57,9 @@ export function GestaoCobrancas() {
   const [colunaOrdenacao, setColunaOrdenacao] = useState("data_vencimento"); // Coluna padrão
   const [direcaoOrdenacao, setDirecaoOrdenacao] = useState("desc"); // Ordenação 'asc' ou 'desc'
   const [mostrarApenasInadimplentes, setMostrarApenasInadimplentes] =
-    useState(false); // Linha adicionada para controlar a exibição de inadimplentes
+    useState(false); // Controlar a exibição de inadimplentes
+  const [errosImportacao, setErrosImportacao] = useState<string[]>([]);
+  const [modalErrosAberto, setModalErrosAberto] = useState(false);
 
   // Carrega as cobranças ao montar o componente e quando os filtros ou ordenação mudam
   useEffect(() => {
@@ -121,6 +124,19 @@ export function GestaoCobrancas() {
   };
 
   /**
+   * Função para limpar o arquivo selecionado
+   * Isso é útil para permitir que o usuário selecione o mesmo arquivo novamente
+   */
+  const LimparArquivo = () => {
+    setArquivoSelecionado(null); // Limpa o arquivo selecionado
+    // Limpa o input de arquivo para permitir novo upload, isso é necessário para que o usuário possa selecionar o mesmo arquivo novamente
+    const input = document.getElementById("file-upload") as HTMLInputElement;
+    if (input) {
+      input.value = ""; // Limpa o valor do input de arquivo
+    }
+  };
+
+  /**
    * Função para lidar com a seleção de arquivo
    */
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,15 +148,51 @@ export function GestaoCobrancas() {
   };
 
   /**
-   * Função para limpar o arquivo selecionado
-   * Isso é útil para permitir que o usuário selecione o mesmo arquivo novamente
+   * Função para validar a planilha selecionada sem salvar no banco
+   * Ela processa a planilha e verifica se há erros, mas não salva nada no banco
    */
-  const LimparArquivo = () => {
-    setArquivoSelecionado(null); // Limpa o arquivo selecionado
-    // Limpa o input de arquivo para permitir novo upload, isso é necessário para que o usuário possa selecionar o mesmo arquivo novamente
-    const input = document.getElementById("file-upload") as HTMLInputElement;
-    if (input) {
-      input.value = ""; // Limpa o valor do input de arquivo
+  const handleValidarPlanilha = async () => {
+    if (!arquivoSelecionado) {
+      alert("Por favor, selecione um arquivo primeiro.");
+      return;
+    }
+
+    setProcessando(true);
+    setErrosImportacao([]); // Limpa erros antigos
+
+    try {
+      const dadosDaPlanilha = await processarPlanilhaExcel(arquivoSelecionado);
+
+      // Chama o mesmo serviço, mas com o parâmetro 'apenasValidar' como true
+      const resultadoValidacao =
+        await cobrancaService.processarImportacaoPlanilha(
+          dadosDaPlanilha,
+          arquivoSelecionado.name,
+          usuario,
+          true // <-- O novo parâmetro 'apenasValidar'
+        );
+
+      // Se houver erros, guardamos e avisamos o usuário
+      if (resultadoValidacao.erros && resultadoValidacao.erros.length > 0) {
+        setErrosImportacao(resultadoValidacao.erros);
+        alert(
+          `Validação concluída. Foram encontrados ${resultadoValidacao.erros.length} problemas. Clique em "Verificar Erros" para ver os detalhes.`
+        );
+      } else {
+        alert(
+          "Validação concluída. Nenhum erro encontrado! A planilha está pronta para ser importada."
+        );
+      }
+    } catch (error: any) {
+      console.error("ERRO CRÍTICO ao validar a planilha:", error);
+      const erroMsg = error.message || "Ocorreu um erro inesperado.";
+      setErrosImportacao([`Erro crítico: ${erroMsg}`]);
+      alert(
+        `Ocorreu um erro crítico durante a validação. Clique em "Verificar Erros" para ver os detalhes.`
+      );
+    } finally {
+      setProcessando(false);
+      // Não fechamos o modal para que o usuário possa processar de verdade
     }
   };
 
@@ -156,10 +208,11 @@ export function GestaoCobrancas() {
 
     setProcessando(true);
     setResultado(null);
+    setErrosImportacao([]); // Limpa os erros antigos antes de processar uma nova planilha
 
     try {
       console.log("Iniciando processamento da planilha...");
-      let dadosDaPlanilha; // Renomeado para clareza
+      let dadosDaPlanilha;
 
       // Lógica para identificar e processar o tipo de arquivo
       if (arquivoSelecionado.name.toLowerCase().endsWith(".xlsx")) {
@@ -192,42 +245,56 @@ export function GestaoCobrancas() {
 
       // Lógica para lidar com a resposta
       if (resultadoImportacao.sucesso) {
-        // Uso de optional chaining para segurança!
-        const sucessoMsg = `Planilha processada com sucesso! ${
-          resultadoImportacao.estatisticas?.novos_registros ?? 0
-        } novos registros foram criados.`;
-        alert(sucessoMsg);
-
         // Verificação de segurança para o ID da importação
         if (resultadoImportacao.importacao_id) {
           await cobrancaService.verificarAcionamentoJuridico(
             resultadoImportacao.importacao_id
           );
         }
-
-        // Limpeza final
-        fecharModal();
-        LimparArquivo();
-        carregarCobrancas();
+        // Uso de optional chaining para segurança!
+        const sucessoMsg = `Planilha processada com sucesso! ${
+          resultadoImportacao.estatisticas?.novos_registros ?? 0
+        } novos registros foram criados.`;
+        alert(sucessoMsg);
       } else {
-        // Garante que a mensagem de erro funcione mesmo se 'erros' for undefined
-        const errosStr =
-          resultadoImportacao.erros?.join("\n") ||
-          "Ocorreu um erro desconhecido durante a importação.";
-        alert(`A importação terminou com erros:\n${errosStr}`);
+        if (resultadoImportacao.erros && resultadoImportacao.erros.length > 0) {
+          setErrosImportacao(resultadoImportacao.erros);
+          alert(
+            `A importação foi concluída, mas foram encontrados ${resultadoImportacao.erros.length} erros. Clique em "Verificar Erros" para ver os detalhes.`
+          );
+        } else {
+          alert("A importação falhou por um motivo desconhecido!");
+        }
       }
     } catch (error: any) {
-      // Tratamento de erros críticos, como o seu, está perfeito.
+      // Tratamento de erros críticos
       console.error("ERRO CRÍTICO ao processar a planilha:", error);
       const erroMsg = error.message || "Ocorreu um erro inesperado.";
+      setErrosImportacao([`Erro crítico: ${erroMsg}`]);
       setResultado({ sucesso: false, erros: [erroMsg] });
-      alert(`Ocorreu um erro crítico:\n${erroMsg}`);
+      alert(
+        `Ocorreu um erro crítico. Clique em "Verificar Erros" para ver os detalhes.`
+      );
     } finally {
       carregarCobrancas();
       fecharModal();
       LimparArquivo(); // Limpa o arquivo selecionado após o processamento
       setProcessando(false);
     }
+  };
+
+  /**
+   * Função para lidar com a ordenação das colunas
+   * Ela altera a direção da ordenação se a mesma coluna for clicada novamente
+   */
+  const handleOrdenacao = (coluna: string) => {
+    // Se clicou na mesma coluna, inverte a direção. Senão, ordena de forma descendente.
+    const novaDirecao =
+      coluna === colunaOrdenacao && direcaoOrdenacao === "desc"
+        ? "asc"
+        : "desc";
+    setColunaOrdenacao(coluna);
+    setDirecaoOrdenacao(novaDirecao);
   };
 
   /**
@@ -305,20 +372,6 @@ export function GestaoCobrancas() {
     }
   };
 
-  /**
-   * Função para lidar com a ordenação das colunas
-   * Ela altera a direção da ordenação se a mesma coluna for clicada novamente
-   */
-  const handleOrdenacao = (coluna: string) => {
-    // Se clicou na mesma coluna, inverte a direção. Senão, ordena de forma descendente.
-    const novaDirecao =
-      coluna === colunaOrdenacao && direcaoOrdenacao === "desc"
-        ? "asc"
-        : "desc";
-    setColunaOrdenacao(coluna);
-    setDirecaoOrdenacao(novaDirecao);
-  };
-
   return (
     <div className="max-w-full mx-auto p-6">
       {/* Fundo Branco */}
@@ -341,8 +394,20 @@ export function GestaoCobrancas() {
           </div>
           {/* Botões de Ação */}
           <div className="flex space-x-3">
+            {errosImportacao.length > 0 && (
+              <button
+                onClick={() => setModalErrosAberto(true)}
+                className="flex items-center px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 animate-pulse"
+              >
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                Verificar Erros da Última Importação
+              </button>
+            )}
             <button
-              onClick={() => setModalAberto("upload")}
+              onClick={() => {
+                setModalAberto("upload");
+                setErrosImportacao([]); // Limpa os erros antigos ao tentar um novo upload
+              }}
               className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
             >
               <Upload className="w-4 h-4 mr-2" />
@@ -754,7 +819,7 @@ export function GestaoCobrancas() {
       {/* Modal de Upload */}
       {modalAberto === "upload" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold">Upload de Planilha</h3>
               <button
@@ -806,6 +871,21 @@ export function GestaoCobrancas() {
             </div>
 
             <div className="flex justify-center space-x-6 mt-6 w-full">
+              {/*Botão de Validação*/}
+              <button
+                onClick={() => handleValidarPlanilha()} // Chama a nova função
+                disabled={!arquivoSelecionado || processando}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {processando ? (
+                  <span className="flex items-center">
+                    <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                    Validando...
+                  </span>
+                ) : (
+                  "Apenas Validar"
+                )}
+              </button>
               <button
                 onClick={handleProcessarPlanilha} // Linha adicionada para processar o upload
                 disabled={!arquivoSelecionado || processando} // Desabilita o botão se não houver arquivo ou se estiver processando
@@ -831,6 +911,49 @@ export function GestaoCobrancas() {
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal de Erros */}
+      {modalErrosAberto && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Erros Encontrados na Última Importação
+              </h3>
+              <button
+                onClick={() => setModalErrosAberto(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg max-h-96 overflow-y-auto">
+              <ul className="space-y-2 text-sm text-gray-700">
+                {errosImportacao.map((erro, index) => (
+                  <li
+                    key={index}
+                    className="p-2 bg-red-100 text-red-800 rounded-md"
+                  >
+                    {erro}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex justify-end items-center mt-6">
+              {/* Botão para Limpar os Erros (à esquerda) */}
+              <button
+                onClick={() => {
+                  setErrosImportacao([]); // Limpa a lista de erros
+                  setModalErrosAberto(false); // Fecha o modal
+                }}
+                className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                title="Limpa os erros da memória e esconde o botão de alerta."
+              >
+                Limpar Erros e Fechar
               </button>
             </div>
           </div>

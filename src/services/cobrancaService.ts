@@ -17,46 +17,47 @@ export class CobrancaService {
   async processarImportacaoPlanilha(
     dadosDaPlanilha: CobrancaFranqueado[],
     nomeArquivo: string,
-    usuario: string
+    usuario: string,
+    apenasValidar = false // <-- PARÂMETRO NOVO ADICIONADO AQUI
   ): Promise<ResultadoImportacao> {
     const referenciaImportacao = `IMP_${Date.now()}_${Math.random()
       .toString(36)
       .substring(2, 9)}`;
     const erros: string[] = [];
 
-    // 1. Cria o registro da importação ANTES de processar as linhas
-    const { data: importacao, error: errorImportacao } = await supabase
-      .from("importacoes_planilha")
-      .insert({
-        usuario,
-        arquivo_nome: nomeArquivo,
-        referencia: referenciaImportacao,
-        total_registros: dadosDaPlanilha.length,
-      })
-      .select()
-      .single();
+    // Se não for apenas uma validação, cria o registro de importação
+    let importacaoId = `validacao_${Date.now()}`;
+    if (!apenasValidar) {
+      const { data: importacao, error: errorImportacao } = await supabase
+        .from("importacoes_planilha")
+        .insert({
+          usuario,
+          arquivo_nome: nomeArquivo,
+          referencia: referenciaImportacao,
+          total_registros: dadosDaPlanilha.length,
+        })
+        .select("id")
+        .single();
 
-    if (errorImportacao) {
-      throw new Error(
-        `Erro fatal ao criar registro de importação: ${errorImportacao.message}`
-      );
+      if (errorImportacao) {
+        throw new Error(
+          `Erro fatal ao criar registro de importação: ${errorImportacao.message}`
+        );
+      }
+      importacaoId = importacao.id;
     }
 
-    // 2. Inicializa estatísticas e configurações
     let novosRegistros = 0;
     let registrosAtualizados = 0;
     const configuracoes = {
-      // Usando configurações padrão por enquanto
       juros_mensal: 2.5,
       multa_atraso: 5.0,
       limite_dias_para_acionamento: 30,
     };
     const referenciasNovaPlanilha = new Set<string>();
 
-    // 3. Processa cada linha da planilha DENTRO de um loop
     for (const [index, dados] of dadosDaPlanilha.entries()) {
       try {
-        // Validação Mínima: Garante que os dados essenciais existem antes de prosseguir
         if (!dados.cnpj || !dados.valor_original || !dados.data_vencimento) {
           throw new Error(
             "Dados essenciais (CNPJ, Valor, Vencimento) faltando na linha."
@@ -71,78 +72,83 @@ export class CobrancaService {
           erros.push(
             `Linha ${index + 2}: Unidade com CNPJ/CPF '${
               dados.cnpj
-            }' não foi encontrada no banco.`
+            }' não encontrada.`
           );
-          continue; // Pula para a próxima linha
+          continue;
         }
 
         const { data: cobrancaExistente } = await supabase
           .from("cobrancas_franqueados")
-          .select("id, status") // Seleciona apenas o necessário
+          .select("id, status")
           .eq("linha_referencia_importada", referenciaLinha)
           .maybeSingle();
 
-        if (cobrancaExistente) {
-          await this.atualizarCobrancaExistente(
-            cobrancaExistente,
-            dados,
-            configuracoes,
-            referenciaImportacao
-          );
-          registrosAtualizados++;
+        // ### LÓGICA DO DRY RUN ###
+        // Se for apenas uma validação, não executa o INSERT ou UPDATE
+        if (!apenasValidar) {
+          if (cobrancaExistente) {
+            await this.atualizarCobrancaExistente(
+              cobrancaExistente,
+              dados,
+              configuracoes,
+              referenciaImportacao
+            );
+            registrosAtualizados++;
+          } else {
+            await this.inserirNovaCobranca(
+              dados,
+              unidadeId,
+              configuracoes,
+              referenciaLinha,
+              referenciaImportacao
+            );
+            novosRegistros++;
+          }
         } else {
-          await this.inserirNovaCobranca(
-            dados,
-            unidadeId,
-            configuracoes,
-            referenciaLinha,
-            referenciaImportacao
-          );
-          novosRegistros++;
+          // Se for validação, apenas contamos o que seria feito
+          if (cobrancaExistente) registrosAtualizados++;
+          else novosRegistros++;
         }
       } catch (error: any) {
         console.error(`### ERRO DETALHADO NA LINHA ${index + 2} ###`, {
           message: error.message,
-          details: error.details,
-          code: error.code,
-          hint: error.hint,
           dadosDaLinha: dados,
         });
         erros.push(`Linha ${index + 2}: ${error.message}`);
       }
     }
 
-    // 4. Marca cobranças antigas como quitadas
-    const registrosQuitados = await this.marcarCobrancasQuitadas(
-      referenciasNovaPlanilha,
-      referenciaImportacao
-    );
+    // Se não for apenas validação, atualiza as estatísticas
+    if (!apenasValidar) {
+      const registrosQuitados = await this.marcarCobrancasQuitadas(
+        referenciasNovaPlanilha,
+        referenciaImportacao
+      );
+      await supabase
+        .from("importacoes_planilha")
+        .update({
+          novos_registros: novosRegistros,
+          registros_atualizados: registrosAtualizados,
+          registros_quitados: registrosQuitados,
+          observacoes:
+            erros.length > 0
+              ? `${erros.length} erros encontrados`
+              : "Importação concluída com sucesso",
+        })
+        .eq("id", importacaoId);
+    }
 
-    // 5. Atualiza o registro de importação com o resultado final
-    await supabase
-      .from("importacoes_planilha")
-      .update({
-        novos_registros: novosRegistros,
-        registros_atualizados: registrosAtualizados,
-        registros_quitados: registrosQuitados,
-        observacoes:
-          erros.length > 0
-            ? `${erros.length} erros encontrados`
-            : "Importação concluída com sucesso",
-      })
-      .eq("id", importacao.id);
-
-    // 6. Retorna o resultado completo
+    // Retorna o resultado completo
     return {
       sucesso: erros.length === 0,
-      importacao_id: importacao.id,
+      importacao_id: importacaoId,
       estatisticas: {
         total_registros: dadosDaPlanilha.length,
         novos_registros: novosRegistros,
         registros_atualizados: registrosAtualizados,
-        registros_quitados: registrosQuitados,
+        registros_quitados: 0, // A validação não calcula isso
       },
-      erros: erros,
+      erros: erros.length > 0 ? erros : [],
     };
   }
 
