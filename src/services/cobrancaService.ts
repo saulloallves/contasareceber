@@ -9,8 +9,18 @@ import {
   normalizarData,
 } from "../utils/planilhaProcessor";
 import { supabase } from "./databaseService";
+import { comparacaoPlanilhaService, ResultadoComparacao } from "./comparacaoPlanilhaService";
 
 export class CobrancaService {
+  /**
+   * Compara nova planilha com a última importação
+   */
+  async compararComUltimaPlanilha(
+    dadosNovaPlanilha: CobrancaFranqueado[]
+  ): Promise<ResultadoComparacao> {
+    return await comparacaoPlanilhaService.compararComUltimaPlanilha(dadosNovaPlanilha);
+  }
+
   /**
    * Processa importação de planilha e atualiza banco de dados
    */

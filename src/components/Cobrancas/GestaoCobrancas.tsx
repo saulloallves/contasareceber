@@ -25,6 +25,8 @@ import {
   processarPlanilhaXML,
 } from "../../utils/planilhaProcessor";
 import type { ResultadoImportacao } from "../../types/cobranca";
+import type { ResultadoComparacao } from "../../services/comparacaoPlanilhaService";
+import { comparacaoPlanilhaService } from "../../services/comparacaoPlanilhaService";
 import {
   formatarCNPJCPF,
   formatarMoeda,
@@ -44,6 +46,8 @@ export function GestaoCobrancas() {
   ); //Linha adicionada para 'guardar' o arquivo selecionado
   const [processando, setProcessando] = useState(false); // Linha adicionada para controlar o estado de processamento do upload
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null); // Linha adicionada para armazenar o resultado do processamento da planilha
+  const [resultadoComparacao, setResultadoComparacao] = useState<ResultadoComparacao | null>(null);
+  const [modalComparacaoAberto, setModalComparacaoAberto] = useState(false);
   const [usuario] = useState("admin"); // Em produção, pegar do contexto de autenticação
   const [formData, setFormData] = useState<Partial<CobrancaFranqueado>>({});
   const [filtros, setFiltros] = useState({
@@ -193,6 +197,50 @@ export function GestaoCobrancas() {
     } finally {
       setProcessando(false);
       // Não fechamos o modal para que o usuário possa processar de verdade
+    }
+  };
+
+  /**
+   * Função para comparar com a última planilha salva
+   */
+  const handleCompararPlanilha = async () => {
+    if (!arquivoSelecionado) {
+      alert("Por favor, selecione um arquivo primeiro.");
+      return;
+    }
+
+    setProcessando(true);
+    setResultadoComparacao(null);
+
+    try {
+      console.log("Iniciando comparação com última planilha...");
+      let dadosDaPlanilha;
+
+      // Processa o arquivo selecionado
+      if (arquivoSelecionado.name.toLowerCase().endsWith(".xlsx")) {
+        dadosDaPlanilha = await processarPlanilhaExcel(arquivoSelecionado);
+      } else if (arquivoSelecionado.name.toLowerCase().endsWith(".csv")) {
+        dadosDaPlanilha = await processarPlanilhaXML(arquivoSelecionado);
+      } else {
+        throw new Error("Formato de arquivo não suportado. Use .xlsx ou .csv");
+      }
+
+      if (!dadosDaPlanilha) {
+        throw new Error("Não foi possível extrair dados da planilha.");
+      }
+
+      console.log(`${dadosDaPlanilha.length} registros extraídos. Comparando...`);
+
+      // Chama o serviço de comparação
+      const resultadoComp = await cobrancaService.compararComUltimaPlanilha(dadosDaPlanilha);
+      setResultadoComparacao(resultadoComp);
+      setModalComparacaoAberto(true);
+
+    } catch (error: any) {
+      console.error("ERRO ao comparar planilhas:", error);
+      alert(`Erro ao comparar planilhas: ${error.message}`);
+    } finally {
+      setProcessando(false);
     }
   };
 
@@ -887,6 +935,20 @@ export function GestaoCobrancas() {
                 )}
               </button>
               <button
+                onClick={handleCompararPlanilha}
+                disabled={!arquivoSelecionado || processando}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {processando ? (
+                  <span className="flex items-center">
+                    <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                    Comparando...
+                  </span>
+                ) : (
+                  "Comparar com Última"
+                )}
+              </button>
+              <button
                 onClick={handleProcessarPlanilha} // Linha adicionada para processar o upload
                 disabled={!arquivoSelecionado || processando} // Desabilita o botão se não houver arquivo ou se estiver processando
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -916,6 +978,162 @@ export function GestaoCobrancas() {
           </div>
         </div>
       )}
+
+      {/* Modal de Comparação */}
+      {modalComparacaoAberto && resultadoComparacao && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Comparação com Última Planilha
+              </h3>
+              <button
+                onClick={() => setModalComparacaoAberto(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Resumo da Comparação */}
+            <div className="mb-6">
+              {resultadoComparacao.tem_diferencas ? (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <AlertTriangle className="w-6 h-6 text-yellow-600 mr-3" />
+                    <div>
+                      <h4 className="font-semibold text-yellow-800">
+                        Diferenças Encontradas
+                      </h4>
+                      <p className="text-yellow-700">
+                        {resultadoComparacao.total_diferencas} diferenças encontradas em relação à última importação
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <CheckCircle className="w-6 h-6 text-green-600 mr-3" />
+                    <div>
+                      <h4 className="font-semibold text-green-800">
+                        Nenhuma Diferença
+                      </h4>
+                      <p className="text-green-700">
+                        A nova planilha é idêntica à última importação
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Informações da Última Importação */}
+            {resultadoComparacao.ultima_importacao && (
+              <div className="mb-6 bg-gray-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-800 mb-2">Última Importação:</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
+                  <div>
+                    <span className="font-medium">Data:</span> {new Date(resultadoComparacao.ultima_importacao.data).toLocaleString('pt-BR')}
+                  </div>
+                  <div>
+                    <span className="font-medium">Arquivo:</span> {resultadoComparacao.ultima_importacao.arquivo}
+                  </div>
+                  <div>
+                    <span className="font-medium">Usuário:</span> {resultadoComparacao.ultima_importacao.usuario}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Estatísticas */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="text-2xl font-bold text-green-600">{resultadoComparacao.resumo.novos}</div>
+                <div className="text-sm text-green-800">Novos Registros</div>
+              </div>
+              <div className="bg-yellow-50 rounded-lg p-4">
+                <div className="text-2xl font-bold text-yellow-600">{resultadoComparacao.resumo.alterados}</div>
+                <div className="text-sm text-yellow-800">Registros Alterados</div>
+              </div>
+              <div className="bg-red-50 rounded-lg p-4">
+                <div className="text-2xl font-bold text-red-600">{resultadoComparacao.resumo.removidos}</div>
+                <div className="text-sm text-red-800">Registros Removidos</div>
+              </div>
+            </div>
+
+            {/* Lista de Diferenças */}
+            {resultadoComparacao.tem_diferencas && (
+              <div className="mb-6">
+                <h4 className="font-semibold text-gray-800 mb-4">Detalhes das Diferenças:</h4>
+                <div className="max-h-96 overflow-y-auto">
+                  <div className="space-y-3">
+                    {resultadoComparacao.diferencas.map((diff, index) => (
+                      <div
+                        key={index}
+                        className={`p-4 rounded-lg border-l-4 ${
+                          diff.tipo === 'novo' ? 'border-green-500 bg-green-50' :
+                          diff.tipo === 'alterado' ? 'border-yellow-500 bg-yellow-50' :
+                          'border-red-500 bg-red-50'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center mb-2">
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                diff.tipo === 'novo' ? 'bg-green-100 text-green-800' :
+                                diff.tipo === 'alterado' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {diff.tipo.toUpperCase()}
+                              </span>
+                              <span className="ml-3 font-medium text-gray-800">
+                                {diff.cliente} ({formatarCNPJCPF(diff.cnpj)})
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-700">{diff.detalhes}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Botões de Ação */}
+            <div className="flex justify-end space-x-3">
+              {resultadoComparacao.tem_diferencas && (
+                <button
+                  onClick={() => {
+                    // Gera e baixa relatório de comparação
+                    const relatorio = comparacaoPlanilhaService.gerarRelatorioComparacao(resultadoComparacao);
+                    const blob = new Blob([relatorio], { type: 'text/plain;charset=utf-8' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `comparacao-planilha-${new Date().toISOString().split('T')[0]}.txt`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Baixar Relatório
+                </button>
+              )}
+              <button
+                onClick={() => setModalComparacaoAberto(false)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de Erros */}
       {modalErrosAberto && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
