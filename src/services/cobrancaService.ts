@@ -305,7 +305,7 @@ export class CobrancaService {
       valor_original: dadosNovos.valor_original,
       data_vencimento: normalizarData(dadosNovos.data_vencimento),
       valor_atualizado: valorAtualizado,
-      data_atualizacao: new Date().toISOString(),
+      data_ultima_atualizacao: new Date().toISOString(),
       referencia_importacao: referenciaImportacao,
       status: cobrancaExistente.status === "quitado" ? "quitado" : "em_aberto",
     };
@@ -355,7 +355,7 @@ export class CobrancaService {
       .from("cobrancas_franqueados")
       .update({
         status: "quitado",
-        data_atualizacao: new Date().toISOString(),
+        data_ultima_atualizacao: new Date().toISOString(),
         referencia_importacao: referenciaImportacao,
       })
       .in("id", idsParaQuitar);
