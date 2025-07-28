@@ -176,19 +176,55 @@ function processarDadosJson(jsonData: any[][]): CobrancaFranqueado[] {
       let documentoFinal = "";
       
       // Se CNPJ existe e não é zero, usa CNPJ
-      if (cnpjLimpo && cnpjLimpo !== "0" && cnpjLimpo.length === 14) {
-        documentoFinal = cnpjLimpo;
+      if (cnpjLimpo && cnpjLimpo !== "0" && cnpjLimpo.length >= 14) {
+        // Garante que o CNPJ tenha exatamente 14 dígitos
+        documentoFinal = cnpjLimpo.substring(0, 14);
       }
       // Senão, se CPF existe e é válido, usa CPF
-      else if (cpfLimpo && cpfLimpo !== "0" && cpfLimpo.length === 11) {
-        documentoFinal = cpfLimpo;
+      else if (cpfLimpo && cpfLimpo !== "0" && cpfLimpo.length >= 11) {
+        // Garante que o CPF tenha exatamente 11 dígitos
+        documentoFinal = cpfLimpo.substring(0, 11);
       }
-      // Se nenhum documento válido, tenta usar o que tiver
+      // Se nenhum documento válido no tamanho correto, tenta usar o que tiver (com validação de tamanho)
       else if (cnpjLimpo && cnpjLimpo !== "0") {
-        documentoFinal = cnpjLimpo;
+        // Se o CNPJ limpo tem pelo menos 14 dígitos, corta para 14
+        if (cnpjLimpo.length >= 14) {
+          documentoFinal = cnpjLimpo.substring(0, 14);
+        } else {
+          documentoFinal = cnpjLimpo;
+        }
       }
       else if (cpfLimpo && cpfLimpo !== "0") {
+        // Se o CPF limpo tem pelo menos 11 dígitos, corta para 11
+        if (cpfLimpo.length >= 11) {
+          documentoFinal = cpfLimpo.substring(0, 11);
+        } else {
+          documentoFinal = cpfLimpo;
+        }
+      }
+
+      // Validação final do tamanho do documento
+      if (documentoFinal.length === 14) {
+        // É um CNPJ válido
+        documentoFinal = cnpjLimpo;
+      }
+      else if (documentoFinal.length === 11) {
+        // É um CPF válido
         documentoFinal = cpfLimpo;
+      }
+      else if (documentoFinal.length < 11) {
+        // Documento muito curto, inválido
+        console.warn(
+          `Linha ${i + 1} ignorada: Documento muito curto (${documentoFinal.length} dígitos): "${documentoFinal}".`
+        );
+        continue;
+      }
+      else {
+        // Documento com tamanho inválido (entre 12-13 dígitos)
+        console.warn(
+          `Linha ${i + 1} ignorada: Documento com tamanho inválido (${documentoFinal.length} dígitos): "${documentoFinal}".`
+        );
+        continue;
       }
 
       // Valida se tem documento válido
@@ -416,6 +452,16 @@ function limparFormatacaoDocumento(valor: string): string {
   
   // Remove zeros à esquerda desnecessários, mas mantém pelo menos um dígito
   limpo = limpo.replace(/^0+/, "") || "0";
+  
+  // Limita o tamanho baseado no tipo de documento
+  // Se tem 14 dígitos ou mais, assume CNPJ e limita a 14
+  if (limpo.length >= 14) {
+    limpo = limpo.substring(0, 14);
+  }
+  // Se tem entre 11 e 13 dígitos, assume CPF e limita a 11
+  else if (limpo.length >= 11) {
+    limpo = limpo.substring(0, 11);
+  }
   
   return limpo;
 }
