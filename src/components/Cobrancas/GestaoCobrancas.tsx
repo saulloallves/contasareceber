@@ -153,55 +153,6 @@ export function GestaoCobrancas() {
   };
 
   /**
-   * Função para validar a planilha selecionada sem salvar no banco
-   * Ela processa a planilha e verifica se há erros, mas não salva nada no banco
-   */
-  const handleValidarPlanilha = async () => {
-    if (!arquivoSelecionado) {
-      alert("Por favor, selecione um arquivo primeiro.");
-      return;
-    }
-
-    setProcessando(true);
-    setErrosImportacao([]); // Limpa erros antigos
-
-    try {
-      const dadosDaPlanilha = await processarPlanilhaExcel(arquivoSelecionado);
-
-      // Chama o mesmo serviço, mas com o parâmetro 'apenasValidar' como true
-      const resultadoValidacao =
-        await cobrancaService.processarImportacaoPlanilha(
-          dadosDaPlanilha,
-          arquivoSelecionado.name,
-          usuario,
-          true // <-- O novo parâmetro 'apenasValidar'
-        );
-
-      // Se houver erros, guardamos e avisamos o usuário
-      if (resultadoValidacao.erros && resultadoValidacao.erros.length > 0) {
-        setErrosImportacao(resultadoValidacao.erros);
-        alert(
-          `Validação concluída. Foram encontrados ${resultadoValidacao.erros.length} problemas. Clique em "Verificar Erros" para ver os detalhes.`
-        );
-      } else {
-        alert(
-          "Validação concluída. Nenhum erro encontrado! A planilha está pronta para ser importada."
-        );
-      }
-    } catch (error: any) {
-      console.error("ERRO CRÍTICO ao validar a planilha:", error);
-      const erroMsg = error.message || "Ocorreu um erro inesperado.";
-      setErrosImportacao([`Erro crítico: ${erroMsg}`]);
-      alert(
-        `Ocorreu um erro crítico durante a validação. Clique em "Verificar Erros" para ver os detalhes.`
-      );
-    } finally {
-      setProcessando(false);
-      // Não fechamos o modal para que o usuário possa processar de verdade
-    }
-  };
-
-  /**
    * Função para comparar com a última planilha salva
    */
   const handleCompararPlanilha = async () => {
@@ -312,7 +263,7 @@ export function GestaoCobrancas() {
         if (resultadoImportacao.erros && resultadoImportacao.erros.length > 0) {
           setErrosImportacao(resultadoImportacao.erros);
           alert(
-            `A importação foi concluída, mas foram encontrados ${resultadoImportacao.erros.length} erros. Clique em "Verificar Erros" para ver os detalhes.`
+            `A importação não foi realizada devido a ${resultadoImportacao.erros.length} erros encontrados. Clique em "Verificar Erros" para ver os detalhes e corrigir a planilha.`
           );
         } else {
           alert("A importação falhou por um motivo desconhecido!");
@@ -923,21 +874,6 @@ export function GestaoCobrancas() {
             </div>
 
             <div className="flex justify-center space-x-6 mt-6 w-full">
-              {/*Botão de Validação*/}
-              <button
-                onClick={() => handleValidarPlanilha()} // Chama a nova função
-                disabled={!arquivoSelecionado || processando}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {processando ? (
-                  <span className="flex items-center">
-                    <RefreshCw className="w-4 h-4 animate-spin mr-2" />
-                    Validando...
-                  </span>
-                ) : (
-                  "Apenas Validar"
-                )}
-              </button>
               <button
                 onClick={handleCompararPlanilha}
                 disabled={!arquivoSelecionado || processando}
@@ -1206,7 +1142,7 @@ export function GestaoCobrancas() {
                   setModalErrosAberto(false); // Fecha o modal
                 }}
                 className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                title="Limpa os erros da memória e esconde o botão de alerta."
+                title="Limpa os erros da memória e esconde o botão de alerta"
               >
                 Limpar Erros e Fechar
               </button>
