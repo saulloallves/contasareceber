@@ -170,7 +170,7 @@ export function CadastroUnidades() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
+    <div className="max-w-full mx-auto p-6">
       <div className="bg-white rounded-lg shadow-lg p-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">

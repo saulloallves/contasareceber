@@ -293,7 +293,7 @@ export function GestaoCobrancas() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
+    <div className="max-w-full mx-auto p-6">
       {/* Fundo Branco */}
       <div className="bg-white rounded-lg shadow-lg p-8">
         {/* Header */}
