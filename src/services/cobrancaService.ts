@@ -53,7 +53,7 @@ export class CobrancaService {
     };
     const referenciasNovaPlanilha = new Set<string>();
 
-    // 3. Processa cada linha da planilha DENTRO de um loop seguro
+    // 3. Processa cada linha da planilha DENTRO de um loop
     for (const [index, dados] of dadosDaPlanilha.entries()) {
       try {
         // Validação Mínima: Garante que os dados essenciais existem antes de prosseguir
@@ -366,6 +366,7 @@ export class CobrancaService {
       valorMax?: string;
       colunaOrdenacao?: string;
       direcaoOrdenacao?: string;
+      apenasInadimplentes?: boolean; // Novo filtro para cobranças inadimplentes
     } = {}
   ) {
     let query = supabase.from("cobrancas_franqueados").select(
@@ -411,6 +412,11 @@ export class CobrancaService {
     } else {
       // Ordenação padrão caso nenhuma seja especificada
       query = query.order("data_vencimento", { ascending: false });
+    }
+
+    if (filtros.apenasInadimplentes) {
+      // A regra de negócio: dias_em_atraso maior ou igual a 30
+      query = query.gte("dias_em_atraso", 30);
     }
 
     const { data, error } = await query;

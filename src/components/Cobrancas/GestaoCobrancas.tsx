@@ -55,11 +55,13 @@ export function GestaoCobrancas() {
   });
   const [colunaOrdenacao, setColunaOrdenacao] = useState("data_vencimento"); // Coluna padrão
   const [direcaoOrdenacao, setDirecaoOrdenacao] = useState("desc"); // Ordenação 'asc' ou 'desc'
+  const [mostrarApenasInadimplentes, setMostrarApenasInadimplentes] =
+    useState(false); // Linha adicionada para controlar a exibição de inadimplentes
 
   // Carrega as cobranças ao montar o componente e quando os filtros ou ordenação mudam
   useEffect(() => {
     carregarCobrancas();
-  }, [filtros, colunaOrdenacao, direcaoOrdenacao]);
+  }, [filtros, colunaOrdenacao, direcaoOrdenacao, mostrarApenasInadimplentes]);
 
   /**
    * Função para carregar as cobranças do serviço
@@ -72,6 +74,7 @@ export function GestaoCobrancas() {
         ...filtros,
         colunaOrdenacao,
         direcaoOrdenacao,
+        apenasInadimplentes: mostrarApenasInadimplentes, // Linha adicionada para filtrar apenas inadimplentes
       });
       setCobrancas(dadosReaisDoBanco);
     } catch (error) {
@@ -416,6 +419,21 @@ export function GestaoCobrancas() {
               placeholder="Valor máximo"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+          <div className="mt-4 ml-1 flex items-center">
+            <input
+              type="checkbox"
+              id="inadimplentes-checkbox"
+              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              checked={mostrarApenasInadimplentes}
+              onChange={(e) => setMostrarApenasInadimplentes(e.target.checked)}
+            />
+            <label
+              htmlFor="inadimplentes-checkbox"
+              className="ml-2 block text-sm text-gray-900"
+            >
+              Mostrar apenas cobranças inadimplentes
+            </label>
           </div>
         </div>
 
