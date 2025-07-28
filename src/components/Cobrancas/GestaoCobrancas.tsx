@@ -24,7 +24,11 @@ import {
   processarPlanilhaXML,
 } from "../../utils/planilhaProcessor";
 import type { ResultadoImportacao } from "../../types/cobranca";
-import { formatarCNPJCPF } from "../../utils/formatters"; // Importando a função de formatação de CNPJ/CPF
+import {
+  formatarCNPJCPF,
+  formatarMoeda,
+  formatarData,
+} from "../../utils/formatters"; // Importando a função de formatação de CNPJ/CPF
 
 export function GestaoCobrancas() {
   const [cobrancas, setCobrancas] = useState<CobrancaFranqueado[]>([]);
@@ -50,12 +54,17 @@ export function GestaoCobrancas() {
     valorMax: "",
   });
   const [colunaOrdenacao, setColunaOrdenacao] = useState("data_vencimento"); // Coluna padrão
-  const [direcaoOrdenacao, setDirecaoOrdenacao] = useState("desc"); // 'asc' ou 'desc'
+  const [direcaoOrdenacao, setDirecaoOrdenacao] = useState("desc"); // Ordenação 'asc' ou 'desc'
 
+  // Carrega as cobranças ao montar o componente e quando os filtros ou ordenação mudam
   useEffect(() => {
     carregarCobrancas();
   }, [filtros, colunaOrdenacao, direcaoOrdenacao]);
 
+  /**
+   * Função para carregar as cobranças do serviço
+   * Ela aplica os filtros e ordenação definidos pelo usuário
+   */
   const carregarCobrancas = async () => {
     setCarregando(true);
     try {
@@ -75,6 +84,9 @@ export function GestaoCobrancas() {
     }
   };
 
+  /**
+   * Função para abrir o modal de criação
+   */
   const abrirModalCriar = () => {
     setFormData({
       cnpj: "",
@@ -87,12 +99,18 @@ export function GestaoCobrancas() {
     setModalAberto("criar");
   };
 
+  /**
+   * Função para abrir o modal de edição
+   */
   const abrirModalEditar = (cobranca: CobrancaFranqueado) => {
     setCobrancaSelecionada(cobranca);
     setFormData(cobranca);
     setModalAberto("editar");
   };
 
+  /**
+   * Função para fechar o modal e limpar os dados do formulário
+   */
   const fecharModal = () => {
     setModalAberto(null);
     setCobrancaSelecionada(null);
@@ -110,6 +128,10 @@ export function GestaoCobrancas() {
     }
   };
 
+  /**
+   * Função para limpar o arquivo selecionado
+   * Isso é útil para permitir que o usuário selecione o mesmo arquivo novamente
+   */
   const LimparArquivo = () => {
     setArquivoSelecionado(null); // Limpa o arquivo selecionado
     // Limpa o input de arquivo para permitir novo upload, isso é necessário para que o usuário possa selecionar o mesmo arquivo novamente
@@ -119,6 +141,10 @@ export function GestaoCobrancas() {
     }
   };
 
+  /**
+   * Função para processar a planilha selecionada
+   * Ela verifica o tipo de arquivo e chama a função apropriada para processar os dados
+   */
   const handleProcessarPlanilha = async () => {
     if (!arquivoSelecionado) {
       alert("Por favor, selecione um arquivo primeiro.");
@@ -201,6 +227,9 @@ export function GestaoCobrancas() {
     }
   };
 
+  /**
+   * Função para salvar a cobrança (criação ou edição)
+   */
   const salvarCobranca = async () => {
     try {
       if (modalAberto === "criar") {
@@ -215,6 +244,10 @@ export function GestaoCobrancas() {
     }
   };
 
+  /**
+   * Função para enviar a cobrança via WhatsApp
+   * (Falta a integração com o serviço de envio de mensagens, apenas um exemplo de como poderia ser implementado)
+   */
   const enviarCobranca = async (cobranca: CobrancaFranqueado) => {
     try {
       console.log("Enviando cobrança via WhatsApp:", cobranca);
@@ -224,6 +257,10 @@ export function GestaoCobrancas() {
     }
   };
 
+  /**
+   * Função para marcar a cobrança como quitada
+   * (Falta a integração com o serviço de atualização de cobranças, apenas um exemplo de como poderia ser implementado)
+   */
   const marcarQuitado = async (id: string) => {
     try {
       console.log("Marcando como quitado:", id);
@@ -233,6 +270,9 @@ export function GestaoCobrancas() {
     }
   };
 
+  /**
+   * Função para obter o ícone de status, conforme o status da cobrança
+   */
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "quitado":
@@ -246,6 +286,9 @@ export function GestaoCobrancas() {
     }
   };
 
+  /**
+   * Função para obter a cor de status, conforme o status da cobrança
+   */
   const getStatusColor = (status: string) => {
     switch (status) {
       case "quitado":
@@ -259,29 +302,10 @@ export function GestaoCobrancas() {
     }
   };
 
-  const formatarMoeda = (valor: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(valor);
-  };
-
-  const formatarData = (data: string) => {
-    if (!data) {
-      return "N/A";
-    }
-    // A string de data (ex: "2024-04-15") é interpretada como UTC.
-    // Adicionamos 'T00:00:00' para garantir que a hora seja meia-noite,
-    // mas o mais importante é que o new Date() vai ajustar para o fuso local.
-    // Para corrigir isso, criamos a data e depois adicionamos o offset do fuso de volta.
-    const dataObj = new Date(`${data}T00:00:00`);
-    const offset = dataObj.getTimezoneOffset(); // Pega a diferença em minutos (ex: 180 para UTC-3)
-    const dataCorrigida = new Date(dataObj.getTime() + offset * 60 * 1000);
-
-    // Agora formata a data já corrigida
-    return dataCorrigida.toLocaleDateString("pt-BR");
-  };
-
+  /**
+   * Função para lidar com a ordenação das colunas
+   * Ela altera a direção da ordenação se a mesma coluna for clicada novamente
+   */
   const handleOrdenacao = (coluna: string) => {
     // Se clicou na mesma coluna, inverte a direção. Senão, ordena de forma descendente.
     const novaDirecao =
