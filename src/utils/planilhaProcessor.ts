@@ -115,8 +115,10 @@ function processarDadosJson(jsonData: any[][]): CobrancaFranqueado[] {
     ]),
     vencimento: encontrarIndiceColuna(cabecalhos, [
       "DATA_VENCIMENTO",
-      "VENCIMENTO",
       "DATA VENCIMENTO",
+      "VENCIMENTO",
+      "DATA_VENCIMENTO_ORIGINAL",
+      "DATA VENCIMENTO ORIGINAL",
     ]),
     vencimentoOriginal: encontrarIndiceColuna(cabecalhos, [
       "DATA_VENCIMENTO_ORIGINAL",
@@ -216,9 +218,10 @@ function processarDadosJson(jsonData: any[][]): CobrancaFranqueado[] {
             : "royalty",
         valor_original: valorOriginal > 0 ? valorOriginal : 0,
         valor_recebido: valorRecebido > 0 ? valorRecebido : 0,
-        data_vencimento: linha[indices.vencimento],
-        data_vencimento_original:
-          linha[indices.vencimentoOriginal] || linha[indices.vencimento],
+        data_vencimento: normalizarDataVencimento(linha[indices.vencimento]),
+        data_vencimento_original: normalizarDataVencimento(
+          linha[indices.vencimentoOriginal] || linha[indices.vencimento]
+        ),
         descricao:
           indices.descricao !== -1
             ? String(linha[indices.descricao] || "").trim()
@@ -318,7 +321,19 @@ function encontrarIndiceColuna(
   nomesPossiveis: string[]
 ): number {
   for (const nome of nomesPossiveis) {
-    const indice = cabecalhos.findIndex((h) => h.includes(nome));
+    // Busca por correspondência exata primeiro, depois por inclusão
+    let indice = cabecalhos.findIndex((h) => h === nome);
+    if (indice === -1) {
+      // Se não encontrou correspondência exata, busca por inclusão
+      // mas exclui colunas que contêm "TEMPO DECORRIDO" ou "DECORRIDO"
+      indice = cabecalhos.findIndex((h) => 
+        h.includes(nome) && 
+        !h.includes("TEMPO DECORRIDO") && 
+        !h.includes("DECORRIDO") &&
+        !h.includes("TEMPO") &&
+        !h.includes("HÁ")
+      );
+    }
     if (indice !== -1) return indice;
   }
   return -1;
@@ -447,4 +462,39 @@ function limparFormatacaoValor(valor: string): number {
   
   // Retorna 0 se não conseguiu converter
   return isNaN(numero) ? 0 : numero;
+}
+/**
+ * Normaliza data de vencimento, tratando diferentes formatos e ignorando texto
+ */
+function normalizarDataVencimento(valor: any): string {
+  if (!valor) return "";
+  
+  // Se for um objeto Date do Excel, converte diretamente
+  if (valor instanceof Date) {
+    return valor.toISOString().split('T')[0];
+  }
+  
+  const valorStr = String(valor).trim();
+  
+  // Ignora valores que são claramente texto descritivo
+  if (
+    valorStr.toLowerCase().includes("há") ||
+    valorStr.toLowerCase().includes("ano") ||
+    valorStr.toLowerCase().includes("mes") ||
+    valorStr.toLowerCase().includes("dia") ||
+    valorStr.toLowerCase().includes("tempo") ||
+    valorStr.toLowerCase().includes("decorrido") ||
+    valorStr.length > 20 // Datas normais não passam de 10-15 caracteres
+  ) {
+    console.warn(`Valor de data ignorado por ser texto descritivo: "${valorStr}"`);
+    return "";
+  }
+  
+  // Tenta converter usando a função existente
+  try {
+    return normalizarData(valorStr);
+  } catch (error) {
+    console.warn(`Erro ao normalizar data "${valorStr}":`, error);
+    return "";
+  }
 }

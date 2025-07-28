@@ -72,9 +72,14 @@ export class CobrancaService {
         }
 
         // Valida formato de data
+        if (!dados.data_vencimento || dados.data_vencimento.trim() === "") {
+          erros.push(`Linha ${index + 2}: Data de vencimento inválida.`);
+          continue;
+        }
+        
         const dataVencimento = new Date(dados.data_vencimento);
         if (isNaN(dataVencimento.getTime())) {
-          erros.push(`Linha ${index + 2}: Data de vencimento inválida.`);
+          erros.push(`Linha ${index + 2}: Data de vencimento inválida: "${dados.data_vencimento}".`);
           continue;
         }
 
