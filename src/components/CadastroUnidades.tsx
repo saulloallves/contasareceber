@@ -41,14 +41,18 @@ export function CadastroUnidades() {
   const carregarDados = async () => {
     setCarregando(true);
     try {
+      console.log('Carregando unidades com filtros:', filtros);
       const [unidadesData, statsData] = await Promise.all([
         unidadesService.buscarUnidades(filtros),
         unidadesService.buscarEstatisticasUnidades(),
       ]);
+      console.log('Unidades carregadas:', unidadesData);
+      console.log('Estatísticas carregadas:', statsData);
       setUnidades(unidadesData);
       setEstatisticas(statsData);
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
+      alert(`Erro ao carregar unidades: ${error}`);
     } finally {
       setCarregando(false);
     }

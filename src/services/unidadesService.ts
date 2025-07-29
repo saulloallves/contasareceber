@@ -1,9 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './databaseService';
 import { UnidadeFranqueada, FiltrosUnidades } from '../types/unidades';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export class UnidadesService {
   /**
@@ -11,33 +7,42 @@ export class UnidadesService {
    */
   async buscarUnidades(filtros: FiltrosUnidades = {}) {
     try {
+      console.log('Buscando unidades no banco...');
       let query = supabase
         .from('unidades_franqueadas')
         .select('*')
         .order('nome_franqueado');
 
       if (filtros.status) {
+        console.log('Aplicando filtro de status:', filtros.status);
         query = query.eq('status_unidade', filtros.status);
       }
 
       if (filtros.estado) {
+        console.log('Aplicando filtro de estado:', filtros.estado);
         query = query.eq('estado', filtros.estado);
       }
 
       if (filtros.franqueado_principal !== undefined) {
+        console.log('Aplicando filtro de franqueado principal:', filtros.franqueado_principal);
         query = query.eq('franqueado_principal', filtros.franqueado_principal);
       }
 
       if (filtros.busca) {
+        console.log('Aplicando filtro de busca:', filtros.busca);
         query = query.or(`nome_franqueado.ilike.%${filtros.busca}%,codigo_unidade.ilike.%${filtros.busca}%,cidade.ilike.%${filtros.busca}%`);
       }
 
       const { data, error } = await query;
+      
+      console.log('Resultado da query:', { data, error });
 
       if (error) {
+        console.error('Erro na query de unidades:', error);
         throw new Error(`Erro ao buscar unidades: ${error.message}`);
       }
 
+      console.log(`Encontradas ${data?.length || 0} unidades`);
       return data || [];
     } catch (error) {
       console.error('Erro ao buscar unidades:', error);
@@ -147,11 +152,15 @@ export class UnidadesService {
    */
   async buscarEstatisticasUnidades() {
     try {
+      console.log('Buscando estatísticas de unidades...');
       const { data, error } = await supabase
         .from('unidades_franqueadas')
         .select('status_unidade, estado, franqueado_principal');
 
+      console.log('Dados para estatísticas:', { data, error });
+
       if (error) {
+        console.error('Erro ao buscar estatísticas:', error);
         throw new Error(`Erro ao buscar estatísticas: ${error.message}`);
       }
 
@@ -180,6 +189,7 @@ export class UnidadesService {
         }
       });
 
+      console.log('Estatísticas calculadas:', stats);
       return stats;
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
