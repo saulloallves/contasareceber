@@ -50,6 +50,11 @@ export class SimulacaoParcelamentoService {
       // Busca configuração
       const config = await this.buscarConfiguracao();
 
+      // Validação de valor mínimo
+      const valorAtualizado = cobranca.valor_atualizado || cobranca.valor_original;
+      if (valorAtualizado < 500) {
+        throw new Error("Valor mínimo para parcelamento é R$ 500,00");
+      }
       // Valida parâmetros
       if (
         quantidadeParcelas < 2 ||
@@ -60,8 +65,6 @@ export class SimulacaoParcelamentoService {
         );
       }
 
-      const valorAtualizado =
-        cobranca.valor_atualizado || cobranca.valor_original;
       const valorParcelar = valorAtualizado - (valorEntrada || 0);
 
       if (valorParcelar <= 0) {
@@ -74,8 +77,12 @@ export class SimulacaoParcelamentoService {
 
       for (let i = 1; i <= quantidadeParcelas; i++) {
         const valorBaseParcela = valorParcelar / quantidadeParcelas;
-        const jurosAplicado =
-          valorBaseParcela * (config.percentual_juros_parcela / 100);
+        
+        // Calcula multa (10%) e juros de mora (1.5%)
+        const multa = valorBaseParcela * 0.10; // 10% de multa
+        const jurosMora = valorBaseParcela * 0.015; // 1.5% de juros de mora
+        const jurosAplicado = multa + jurosMora;
+        
         const valorParcela = valorBaseParcela + jurosAplicado;
 
         // Calcula data de vencimento
@@ -89,6 +96,8 @@ export class SimulacaoParcelamentoService {
           valor: valorParcela,
           data_vencimento: dataVencimento.toISOString().split("T")[0],
           juros_aplicado: jurosAplicado,
+          multa: multa,
+          juros_mora: jurosMora,
         });
 
         valorTotalParcelamento += valorParcela;
@@ -111,7 +120,8 @@ export class SimulacaoParcelamentoService {
         valor_atualizado: valorAtualizado,
         quantidade_parcelas: quantidadeParcelas,
         valor_entrada: valorEntrada,
-        percentual_juros_parcela: config.percentual_juros_parcela,
+        percentual_multa: 10.0,
+        percentual_juros_mora: 1.5,
         data_primeira_parcela: dataPrimeiraParcela,
         parcelas,
         valor_total_parcelamento: valorTotalParcelamento,

@@ -389,8 +389,12 @@ Enviado em: ${new Date().toLocaleString('pt-BR')}
                 <td style="padding: 8px 0; border-bottom: 1px solid #ddd; text-align: right;">${simulacao.quantidade_parcelas}x de ${this.formatarMoeda(simulacao.parcelas[0].valor)}</td>
               </tr>
               <tr>
-                <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Juros por parcela:</strong></td>
-                <td style="padding: 8px 0; border-bottom: 1px solid #ddd; text-align: right;">${simulacao.percentual_juros_parcela}%</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Multa:</strong></td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #ddd; text-align: right;">10% (${this.formatarMoeda(simulacao.parcelas[0].multa)})</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Juros Mora:</strong></td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #ddd; text-align: right;">1.5% (${this.formatarMoeda(simulacao.parcelas[0].juros_mora)})</td>
               </tr>
               <tr style="background-color: #F3F4F6;">
                 <td style="padding: 12px 8px; font-weight: bold; font-size: 16px;"><strong>Valor Total:</strong></td>
@@ -445,7 +449,8 @@ DETALHES DA PROPOSTA:
 - Valor Atualizado: ${this.formatarMoeda(simulacao.valor_atualizado)}
 ${simulacao.valor_entrada ? `- Entrada: ${this.formatarMoeda(simulacao.valor_entrada)}` : ''}
 - Parcelamento: ${simulacao.quantidade_parcelas}x de ${this.formatarMoeda(simulacao.parcelas[0].valor)}
-- Juros por parcela: ${simulacao.percentual_juros_parcela}%
+- Multa: 10% (${this.formatarMoeda(simulacao.parcelas[0].multa)})
+- Juros Mora: 1.5% (${this.formatarMoeda(simulacao.parcelas[0].juros_mora)})
 - Valor Total: ${this.formatarMoeda(simulacao.valor_total_parcelamento)}
 
 CRONOGRAMA:

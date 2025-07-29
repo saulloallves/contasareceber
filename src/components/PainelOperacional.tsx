@@ -358,7 +358,8 @@ Entre em contato: (11) 99999-9999`
   };
 
   const podeSimularParcelamento = (cobranca: any) => {
-    return cobranca.status !== 'quitado' && (cobranca.valor_atualizado || cobranca.valor_original) > 0;
+    const valorAtualizado = cobranca.valor_atualizado || cobranca.valor_original;
+    return cobranca.status !== 'quitado' && valorAtualizado >= 500;
   };
 
   return (
@@ -691,8 +692,12 @@ Entre em contato: (11) 99999-9999`
                       <span className="font-medium">{simulacaoAtual.quantidade_parcelas}x {formatarMoeda(simulacaoAtual.parcelas[0].valor)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Juros por parcela:</span>
-                      <span className="font-medium">{simulacaoAtual.percentual_juros_parcela}%</span>
+                      <span>Multa:</span>
+                      <span className="font-medium">10% ({formatarMoeda(simulacaoAtual.parcelas[0].multa)})</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Juros Mora:</span>
+                      <span className="font-medium">1.5% ({formatarMoeda(simulacaoAtual.parcelas[0].juros_mora)})</span>
                     </div>
                     <div className="flex justify-between border-t pt-2">
                       <span className="font-semibold">Total:</span>
@@ -743,7 +748,8 @@ Entre em contato: (11) 99999-9999`
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>Valor Atualizado: {formatarMoeda(simulacaoAtual.valor_atualizado)}</div>
                   <div>Parcelas: {simulacaoAtual.quantidade_parcelas}x {formatarMoeda(simulacaoAtual.parcelas[0].valor)}</div>
-                  <div>Juros: {simulacaoAtual.percentual_juros_parcela}%</div>
+                  <div>Multa: 10% ({formatarMoeda(simulacaoAtual.parcelas[0].multa)})</div>
+                  <div>Juros Mora: 1.5% ({formatarMoeda(simulacaoAtual.parcelas[0].juros_mora)})</div>
                   <div>Total: {formatarMoeda(simulacaoAtual.valor_total_parcelamento)}</div>
                 </div>
               </div>

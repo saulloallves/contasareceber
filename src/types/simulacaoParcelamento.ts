@@ -6,7 +6,8 @@ export interface SimulacaoParcelamento {
   valor_atualizado: number;
   quantidade_parcelas: number;
   valor_entrada?: number;
-  percentual_juros_parcela: number;
+  percentual_multa: number;
+  percentual_juros_mora: number;
   data_primeira_parcela: string;
   parcelas: ParcelaSimulacao[];
   valor_total_parcelamento: number;
@@ -20,6 +21,8 @@ export interface ParcelaSimulacao {
   valor: number;
   data_vencimento: string;
   juros_aplicado: number;
+  multa: number;
+  juros_mora: number;
 }
 
 export interface PropostaParcelamento {
