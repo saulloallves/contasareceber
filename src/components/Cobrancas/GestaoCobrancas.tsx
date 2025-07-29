@@ -1118,7 +1118,8 @@ export function GestaoCobrancas() {
                     // Gera e baixa relatório de comparação
                     const relatorio =
                       comparacaoPlanilhaService.gerarRelatorioComparacao(
-                        resultadoComparacao
+                    !formData.valor_original ||
+                    (formData.status === 'quitado' && !formData.valor_recebido)
                       );
                     const blob = new Blob([relatorio], {
                       type: "text/plain;charset=utf-8",

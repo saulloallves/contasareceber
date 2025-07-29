@@ -522,6 +522,32 @@ export class CobrancaService {
   }
 
   /**
+   * Atualiza uma cobrança existente
+   */
+  async atualizarCobranca(id: string, dadosAtualizacao: Partial<CobrancaFranqueado>) {
+    try {
+      const { data, error } = await supabase
+        .from('cobrancas_franqueados')
+        .update({
+          ...dadosAtualizacao,
+          data_ultima_atualizacao: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(`Erro ao atualizar cobrança: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Erro ao atualizar cobrança:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Executa verificação de acionamento jurídico após importação
    */
   async verificarAcionamentoJuridico(
