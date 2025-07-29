@@ -59,6 +59,8 @@ function App() {
         return <GestaoReunioes />;
       case "acordos":
         return <GestaoAcordos />;
+      case "simulacao-parcelamento":
+        return <SimulacaoParcelamento />;
       case "score-risco":
         return <ScoreRisco />;
       case "bloqueios":
