@@ -328,6 +328,7 @@ export function GestaoCobrancas() {
           mostrarMensagem("sucesso", "Cobrança atualizada com sucesso!");
         }
       }
+      await carregarCobrancas(); // Recarrega a lista para mostrar as alterações
       fecharModal();
       carregarCobrancas();
     } catch (error) {
@@ -377,15 +378,21 @@ export function GestaoCobrancas() {
       const dadosAtualizacao: Partial<CobrancaFranqueado> = {
         status: formData.status as any
       };
-
-      // Se o status for quitado, inclui o valor recebido
-      if (formData.status === 'quitado') {
-        dadosAtualizacao.valor_recebido = formData.valor_recebido;
+      const dadosAtualizacao: any = {
+        status: formStatus.status
+      };
+      
+      if (formStatus.status === 'quitado' && formStatus.valor_recebido) {
+        dadosAtualizacao.valor_recebido = formStatus.valor_recebido;
+      }
+      
+      await cobrancaService.atualizarCobranca(cobrancaSelecionada.id!, dadosAtualizacao);
       }
 
       await cobrancaService.atualizarCobranca(cobrancaSelecionada.id, dadosAtualizacao);
       mostrarMensagem("sucesso", "Status da cobrança atualizado com sucesso!");
       fecharModal();
+      await carregarCobrancas(); // Recarrega a lista para mostrar as alterações
       carregarCobrancas();
     } catch (error) {
       console.error("Erro ao atualizar status:", error);
