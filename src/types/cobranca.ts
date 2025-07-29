@@ -39,7 +39,7 @@ export interface TrativativaCobranca {
   id?: string;
   titulo_id: string;
   data_interacao?: string;
-  tipo_interacao: 'mensagem_automatica' | 'resposta_franqueado' | 'agendamento' | 'observacao_manual' | 'proposta_enviada' | 'proposta_aceita' | 'marcado_como_quitado' | 'negociacao_iniciada' | 'pagamento_parcial' | 'acordo_fechado';
+  tipo_interacao: 'mensagem_automatica' | 'resposta_franqueado' | 'agendamento' | 'observacao_manual' | 'proposta_enviada' | 'proposta_aceita' | 'marcado_como_quitado' | 'negociacao_iniciada' | 'pagamento_parcial' | 'acordo_fechado' | 'escalonamento';
   canal: 'whatsapp' | 'calendly' | 'interno' | 'email' | 'telefone' | 'presencial' | 'outro';
   usuario_sistema: string;
   descricao: string;
