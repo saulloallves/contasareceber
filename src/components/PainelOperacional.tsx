@@ -845,7 +845,7 @@ Entre em contato: (11) 99999-9999`
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Template de Mensagem
+                    Template
                   </label>
                   <select
                     value={formMensagem.template}
@@ -903,18 +903,6 @@ Entre em contato: (11) 99999-9999`
                     {getPreviewMensagem()}
                   </pre>
                 </div>
-                
-                {unidadeSelecionada && (
-                  <div className="mt-4 text-sm text-gray-600">
-                    <div><strong>Destinatário:</strong></div>
-                    <div>
-                      {formMensagem.canal === 'whatsapp' 
-                        ? `WhatsApp: ${unidadeSelecionada.telefone_franqueado || 'Não informado'}`
-                        : `Email: ${unidadeSelecionada.email_franqueado || 'Não informado'}`
-                      }
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -933,24 +921,16 @@ Entre em contato: (11) 99999-9999`
             </div>
             
             {/* Abas */}
-            <div className="flex space-x-1 mb-6">
+            <div className="flex border-b mb-6">
               <button
                 onClick={() => setAbaDetalhes('cobranca')}
-                className={`px-4 py-2 rounded-lg font-medium ${
-                  abaDetalhes === 'cobranca'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                className={`px-4 py-2 font-medium ${abaDetalhes === 'cobranca' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
               >
                 Dados da Cobrança
               </button>
               <button
                 onClick={() => setAbaDetalhes('unidade')}
-                className={`px-4 py-2 rounded-lg font-medium ${
-                  abaDetalhes === 'unidade'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                className={`px-4 py-2 font-medium ${abaDetalhes === 'unidade' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
               >
                 Dados da Unidade
               </button>
@@ -960,89 +940,82 @@ Entre em contato: (11) 99999-9999`
             {abaDetalhes === 'cobranca' && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-800 mb-3">Informações Básicas</h4>
-                    <div className="space-y-2 text-sm">
-                      <div><strong>Cliente:</strong> {cobrancaSelecionada.cliente}</div>
-                      <div><strong>CNPJ:</strong> {formatarCNPJCPF(cobrancaSelecionada.cnpj)}</div>
-                      <div><strong>Status:</strong> 
-                        <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(cobrancaSelecionada.status)}`}>
-                          {cobrancaSelecionada.status.replace('_', ' ').toUpperCase()}
-                        </span>
-                      </div>
-                      <div><strong>Data de Criação:</strong> {formatarData(cobrancaSelecionada.data_criacao)}</div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Cliente</label>
+                      <p className="mt-1 text-sm text-gray-900">{cobrancaSelecionada.cliente}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">CNPJ</label>
+                      <p className="mt-1 text-sm text-gray-900">{formatarCNPJCPF(cobrancaSelecionada.cnpj)}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Status</label>
+                      <span className={`mt-1 inline-block px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(cobrancaSelecionada.status)}`}>
+                        {cobrancaSelecionada.status.replace('_', ' ').toUpperCase()}
+                      </span>
                     </div>
                   </div>
-
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-800 mb-3">Valores</h4>
-                    <div className="space-y-2 text-sm">
-                      <div><strong>Valor Original:</strong> {formatarMoeda(cobrancaSelecionada.valor_original)}</div>
-                      <div><strong>Valor Atualizado:</strong> 
-                        <span className="text-red-600 font-medium ml-1">
-                          {formatarMoeda(cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original)}
-                        </span>
-                      </div>
-                      <div><strong>Juros Acumulados:</strong> 
-                        <span className="text-orange-600 font-medium ml-1">
-                          {formatarMoeda(calcularJuros(cobrancaSelecionada))}
-                        </span>
-                      </div>
-                      <div><strong>Data de Vencimento:</strong> {formatarData(cobrancaSelecionada.data_vencimento)}</div>
-                      <div><strong>Dias em Atraso:</strong> 
-                        <span className={`ml-1 font-medium ${cobrancaSelecionada.dias_em_atraso > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {cobrancaSelecionada.dias_em_atraso || 0} dias
-                        </span>
-                      </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Valor Original</label>
+                      <p className="mt-1 text-sm text-gray-900">{formatarMoeda(cobrancaSelecionada.valor_original)}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Valor Atualizado</label>
+                      <p className="mt-1 text-sm text-red-600 font-medium">{formatarMoeda(cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original)}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Juros/Multa</label>
+                      <p className="mt-1 text-sm text-orange-600">{formatarMoeda(calcularJuros(cobrancaSelecionada))}</p>
                     </div>
                   </div>
                 </div>
-
-                {cobrancaSelecionada.observacoes && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h4 className="font-medium text-yellow-800 mb-2">Observações</h4>
-                    <p className="text-sm text-yellow-700">{cobrancaSelecionada.observacoes}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Data de Vencimento</label>
+                    <p className="mt-1 text-sm text-gray-900">{formatarData(cobrancaSelecionada.data_vencimento)}</p>
                   </div>
-                )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Dias em Atraso</label>
+                    <p className="mt-1 text-sm text-red-600">{cobrancaSelecionada.dias_em_atraso || 0} dias</p>
+                  </div>
+                </div>
               </div>
             )}
 
             {abaDetalhes === 'unidade' && unidadeSelecionada && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-800 mb-3">Dados do Franqueado</h4>
-                    <div className="space-y-2 text-sm">
-                      <div><strong>Nome:</strong> {unidadeSelecionada.nome_franqueado || 'N/A'}</div>
-                      <div><strong>Email:</strong> {unidadeSelecionada.email_franqueado || 'N/A'}</div>
-                      <div><strong>Telefone:</strong> {unidadeSelecionada.telefone_franqueado || 'N/A'}</div>
-                      <div><strong>CNPJ:</strong> {formatarCNPJCPF(unidadeSelecionada.cnpj_franqueado || '')}</div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Nome do Franqueado</label>
+                      <p className="mt-1 text-sm text-gray-900">{unidadeSelecionada.nome_franqueado || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Código da Unidade</label>
+                      <p className="mt-1 text-sm text-gray-900">{unidadeSelecionada.codigo_unidade || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Telefone</label>
+                      <p className="mt-1 text-sm text-gray-900">{unidadeSelecionada.telefone_franqueado || 'N/A'}</p>
                     </div>
                   </div>
-
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-800 mb-3">Dados da Unidade</h4>
-                    <div className="space-y-2 text-sm">
-                      <div><strong>Código:</strong> {unidadeSelecionada.codigo_unidade || 'N/A'}</div>
-                      <div><strong>Status:</strong> {unidadeSelecionada.status_unidade || 'N/A'}</div>
-                      <div><strong>Data de Abertura:</strong> {unidadeSelecionada.data_abertura ? formatarData(unidadeSelecionada.data_abertura) : 'N/A'}</div>
-                      <div><strong>Região:</strong> {unidadeSelecionada.regiao || 'N/A'}</div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Email</label>
+                      <p className="mt-1 text-sm text-gray-900">{unidadeSelecionada.email_franqueado || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Cidade</label>
+                      <p className="mt-1 text-sm text-gray-900">{unidadeSelecionada.cidade || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Estado</label>
+                      <p className="mt-1 text-sm text-gray-900">{unidadeSelecionada.estado || 'N/A'}</p>
                     </div>
                   </div>
                 </div>
-
-                {unidadeSelecionada.endereco && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-800 mb-3">Endereço</h4>
-                    <p className="text-sm text-gray-700">{unidadeSelecionada.endereco}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {abaDetalhes === 'unidade' && !unidadeSelecionada && (
-              <div className="text-center py-8">
-                <p className="text-gray-500">Dados da unidade não encontrados</p>
               </div>
             )}
           </div>
