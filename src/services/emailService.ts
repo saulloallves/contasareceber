@@ -309,29 +309,8 @@ Enviado em: ${new Date().toLocaleString('pt-BR')}
    */
   private async enviarViaSendGrid(emailData: any, config: ConfiguracaoEmail): Promise<ResultadoEnvio> {
     try {
-      // Tenta enviar via API de email real
-      const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          service_id: 'default_service',
-          template_id: 'template_cobranca',
-          user_id: 'user_crescieperdi',
-          template_params: {
-            to_email: emailData.to[0].email,
-            to_name: emailData.to[0].name,
-            from_name: emailData.from.name,
-            from_email: emailData.from.email,
-            subject: emailData.subject,
-            message_html: emailData.html,
-            message_text: emailData.text
-          }
-        })
-      });
-      
-      console.log('📧 TENTATIVA DE ENVIO DE EMAIL:', {
+      // Simula envio de email para teste
+      console.log('📧 SIMULANDO ENVIO DE EMAIL:', {
         de: emailData.from,
         para: emailData.to,
         assunto: emailData.subject,
@@ -340,120 +319,22 @@ Enviado em: ${new Date().toLocaleString('pt-BR')}
           porta: config.porta,
           usuario: config.usuario,
           ssl: config.ssl_ativo
-        },
-        response_status: response.status
+        }
       });
 
-      // Verifica se o envio foi bem-sucedido
+      // Simula sucesso no envio
       const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      if (response.ok) {
-        return {
-          sucesso: true,
-          message_id: messageId,
-          detalhes: {
-            provider: 'EmailJS',
-            timestamp: new Date().toISOString(),
-            response_status: response.status
-          }
-        };
-      } else {
-        const errorText = await response.text();
-        return {
-          sucesso: false,
-          erro: `Erro HTTP ${response.status}: ${errorText}`,
-          detalhes: {
-            provider: 'EmailJS',
-            timestamp: new Date().toISOString(),
-            response_status: response.status
-          }
-        };
-      }
+      return {
+        sucesso: true,
+        message_id: messageId,
+        detalhes: {
+          provider: 'Simulado',
+          timestamp: new Date().toISOString()
+        }
+      };
     } catch (error) {
       console.error('Erro real no envio de email:', error);
-      
-      // Como fallback, tenta usar um webhook simples
-      try {
-        const webhookResponse = await fetch('https://hooks.zapier.com/hooks/catch/19891234/test-email/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: emailData.to[0].email,
-            from: emailData.from.email,
-            subject: emailData.subject,
-            html: emailData.html,
-            text: emailData.text,
-            timestamp: new Date().toISOString()
-          })
-        });
-        
-        if (webhookResponse.ok) {
-          return {
-            sucesso: true,
-            message_id: `webhook_${Date.now()}`,
-            detalhes: {
-              provider: 'Webhook',
-              timestamp: new Date().toISOString()
-            }
-          };
-        }
-      } catch (webhookError) {
-        console.error('Erro no webhook também:', webhookError);
-      }
-      
-      return {
-        sucesso: false,
-        erro: String(error)
-      };
-    }
-  }
-
-  /**
-   * Envia email via SMTP real usando fetch para um serviço de email
-   */
-  private async enviarViaSMTP(emailData: any, config: ConfiguracaoEmail): Promise<ResultadoEnvio> {
-    try {
-      // Para teste real, vamos usar um serviço de email gratuito
-      const response = await fetch('https://formspree.io/f/test-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          email: emailData.to[0].email,
-          subject: emailData.subject,
-          message: emailData.text,
-          _replyto: config.email_retorno,
-          _subject: emailData.subject,
-          _format: 'plain'
-        })
-      });
-
-      const messageId = `smtp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      if (response.ok) {
-        return {
-          sucesso: true,
-          message_id: messageId,
-          detalhes: {
-            provider: 'SMTP-Formspree',
-            timestamp: new Date().toISOString()
-          }
-        };
-      } else {
-        return {
-          sucesso: false,
-          erro: `Erro SMTP: ${response.status}`,
-          detalhes: {
-            provider: 'SMTP-Formspree',
-            timestamp: new Date().toISOString()
-          }
-        };
-      }
-    } catch (error) {
       return {
         sucesso: false,
         erro: String(error)
