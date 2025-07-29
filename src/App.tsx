@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { AuthProvider, useAuth } from "./components/Auth/AuthProvider";
+import { SimpleAuth } from "./components/Auth/SimpleAuth";
 import { Header } from "./components/Layout/Header";
 import { Sidebar } from "./components/Layout/Sidebar";
 import { Dashboard } from "./components/Dashboard";
@@ -34,12 +36,30 @@ import { Layout } from "./components/Layout/Layout";
 import { SimulacaoParcelamento } from "./components/SimulacaoParcelamento";
 import { EmailConfiguration } from "./components/ConfiguracaoEmail";
 
-function App() {
+function AppContent() {
+  const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [cnpjSelecionado, setCnpjSelecionado] = useState("");
 
   // Simula dados do usuário logado
   const userPermissions = ["admin"]; // Exemplo de permissões
+
+  // Se ainda está carregando, mostra loading
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando sistema...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não está logado, mostra tela de login
+  if (!user) {
+    return <SimpleAuth onAuthSuccess={() => window.location.reload()} />;
+  }
 
   const renderContent = () => {
     switch (activeTab) {
@@ -63,8 +83,6 @@ function App() {
         return <GestaoReunioes />;
       case "acordos":
         return <GestaoAcordos />;
-      case "simulacao-parcelamento":
-        return <SimulacaoParcelamento />;
       case "score-risco":
         return <ScoreRisco />;
       case "bloqueios":
@@ -136,10 +154,16 @@ function App() {
       onTabChange={setActiveTab}
       userPermissions={userPermissions}
     >
-      {/* O Layout agora renderiza o Header e o Sidebar, 
-          e aqui passamos apenas o conteúdo da página como "children" */}
       {renderContent()}
     </Layout>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

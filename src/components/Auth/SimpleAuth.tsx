@@ -40,34 +40,15 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
     setError('');
 
     try {
-      // Tenta fazer login com usuário demo
+      // Faz login com usuário demo fixo
       const { error } = await supabase.auth.signInWithPassword({
-        email: 'demo@crescieperdi.com',
-        password: 'demo123456'
+        email: 'admin@crescieperdi.com',
+        password: 'admin123456'
       });
 
       if (error) {
-        // Se não conseguir, cria o usuário demo
-        const { error: signUpError } = await supabase.auth.signUp({
-          email: 'demo@crescieperdi.com',
-          password: 'demo123456'
-        });
-
-        if (signUpError) {
-          setError('Erro ao criar usuário demo');
-          return;
-        }
-
-        // Tenta fazer login novamente
-        const { error: loginError } = await supabase.auth.signInWithPassword({
-          email: 'demo@crescieperdi.com',
-          password: 'demo123456'
-        });
-
-        if (loginError) {
-          setError('Erro ao fazer login com usuário demo');
-          return;
-        }
+        setError('Erro ao fazer login demo: ' + error.message);
+        return;
       }
 
       onAuthSuccess();
