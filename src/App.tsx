@@ -31,6 +31,7 @@ import { AuditoriaLogs } from "./components/AuditoriaLogs";
 import { TemplatesJuridicos } from "./components/TemplatesJuridicos";
 import { KanbanCobranca } from "./components/KanbanCobranca";
 import { Layout } from "./components/Layout/Layout";
+import { SimulacaoParcelamento } from "./components/SimulacaoParcelamento";
 
 function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
