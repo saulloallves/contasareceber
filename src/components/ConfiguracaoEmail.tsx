@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Mail, Settings, Save, TestTube, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { EmailService, ConfiguracaoEmail } from '../services/emailService';
 
-export function ConfiguracaoEmail() {
+export function EmailConfiguration() {
   const [config, setConfig] = useState<ConfiguracaoEmail>({
     id: 'default',
     servidor_smtp: 'smtp.gmail.com',

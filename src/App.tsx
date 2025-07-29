@@ -32,7 +32,7 @@ import { TemplatesJuridicos } from "./components/TemplatesJuridicos";
 import { KanbanCobranca } from "./components/KanbanCobranca";
 import { Layout } from "./components/Layout/Layout";
 import { SimulacaoParcelamento } from "./components/SimulacaoParcelamento";
-import { ConfiguracaoEmail } from "./components/ConfiguracaoEmail";
+import { EmailConfiguration } from "./components/ConfiguracaoEmail";
 
 function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -84,7 +84,7 @@ function App() {
       case "admin":
         return <ConfiguracaoAdmin />;
       case 'config-email':
-        return <ConfiguracaoEmail />;
+        return <EmailConfiguration />;
       case "auditoria":
         return <AuditoriaLogs />;
       case "templates-juridicos":
