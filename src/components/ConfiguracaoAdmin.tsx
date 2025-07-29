@@ -172,15 +172,7 @@ export function ConfiguracaoAdmin() {
   const previewMensagem = () => {
     if (!config) return "";
 
-    return configuracaoService.aplicarTemplateMensagem(
-      config.texto_padrao_mensagem,
-      {
-        cliente: "João da Silva",
-        data_vencimento: "15/01/2024",
-        valor_atualizado: "R$ 1.250,00",
-        link_negociacao: config.link_base_agendamento,
-      }
-    );
+    return configuracaoService.gerarPreviewMensagem(config.texto_padrao_mensagem);
   };
 
   const formatarData = (data: string) => {

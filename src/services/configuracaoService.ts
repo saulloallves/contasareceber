@@ -836,6 +836,26 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
   }
 
   /**
+   * Gera preview da mensagem com dados de exemplo
+   */
+  gerarPreviewMensagem(template: string): string {
+    const variaveisExemplo = {
+      'cliente': 'João da Silva',
+      'codigo_unidade': 'CP001',
+      'cnpj': '12.345.678/0001-99',
+      'valor_original': 'R$ 1.000,00',
+      'valor_atualizado': 'R$ 1.250,00',
+      'data_vencimento': '15/01/2024',
+      'dias_atraso': '5',
+      'tipo_cobranca': 'Royalties',
+      'data_atual': new Date().toLocaleDateString('pt-BR'),
+      'link_negociacao': 'https://calendly.com/sua-empresa/negociacao'
+    };
+
+    return this.aplicarTemplateMensagem(template, variaveisExemplo);
+  }
+
+  /**
    * Calcula valor atualizado com multa e juros
    */
   calcularValorAtualizado(
