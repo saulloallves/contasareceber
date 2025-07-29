@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect } from 'react';
 import { 
-  DollarSign, Calculator, MessageSquare, Mail, CheckCircle, Clock, 
-  Filter, RefreshCw, Eye, Download, Send, X, Save, AlertTriangle,
-  Users, TrendingUp, Target, Calendar, FileText
-} from 'lucide-react';
+  DollarSign, Calculator, MessageSquare, Mail, 
+  Filter, RefreshCw, Eye, X
+  } from 'lucide-react';
 import { CobrancaService } from '../services/cobrancaService';
 import { SimulacaoParcelamentoService } from '../services/simulacaoParcelamentoService';
 import { formatarMoeda, formatarData, formatarCNPJCPF } from '../utils/formatters';
