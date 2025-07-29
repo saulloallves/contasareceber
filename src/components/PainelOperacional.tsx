@@ -287,10 +287,37 @@ Entre em contato: (11) 99999-9999`
       data_primeira_parcela: '',
       valor_entrada: 0
     });
+    setFormMensagem({
+      template: 'padrao',
+      mensagem_personalizada: '',
+      canal: 'whatsapp'
+    });
+    setUnidadeSelecionada(null);
+    setAbaDetalhes('cobranca');
     setFormProposta({
       canais_envio: ['whatsapp'],
       observacoes: ''
     });
+  };
+
+  const calcularJuros = (cobranca: any) => {
+    const valorOriginal = cobranca.valor_original;
+    const valorAtualizado = cobranca.valor_atualizado || valorOriginal;
+    return valorAtualizado - valorOriginal;
+  };
+
+  const calcularDiasAtraso = (dataVencimento: string) => {
+    const hoje = new Date();
+    const vencimento = new Date(dataVencimento);
+    const diffTime = hoje.getTime() - vencimento.getTime();
+    return Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+  };
+
+  const getPreviewMensagem = () => {
+    if (formMensagem.template === 'personalizada') {
+      return formMensagem.mensagem_personalizada;
+    }
+    return aplicarVariaveis(templatesPadrao[formMensagem.template as keyof typeof templatesPadrao]);
   };
 
   const getStatusColor = (status: string) => {
@@ -784,6 +811,182 @@ Entre em contato: (11) 99999-9999`
                 Voltar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Mensagem */}
+      {modalAberto === 'mensagem' && cobrancaSelecionada && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold">Enviar Mensagem de Cobrança</h3>
+              <button onClick={fecharModal} className="text-gray-500 hover:text-gray-700">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Configuração da Mensagem */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Canal de Envio
+                  </label>
+                  <select
+                    value={formMensagem.canal}
+                    onChange={(e) => setFormMensagem({...formMensagem, canal: e.target.value as 'whatsapp' | 'email'})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="email">Email</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Template
+                  </label>
+                  <select
+                    value={formMensagem.template}
+                    onChange={(e) => setFormMensagem({...formMensagem, template: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="padrao">Padrão</option>
+                    <option value="formal">Formal</option>
+                    <option value="urgente">Urgente</option>
+                    <option value="personalizada">Personalizada</option>
+                  </select>
+                </div>
+
+                {formMensagem.template === 'personalizada' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Mensagem Personalizada
+                    </label>
+                    <textarea
+                      value={formMensagem.mensagem_personalizada}
+                      onChange={(e) => setFormMensagem({...formMensagem, mensagem_personalizada: e.target.value})}
+                      rows={8}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      placeholder="Digite sua mensagem personalizada..."
+                    />
+                  </div>
+                )}
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <h5 className="font-medium text-blue-800 mb-2">Variáveis disponíveis:</h5>
+                  <div className="text-sm text-blue-700 space-y-1">
+                    <div>{{'{'}cliente{'}'}} - Nome do cliente</div>
+                    <div>{{'{'}codigo_unidade{'}'}} - Código da unidade</div>
+                    <div>{{'{'}valor_original{'}'}} - Valor original</div>
+                    <div>{{'{'}valor_atualizado{'}'}} - Valor atualizado</div>
+                    <div>{{'{'}data_vencimento{'}'}} - Data de vencimento</div>
+                    <div>{{'{'}dias_atraso{'}'}} - Dias em atraso</div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={enviarMensagem}
+                  disabled={processando}
+                  className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {processando ? 'Enviando...' : `Enviar via ${formMensagem.canal === 'whatsapp' ? 'WhatsApp' : 'Email'}`}
+                </button>
+              </div>
+
+              {/* Preview da Mensagem */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h4 className="font-medium text-gray-800 mb-4">Preview da Mensagem:</h4>
+                <div className="bg-white border rounded-lg p-4 min-h-[300px]">
+                  <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">
+                    {getPreviewMensagem()}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Detalhes */}
+      {modalAberto === 'detalhes' && cobrancaSelecionada && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold">Detalhes da Cobrança</h3>
+              <button onClick={fecharModal} className="text-gray-500 hover:text-gray-700">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            {/* Abas */}
+            <div className="flex border-b mb-6">
+              <button
+                onClick={() => setAbaDetalhes('cobranca')}
+                className={`px-4 py-2 font-medium ${abaDetalhes === 'cobranca' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+              >
+                Cobrança
+              </button>
+              <button
+                onClick={() => setAbaDetalhes('unidade')}
+                className={`px-4 py-2 font-medium ${abaDetalhes === 'unidade' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+              >
+                Unidade
+              </button>
+            </div>
+
+            {/* Conteúdo das Abas */}
+            {abaDetalhes === 'cobranca' && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-gray-800">Informações Básicas</h4>
+                    <div className="space-y-2 text-sm">
+                      <div><span className="font-medium">Cliente:</span> {cobrancaSelecionada.cliente}</div>
+                      <div><span className="font-medium">CNPJ:</span> {formatarCNPJCPF(cobrancaSelecionada.cnpj)}</div>
+                      <div><span className="font-medium">Status:</span> {cobrancaSelecionada.status}</div>
+                      <div><span className="font-medium">Data de Vencimento:</span> {formatarData(cobrancaSelecionada.data_vencimento)}</div>
+                      <div><span className="font-medium">Dias em Atraso:</span> {cobrancaSelecionada.dias_em_atraso || 0}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-gray-800">Valores</h4>
+                    <div className="space-y-2 text-sm">
+                      <div><span className="font-medium">Valor Original:</span> {formatarMoeda(cobrancaSelecionada.valor_original)}</div>
+                      <div><span className="font-medium">Valor Atualizado:</span> {formatarMoeda(cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original)}</div>
+                      <div><span className="font-medium">Juros:</span> {formatarMoeda(calcularJuros(cobrancaSelecionada))}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {abaDetalhes === 'unidade' && unidadeSelecionada && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-gray-800">Dados da Unidade</h4>
+                    <div className="space-y-2 text-sm">
+                      <div><span className="font-medium">Código:</span> {unidadeSelecionada.codigo_unidade}</div>
+                      <div><span className="font-medium">Nome do Franqueado:</span> {unidadeSelecionada.nome_franqueado}</div>
+                      <div><span className="font-medium">Email:</span> {unidadeSelecionada.email_franqueado}</div>
+                      <div><span className="font-medium">Telefone:</span> {unidadeSelecionada.telefone_franqueado}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-gray-800">Endereço</h4>
+                    <div className="space-y-2 text-sm">
+                      <div><span className="font-medium">Cidade:</span> {unidadeSelecionada.cidade}</div>
+                      <div><span className="font-medium">Estado:</span> {unidadeSelecionada.estado}</div>
+                      <div><span className="font-medium">Status:</span> {unidadeSelecionada.status_unidade}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
