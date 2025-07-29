@@ -191,6 +191,7 @@ export function GestaoCobrancas() {
         throw new Error("Não foi possível extrair dados da planilha.");
       }
 
+      console.log(
         `${dadosDaPlanilha.length} registros extraídos. Comparando...`
       );
 
@@ -366,6 +367,8 @@ export function GestaoCobrancas() {
    */
   const salvarAlteracaoStatus = async () => {
     if (!cobrancaSelecionada?.id) return;
+    
+    try {
       const dadosAtualizacao: any = {
         cliente: formData.cliente,
         valor_original: formData.valor_original,
@@ -375,13 +378,16 @@ export function GestaoCobrancas() {
         email_cobranca: formData.email_cobranca,
         descricao: formData.descricao,
         tipo_cobranca: formData.tipo_cobranca,
-        status: formStatus.status,
-        telefone: formStatus.telefone || cobrancaSelecionada.telefone,
+        status: formData.status,
+        telefone: formData.telefone || cobrancaSelecionada.telefone,
       };
 
-      if (formStatus.status === 'quitado' && formStatus.valor_recebido) {
-        dadosAtualizacao.valor_recebido = formStatus.valor_recebido;
+      if (formData.status === 'quitado' && formData.valor_recebido) {
+        dadosAtualizacao.valor_recebido = formData.valor_recebido;
       }
+      
+      await cobrancaService.atualizarCobranca(cobrancaSelecionada.id, dadosAtualizacao);
+      mostrarMensagem("sucesso", "Status atualizado com sucesso!");
       fecharModal();
       await carregarCobrancas(); // Recarrega a lista para mostrar as alterações
       carregarCobrancas();
