@@ -877,12 +877,12 @@ Entre em contato: (11) 99999-9999`
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <h5 className="font-medium text-blue-800 mb-2">Variáveis disponíveis:</h5>
                   <div className="text-sm text-blue-700 space-y-1">
-                    <div>{{'{'}cliente{'}'}} - Nome do cliente</div>
-                    <div>{{'{'}codigo_unidade{'}'}} - Código da unidade</div>
-                    <div>{{'{'}valor_original{'}'}} - Valor original</div>
-                    <div>{{'{'}valor_atualizado{'}'}} - Valor atualizado</div>
-                    <div>{{'{'}data_vencimento{'}'}} - Data de vencimento</div>
-                    <div>{{'{'}dias_atraso{'}'}} - Dias em atraso</div>
+                    <div>{"{{"}cliente{"}}"} - Nome do cliente</div>
+                    <div>{"{{"}codigo_unidade{"}}"} - Código da unidade</div>
+                    <div>{"{{"}valor_original{"}}"} - Valor original</div>
+                    <div>{"{{"}valor_atualizado{"}}"} - Valor atualizado</div>
+                    <div>{"{{"}data_vencimento{"}}"} - Data de vencimento</div>
+                    <div>{"{{"}dias_atraso{"}}"} - Dias em atraso</div>
                   </div>
                 </div>
 
