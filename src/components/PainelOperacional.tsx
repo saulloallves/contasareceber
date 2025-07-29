@@ -125,7 +125,7 @@ Entre em contato: (11) 99999-9999`
     
     // Busca dados da unidade
     try {
-      const unidade = await unidadesService.buscarUnidadePorCodigo(cobranca.cnpj);
+      const unidade = await unidadesService.buscarUnidadePorCnpj(cobranca.cnpj);
       setUnidadeSelecionada(unidade);
     } catch (error) {
       console.error('Erro ao buscar dados da unidade:', error);
@@ -145,7 +145,7 @@ Entre em contato: (11) 99999-9999`
     
     // Busca dados da unidade para templates
     try {
-      const unidade = await unidadesService.buscarUnidadePorCodigo(cobranca.cnpj);
+      const unidade = await unidadesService.buscarUnidadePorCnpj(cobranca.cnpj);
       setUnidadeSelecionada(unidade);
     } catch (error) {
       console.error('Erro ao buscar dados da unidade:', error);

@@ -73,6 +73,31 @@ export class UnidadesService {
   }
 
   /**
+   * Busca unidade por CNPJ
+   */
+  async buscarUnidadePorCnpj(cnpj: string): Promise<UnidadeFranqueada | null> {
+    try {
+      // Remove caracteres não numéricos do CNPJ
+      const cnpjLimpo = cnpj.replace(/\D/g, '');
+      
+      const { data, error } = await supabase
+        .from('unidades_franqueadas')
+        .select('*')
+        .eq('cnpj', cnpjLimpo)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(`Erro ao buscar unidade por CNPJ: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar unidade por CNPJ:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Cria nova unidade
    */
   async criarUnidade(unidade: Omit<UnidadeFranqueada, 'id' | 'created_at' | 'updated_at'>): Promise<UnidadeFranqueada> {
