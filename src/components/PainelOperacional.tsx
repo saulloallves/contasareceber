@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useEffect } from 'react';
 import { 
   DollarSign, Calculator, MessageSquare, Mail, 
@@ -6,6 +6,7 @@ import {
   } from 'lucide-react';
 import { CobrancaService } from '../services/cobrancaService';
 import { SimulacaoParcelamentoService } from '../services/simulacaoParcelamentoService';
+import { UnidadesService } from '../services/unidadesService';
 import { formatarMoeda, formatarData, formatarCNPJCPF } from '../utils/formatters';
 
 export function PainelOperacional() {
@@ -23,8 +24,10 @@ export function PainelOperacional() {
   });
   
   // Estados dos modais
-  const [modalAberto, setModalAberto] = useState<'simular' | 'proposta' | null>(null);
+  const [modalAberto, setModalAberto] = useState<'simular' | 'proposta' | 'detalhes' | 'mensagem' | null>(null);
   const [cobrancaSelecionada, setCobrancaSelecionada] = useState<any>(null);
+  const [unidadeSelecionada, setUnidadeSelecionada] = useState<any>(null);
+  const [abaDetalhes, setAbaDetalhes] = useState<'cobranca' | 'unidade'>('cobranca');
   const [simulacaoAtual, setSimulacaoAtual] = useState<any>(null);
   
   // Form de simulação
@@ -40,8 +43,57 @@ export function PainelOperacional() {
     observacoes: ''
   });
 
+  // Form de mensagem
+  const [formMensagem, setFormMensagem] = useState({
+    template: 'padrao',
+    mensagem_personalizada: '',
+    canal: 'whatsapp' as 'whatsapp' | 'email'
+  });
+
   const cobrancaService = new CobrancaService();
   const simulacaoService = new SimulacaoParcelamentoService();
+  const unidadesService = new UnidadesService();
+
+  // Templates de mensagem padrão
+  const templatesPadrao = {
+    padrao: `Olá, {{cliente}}!
+
+Consta um débito da sua unidade, vencido em {{data_vencimento}}.
+Valor atualizado até hoje: *{{valor_atualizado}}*
+
+Deseja regularizar? Entre em contato conosco.
+
+_Esta é uma mensagem do sistema de cobrança._`,
+    
+    formal: `Prezado(a) {{cliente}},
+
+Identificamos pendência financeira em aberto referente à sua unidade {{codigo_unidade}}.
+
+Dados da pendência:
+- Valor original: {{valor_original}}
+- Valor atualizado: {{valor_atualizado}}
+- Data de vencimento: {{data_vencimento}}
+- Dias em atraso: {{dias_atraso}}
+
+Solicitamos regularização no prazo de 5 dias úteis.
+
+Atenciosamente,
+Equipe Financeira`,
+
+    urgente: `🚨 ATENÇÃO {{cliente}}
+
+Sua unidade {{codigo_unidade}} possui débito VENCIDO há {{dias_atraso}} dias.
+
+💰 Valor: {{valor_atualizado}}
+📅 Vencimento: {{data_vencimento}}
+
+⚠️ Regularize HOJE para evitar bloqueios!
+
+Entre em contato: (11) 99999-9999`
+  };
+
+  // Templates de mensagem padrão
+  const templatesPadrao = {
 
   useEffect(() => {
     carregarCobrancas();
@@ -68,6 +120,42 @@ export function PainelOperacional() {
     });
     setSimulacaoAtual(null);
     setModalAberto('simular');
+  };
+
+  const abrirModalDetalhes = async (cobranca: any) => {
+    setCobrancaSelecionada(cobranca);
+    setAbaDetalhes('cobranca');
+    
+    // Busca dados da unidade
+    try {
+      const unidade = await unidadesService.buscarUnidadePorCodigo(cobranca.cnpj);
+      setUnidadeSelecionada(unidade);
+    } catch (error) {
+      console.error('Erro ao buscar dados da unidade:', error);
+      setUnidadeSelecionada(null);
+    }
+    
+    setModalAberto('detalhes');
+  };
+
+  const abrirModalMensagem = async (cobranca: any) => {
+    setCobrancaSelecionada(cobranca);
+    setFormMensagem({
+      template: 'padrao',
+      mensagem_personalizada: '',
+      canal: 'whatsapp'
+    });
+    
+    // Busca dados da unidade para templates
+    try {
+      const unidade = await unidadesService.buscarUnidadePorCodigo(cobranca.cnpj);
+      setUnidadeSelecionada(unidade);
+    } catch (error) {
+      console.error('Erro ao buscar dados da unidade:', error);
+      setUnidadeSelecionada(null);
+    }
+    
+    setModalAberto('mensagem');
   };
 
   const simularParcelamento = async () => {
@@ -132,11 +220,104 @@ export function PainelOperacional() {
     }
   };
 
+  const enviarMensagem = async () => {
+    if (!cobrancaSelecionada || !unidadeSelecionada) {
+      alert('Dados da cobrança ou unidade não encontrados');
+      return;
+    }
+
+    const mensagemFinal = formMensagem.template === 'personalizada' 
+      ? formMensagem.mensagem_personalizada 
+      : aplicarVariaveis(templatesPadrao[formMensagem.template as keyof typeof templatesPadrao]);
+
+    if (!mensagemFinal.trim()) {
+      alert('Digite uma mensagem');
+      return;
+    }
+
+    setProcessando(true);
+    try {
+      if (formMensagem.canal === 'whatsapp') {
+        // Simula envio WhatsApp
+        console.log('Enviando WhatsApp:', {
+          telefone: unidadeSelecionada.telefone_franqueado,
+          mensagem: mensagemFinal
+        });
+        alert('Mensagem enviada via WhatsApp!');
+      } else {
+        // Simula envio Email
+        console.log('Enviando Email:', {
+          email: unidadeSelecionada.email_franqueado,
+          assunto: 'Cobrança Pendente',
+          mensagem: mensagemFinal
+        });
+        alert('Mensagem enviada via Email!');
+      }
+      
+      fecharModal();
+    } catch (error) {
+      alert(`Erro ao enviar mensagem: ${error}`);
+    } finally {
+      setProcessando(false);
+    }
+  };
+
+  const aplicarVariaveis = (template: string) => {
+    if (!cobrancaSelecionada || !unidadeSelecionada) return template;
+    
+    const variaveis = {
+      '{{cliente}}': cobrancaSelecionada.cliente,
+      '{{codigo_unidade}}': unidadeSelecionada.codigo_unidade || cobrancaSelecionada.cnpj,
+      '{{valor_original}}': formatarMoeda(cobrancaSelecionada.valor_original),
+      '{{valor_atualizado}}': formatarMoeda(cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original),
+      '{{data_vencimento}}': formatarData(cobrancaSelecionada.data_vencimento),
+      '{{dias_atraso}}': (cobrancaSelecionada.dias_em_atraso || 0).toString()
+    };
+
+    let mensagem = template;
+    Object.entries(variaveis).forEach(([chave, valor]) => {
+      mensagem = mensagem.replace(new RegExp(chave.replace(/[{}]/g, '\\$&'), 'g'), valor);
+    });
+    return mensagem;
+  };
+
   const fecharModal = () => {
     setModalAberto(null);
     setCobrancaSelecionada(null);
     setSimulacaoAtual(null);
     setFormSimulacao({
+      quantidade_parcelas: 3,
+      data_primeira_parcela: '',
+      valor_entrada: 0
+    });
+    setFormMensagem({
+      template: 'padrao',
+      mensagem_personalizada: '',
+      canal: 'whatsapp'
+    });
+    setUnidadeSelecionada(null);
+    setAbaDetalhes('cobranca');
+  };
+
+  const calcularJuros = (cobranca: any) => {
+    const valorOriginal = cobranca.valor_original;
+    const valorAtualizado = cobranca.valor_atualizado || valorOriginal;
+    return valorAtualizado - valorOriginal;
+  };
+
+  const calcularDiasAtraso = (dataVencimento: string) => {
+    const hoje = new Date();
+    const vencimento = new Date(dataVencimento);
+    const diffTime = hoje.getTime() - vencimento.getTime();
+    return Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+  };
+
+  const getPreviewMensagem = () => {
+    if (formMensagem.template === 'personalizada') {
+      return formMensagem.mensagem_personalizada;
+    }
+    return aplicarVariaveis(templatesPadrao[formMensagem.template as keyof typeof templatesPadrao]);
+  };
       quantidade_parcelas: 3,
       data_primeira_parcela: '',
       valor_entrada: 0
@@ -352,11 +533,13 @@ export function PainelOperacional() {
                         )}
                         <button
                           className="text-blue-600 hover:text-blue-900"
-                          title="Ver detalhes"
+                          onClick={() => abrirModalDetalhes(cobranca)}
+                          title="Ver detalhes da cobrança"
                         >
                           <Eye className="w-5 h-5" />
                         </button>
                         <button
+                          onClick={() => abrirModalMensagem(cobranca)}
                           className="text-purple-600 hover:text-purple-900"
                           title="Enviar mensagem"
                         >
