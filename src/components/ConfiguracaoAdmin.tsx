@@ -191,23 +191,18 @@ export function ConfiguracaoAdmin() {
 
   return (
     <div className="max-w-full mx-auto p-6">
-      {/* Variáveis Disponíveis */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+      <div className="bg-white rounded-lg shadow-lg p-8">
         <div className="flex items-center justify-between mb-8">
-          <p className="text-sm text-gray-600 mb-4">
-            Use essas variáveis nos templates acima. Elas serão substituídas
-            automaticamente pelos dados reais:
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+          <div className="flex items-center">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
               <Settings className="w-7 h-7 text-white" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-800">
-                Configurações Gerais e Controle de Acessos
+                Configurações e Controle de Acesso
               </h1>
               <p className="text-gray-600">
-                Gestão completa do sistema e permissões
+                Gestão completa do sistema, permissões e logs
               </p>
             </div>
           </div>
@@ -221,44 +216,6 @@ export function ConfiguracaoAdmin() {
                 <Download className="w-4 h-4 mr-2" />
                 Exportar
               </button>
-              <div className="flex flex-col space-y-1">
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    "{{cliente}}",
-                    "{{codigo_unidade}}",
-                    "{{cnpj}}",
-                    "{{valor_original}}",
-                    "{{valor_atualizado}}",
-                    "{{data_vencimento}}",
-                    "{{dias_atraso}}",
-                    "{{tipo_cobranca}}",
-                    "{{data_atual}}",
-                    "{{link_negociacao}}",
-                  ].map((variavel) => (
-                    <div key={variavel} className="flex flex-col items-center">
-                      <code className="text-blue-600 font-mono text-xs">
-                        {variavel}
-                      </code>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {variavel === "{{cliente}}" && "Nome do franqueado"}
-                        {variavel === "{{codigo_unidade}}" &&
-                          "Código da unidade"}
-                        {variavel === "{{cnpj}}" && "CNPJ formatado"}
-                        {variavel === "{{valor_original}}" && "Valor original"}
-                        {variavel === "{{valor_atualizado}}" &&
-                          "Valor com juros"}
-                        {variavel === "{{data_vencimento}}" &&
-                          "Data de vencimento"}
-                        {variavel === "{{dias_atraso}}" && "Dias em atraso"}
-                        {variavel === "{{tipo_cobranca}}" && "Tipo da cobrança"}
-                        {variavel === "{{data_atual}}" && "Data atual"}
-                        {variavel === "{{link_negociacao}}" &&
-                          "Link para negociar"}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
               <button
                 onClick={resetarConfiguracao}
                 className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
@@ -354,7 +311,7 @@ export function ConfiguracaoAdmin() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Parâmetros Financeiros */}
-              <div className="space-y-6">
+              <div className="space-y-6 bg-gray-50 p-6 rounded-lg border border-gray-200">
                 <div className="flex items-center mb-4">
                   <DollarSign className="w-6 h-6 text-green-600 mr-2" />
                   <h3 className="text-lg font-semibold text-gray-800">
@@ -432,7 +389,7 @@ export function ConfiguracaoAdmin() {
               </div>
 
               {/* Parâmetros de Envio */}
-              <div className="space-y-6">
+              <div className="space-y-6 bg-gray-50 p-6 rounded-lg border border-gray-200">
                 <div className="flex items-center mb-4">
                   <MessageSquare className="w-6 h-6 text-blue-600 mr-2" />
                   <h3 className="text-lg font-semibold text-gray-800">
@@ -519,11 +476,11 @@ export function ConfiguracaoAdmin() {
             </div>
 
             {/* Template da Mensagem */}
-            <div className="mt-8">
+            <div className="mt-8 bg-gray-50 p-6 rounded-lg border border-gray-200">
               <div className="flex items-center mb-4">
                 <MessageSquare className="w-6 h-6 text-purple-600 mr-2" />
                 <h3 className="text-lg font-semibold text-gray-800">
-                  Template da Mensagem
+                  Template da Mensagem Padrão
                 </h3>
               </div>
 
@@ -541,45 +498,55 @@ export function ConfiguracaoAdmin() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Digite o template da mensagem..."
                   />
-                  <div className="mt-2 text-sm text-gray-500">
-                    <p className="font-medium mb-1">Variáveis disponíveis:</p>
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-600 mb-2">
+                      Variáveis que você pode usar no texto:
+                    </p>
                     <div className="flex flex-wrap gap-2">
-                      <code className="bg-gray-100 px-2 py-1 rounded">
-                        {"{{cliente}}"}
-                      </code>
-                      <code className="bg-gray-100 px-2 py-1 rounded">
-                        {"{{valor_atualizado}}"}
-                      </code>
-                      <code className="bg-gray-100 px-2 py-1 rounded">
-                        {"{{data_vencimento}}"}
-                      </code>
-                      <code className="bg-gray-100 px-2 py-1 rounded">
-                        {"{{link_negociacao}}"}
-                      </code>
+                      {[
+                        "{{cliente}}",
+                        "{{codigo_unidade}}",
+                        "{{cnpj}}",
+                        "{{valor_original}}",
+                        "{{valor_atualizado}}",
+                        "{{data_vencimento}}",
+                        "{{dias_atraso}}",
+                        "{{tipo_cobranca}}",
+                        "{{data_atual}}",
+                        "{{link_negociacao}}",
+                      ].map((variavel) => (
+                        <code
+                          key={variavel}
+                          className="bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs font-mono"
+                        >
+                          {variavel}
+                        </code>
+                      ))}
                     </div>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Preview da Mensagem
+                    Preview da Mensagem (Exemplo)
                   </label>
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 h-48 overflow-y-auto">
-                    <div className="bg-green-100 rounded-lg p-3 max-w-xs">
+                  <div className="bg-white border border-gray-300 rounded-lg p-4 h-full">
+                    <div className="bg-green-100 rounded-lg p-3 max-w-sm shadow-sm">
                       <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans">
                         {previewMensagem()}
                       </pre>
                     </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Esta é uma simulação de como a mensagem aparecerá no
+                      WhatsApp.
+                    </p>
                   </div>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Exemplo de como a mensagem aparecerá no WhatsApp
-                  </p>
                 </div>
               </div>
             </div>
 
             {/* Informações do Sistema */}
-            <div className="mt-8 bg-gray-50 rounded-lg p-6">
+            <div className="mt-8 bg-gray-50 rounded-lg p-6 border border-gray-200">
               <div className="flex items-center mb-4">
                 <Info className="w-6 h-6 text-gray-600 mr-2" />
                 <h3 className="text-lg font-semibold text-gray-800">

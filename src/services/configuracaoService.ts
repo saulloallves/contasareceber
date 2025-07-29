@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from '@supabase/supabase-js';
-import { ConfiguracaoCobranca, ValidacaoConfiguracao, Usuario, LogSistema, ConfiguracaoSistema, PermissaoUsuario } from '../types/configuracao';
+import { ConfiguracaoCobranca, ValidacaoConfiguracao, Usuario, LogSistema, ConfiguracaoSistema, PermissaoUsuario, LogSeguranca, EstatisticasUsuarios } from '../types/configuracao';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -702,7 +703,8 @@ export class ConfiguracaoService {
       let query = supabase
         .from('configuracoes_sistema')
         .select('*')
-        .order('categoria', 'chave');
+        .order('categoria')
+        .order('chave');
 
       if (categoria) {
         query = query.eq('categoria', categoria);
