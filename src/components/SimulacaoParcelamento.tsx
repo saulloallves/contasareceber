@@ -5,7 +5,7 @@ import {
   Eye, AlertTriangle, Users, TrendingUp, Target, X, Save
 } from 'lucide-react';
 import { SimulacaoParcelamentoService } from '../services/simulacaoParcelamentoService';
-import { SimulacaoParcelamento, PropostaParcelamento, FiltrosSimulacao, EstatisticasParcelamento } from '../types/simulacaoParcelamento';
+import { SimulacaoParcelamento as SimulacaoParcelamentoType, PropostaParcelamento, FiltrosSimulacao, EstatisticasParcelamento } from '../types/simulacaoParcelamento';
 
 export function SimulacaoParcelamento() {
   const [abaSelecionada, setAbaSelecionada] = useState<'simular' | 'propostas' | 'aceites'>('simular');
@@ -14,7 +14,7 @@ export function SimulacaoParcelamento() {
   const [processando, setProcessando] = useState(false);
   const [filtros, setFiltros] = useState<FiltrosSimulacao>({});
   const [modalAberto, setModalAberto] = useState<'simular' | 'proposta' | 'aceite' | null>(null);
-  const [simulacaoAtual, setSimulacaoAtual] = useState<SimulacaoParcelamento | null>(null);
+  const [simulacaoAtual, setSimulacaoAtual] = useState<SimulacaoParcelamentoType | null>(null);
   const [propostaSelecionada, setPropostaSelecionada] = useState<any>(null);
   const [estatisticas, setEstatisticas] = useState<EstatisticasParcelamento | null>(null);
 
