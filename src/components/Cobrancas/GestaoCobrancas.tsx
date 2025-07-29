@@ -191,7 +191,6 @@ export function GestaoCobrancas() {
         throw new Error("Não foi possível extrair dados da planilha.");
       }
 
-      console.log(
         `${dadosDaPlanilha.length} registros extraídos. Comparando...`
       );
 
@@ -367,18 +366,15 @@ export function GestaoCobrancas() {
    */
   const salvarAlteracaoStatus = async () => {
     if (!cobrancaSelecionada?.id) return;
-
-    // Validação: se status for quitado, valor recebido é obrigatório
-    if (formData.status === 'quitado' && (!formData.valor_recebido || formData.valor_recebido <= 0)) {
-      mostrarMensagem("erro", "Valor recebido é obrigatório quando o status for 'Quitado'");
-      return;
-    }
-
-    try {
       const dadosAtualizacao: any = {
-        status: formData.status
-      };
-      const dadosAtualizacao: any = {
+        cliente: formData.cliente,
+        valor_original: formData.valor_original,
+        valor_atualizado: formData.valor_atualizado,
+        data_vencimento: formData.data_vencimento,
+        telefone: formData.telefone,
+        email_cobranca: formData.email_cobranca,
+        descricao: formData.descricao,
+        tipo_cobranca: formData.tipo_cobranca,
         status: formStatus.status,
         telefone: formStatus.telefone || cobrancaSelecionada.telefone,
       };
