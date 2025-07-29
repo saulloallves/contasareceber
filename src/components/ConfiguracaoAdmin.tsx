@@ -20,6 +20,7 @@ import {
 import { ConfiguracaoService } from "../services/configuracaoService";
 import { ConfiguracaoCobranca, LogSistema } from "../types/configuracao";
 import { GestaoUsuarios } from "./Usuarios/GestaoUsuarios";
+import { NotificacaoAutomaticaService } from "../services/notificacaoAutomaticaService";
 
 export function ConfiguracaoAdmin() {
   const [abaSelecionada, setAbaSelecionada] = useState<
@@ -53,12 +54,15 @@ export function ConfiguracaoAdmin() {
   });
 
   const configuracaoService = new ConfiguracaoService();
+  const notificacaoAutomaticaService = new NotificacaoAutomaticaService();
 
   useEffect(() => {
     if (abaSelecionada === "configuracoes") {
       carregarConfiguracao();
     } else if (abaSelecionada === "logs") {
       carregarLogs();
+    } else if (abaSelecionada === "notificacoes") {
+      carregarConfiguracaoNotificacao();
     }
   }, [abaSelecionada]);
 
@@ -95,6 +99,30 @@ export function ConfiguracaoAdmin() {
       mostrarMensagem("erro", "Erro ao carregar logs");
     } finally {
       setCarregando(false);
+    }
+  };
+
+  const carregarConfiguracaoNotificacao = async () => {
+    setCarregando(true);
+    try {
+      const dados = await notificacaoAutomaticaService.buscarConfiguracaoNotificacao();
+      setConfigNotificacao(dados);
+    } catch (error) {
+      mostrarMensagem("erro", "Erro ao carregar configurações de notificação");
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  const salvarConfiguracaoNotificacao = async () => {
+    setSalvando(true);
+    try {
+      await notificacaoAutomaticaService.salvarConfiguracaoNotificacao(configNotificacao, "usuario_atual");
+      mostrarMensagem("sucesso", "Configurações de notificação salvas com sucesso!");
+    } catch (error) {
+      mostrarMensagem("erro", `Erro ao salvar configurações de notificação: ${error}`);
+    } finally {
+      setSalvando(false);
     }
   };
 
@@ -1085,24 +1113,7 @@ export function ConfiguracaoAdmin() {
             <button
               className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               disabled={salvando}
-              onClick={async () => {
-                setSalvando(true);
-                try {
-                  // Aqui você deve chamar o método do seu service para salvar as configurações de notificação
-                  //await configuracaoService.atualizarConfiguracaoNotificacao(configNotificacao, "usuario_atual");
-                  mostrarMensagem(
-                    "sucesso",
-                    "Configurações de notificação salvas com sucesso!"
-                  );
-                } catch (error) {
-                  mostrarMensagem(
-                    "erro",
-                    "Erro ao salvar configurações de notificação"
-                  );
-                } finally {
-                  setSalvando(false);
-                }
-              }}
+              onClick={salvarConfiguracaoNotificacao}
             >
               {salvando ? "Salvando..." : "Salvar Configurações de Notificação"}
             </button>

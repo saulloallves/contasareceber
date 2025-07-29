@@ -255,12 +255,12 @@ export class NotificacaoAutomaticaService {
   /**
    * Busca configuração de notificação
    */
-  private async buscarConfiguracaoNotificacao(): Promise<NotificacaoConfig> {
+  async buscarConfiguracaoNotificacao(): Promise<NotificacaoConfig> {
     const { data, error } = await supabase
       .from('configuracao_notificacao_automatica')
       .select('*')
       .eq('id', 'default')
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       // Retorna configuração padrão
@@ -299,6 +299,39 @@ Equipe Financeira`,
     }
 
     return data;
+  }
+
+  /**
+   * Salva configuração de notificação
+   */
+  async salvarConfiguracaoNotificacao(config: NotificacaoConfig, usuario: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('configuracao_notificacao_automatica')
+        .upsert({
+          id: 'default',
+          ...config,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) {
+        throw new Error(`Erro ao salvar configuração de notificação: ${error.message}`);
+      }
+
+      // Registra log da alteração
+      await supabase
+        .from('logs_sistema')
+        .insert({
+          usuario_id: usuario,
+          acao: 'atualizar_configuracao_notificacao',
+          tabela_afetada: 'configuracao_notificacao_automatica',
+          registro_id: 'default',
+          dados_novos: config
+        });
+    } catch (error) {
+      console.error('Erro ao salvar configuração de notificação:', error);
+      throw error;
+    }
   }
 
   /**

@@ -16,10 +16,42 @@ export class ConfiguracaoService {
         .from('configuracoes_cobranca')
         .select('*')
         .eq('id', 'default')
-        .single();
+        .maybeSingle();
 
       if (error) {
         throw new Error(`Erro ao buscar configuração: ${error.message}`);
+      }
+
+      // Se não existe configuração, retorna configuração padrão
+      if (!data) {
+        const configPadrao: ConfiguracaoCobranca = {
+          id: 'default',
+          percentual_multa: 2.0,
+          percentual_juros_dia: 0.033,
+          dia_disparo_mensal: 15,
+          tempo_tolerancia_dias: 3,
+          texto_padrao_mensagem: `Olá, {{cliente}}!
+
+Consta um débito da sua unidade, vencido em {{data_vencimento}}.
+Valor atualizado até hoje: *{{valor_atualizado}}*
+
+Deseja regularizar? {{link_negociacao}}
+
+_Esta é uma mensagem automática do sistema de cobrança._`,
+          link_base_agendamento: 'https://calendly.com/sua-empresa/negociacao',
+          canal_envio: 'whatsapp',
+          modo_debug: false,
+          ultima_data_importacao: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        // Cria configuração padrão no banco
+        await supabase
+          .from('configuracoes_cobranca')
+          .insert(configPadrao);
+          
+        return configPadrao;
       }
 
       return data;
