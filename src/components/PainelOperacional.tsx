@@ -524,9 +524,9 @@ Entre em contato: (11) 99999-9999`
                           </button>
                         )}
                         <button
-                          onClick={() => abrirModalDetalhes(cobranca)}
                           className="text-blue-600 hover:text-blue-900"
-                          title="Ver detalhes"
+                          onClick={() => abrirModalDetalhes(cobranca)}
+                          title="Ver detalhes da cobrança"
                         >
                           <Eye className="w-5 h-5" />
                         </button>
@@ -845,7 +845,7 @@ Entre em contato: (11) 99999-9999`
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Template
+                    Template de Mensagem
                   </label>
                   <select
                     value={formMensagem.template}
@@ -903,6 +903,18 @@ Entre em contato: (11) 99999-9999`
                     {getPreviewMensagem()}
                   </pre>
                 </div>
+                
+                {unidadeSelecionada && (
+                  <div className="mt-4 text-sm text-gray-600">
+                    <div><strong>Destinatário:</strong></div>
+                    <div>
+                      {formMensagem.canal === 'whatsapp' 
+                        ? `WhatsApp: ${unidadeSelecionada.telefone_franqueado || 'Não informado'}`
+                        : `Email: ${unidadeSelecionada.email_franqueado || 'Não informado'}`
+                      }
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -921,18 +933,26 @@ Entre em contato: (11) 99999-9999`
             </div>
             
             {/* Abas */}
-            <div className="flex border-b mb-6">
+            <div className="flex space-x-1 mb-6">
               <button
                 onClick={() => setAbaDetalhes('cobranca')}
-                className={`px-4 py-2 font-medium ${abaDetalhes === 'cobranca' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+                className={`px-4 py-2 rounded-lg font-medium ${
+                  abaDetalhes === 'cobranca'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
               >
-                Cobrança
+                Dados da Cobrança
               </button>
               <button
                 onClick={() => setAbaDetalhes('unidade')}
-                className={`px-4 py-2 font-medium ${abaDetalhes === 'unidade' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+                className={`px-4 py-2 rounded-lg font-medium ${
+                  abaDetalhes === 'unidade'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
               >
-                Unidade
+                Dados da Unidade
               </button>
             </div>
 
@@ -940,51 +960,89 @@ Entre em contato: (11) 99999-9999`
             {abaDetalhes === 'cobranca' && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <h4 className="font-medium text-gray-800">Informações Básicas</h4>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-800 mb-3">Informações Básicas</h4>
                     <div className="space-y-2 text-sm">
-                      <div><span className="font-medium">Cliente:</span> {cobrancaSelecionada.cliente}</div>
-                      <div><span className="font-medium">CNPJ:</span> {formatarCNPJCPF(cobrancaSelecionada.cnpj)}</div>
-                      <div><span className="font-medium">Status:</span> {cobrancaSelecionada.status}</div>
-                      <div><span className="font-medium">Data de Vencimento:</span> {formatarData(cobrancaSelecionada.data_vencimento)}</div>
-                      <div><span className="font-medium">Dias em Atraso:</span> {cobrancaSelecionada.dias_em_atraso || 0}</div>
+                      <div><strong>Cliente:</strong> {cobrancaSelecionada.cliente}</div>
+                      <div><strong>CNPJ:</strong> {formatarCNPJCPF(cobrancaSelecionada.cnpj)}</div>
+                      <div><strong>Status:</strong> 
+                        <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(cobrancaSelecionada.status)}`}>
+                          {cobrancaSelecionada.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                      </div>
+                      <div><strong>Data de Criação:</strong> {formatarData(cobrancaSelecionada.data_criacao)}</div>
                     </div>
                   </div>
-                  
-                  <div className="space-y-4">
-                    <h4 className="font-medium text-gray-800">Valores</h4>
+
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-800 mb-3">Valores</h4>
                     <div className="space-y-2 text-sm">
-                      <div><span className="font-medium">Valor Original:</span> {formatarMoeda(cobrancaSelecionada.valor_original)}</div>
-                      <div><span className="font-medium">Valor Atualizado:</span> {formatarMoeda(cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original)}</div>
-                      <div><span className="font-medium">Juros:</span> {formatarMoeda(calcularJuros(cobrancaSelecionada))}</div>
+                      <div><strong>Valor Original:</strong> {formatarMoeda(cobrancaSelecionada.valor_original)}</div>
+                      <div><strong>Valor Atualizado:</strong> 
+                        <span className="text-red-600 font-medium ml-1">
+                          {formatarMoeda(cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original)}
+                        </span>
+                      </div>
+                      <div><strong>Juros Acumulados:</strong> 
+                        <span className="text-orange-600 font-medium ml-1">
+                          {formatarMoeda(calcularJuros(cobrancaSelecionada))}
+                        </span>
+                      </div>
+                      <div><strong>Data de Vencimento:</strong> {formatarData(cobrancaSelecionada.data_vencimento)}</div>
+                      <div><strong>Dias em Atraso:</strong> 
+                        <span className={`ml-1 font-medium ${cobrancaSelecionada.dias_em_atraso > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {cobrancaSelecionada.dias_em_atraso || 0} dias
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
+
+                {cobrancaSelecionada.observacoes && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h4 className="font-medium text-yellow-800 mb-2">Observações</h4>
+                    <p className="text-sm text-yellow-700">{cobrancaSelecionada.observacoes}</p>
+                  </div>
+                )}
               </div>
             )}
 
             {abaDetalhes === 'unidade' && unidadeSelecionada && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <h4 className="font-medium text-gray-800">Dados da Unidade</h4>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-800 mb-3">Dados do Franqueado</h4>
                     <div className="space-y-2 text-sm">
-                      <div><span className="font-medium">Código:</span> {unidadeSelecionada.codigo_unidade}</div>
-                      <div><span className="font-medium">Nome do Franqueado:</span> {unidadeSelecionada.nome_franqueado}</div>
-                      <div><span className="font-medium">Email:</span> {unidadeSelecionada.email_franqueado}</div>
-                      <div><span className="font-medium">Telefone:</span> {unidadeSelecionada.telefone_franqueado}</div>
+                      <div><strong>Nome:</strong> {unidadeSelecionada.nome_franqueado || 'N/A'}</div>
+                      <div><strong>Email:</strong> {unidadeSelecionada.email_franqueado || 'N/A'}</div>
+                      <div><strong>Telefone:</strong> {unidadeSelecionada.telefone_franqueado || 'N/A'}</div>
+                      <div><strong>CNPJ:</strong> {formatarCNPJCPF(unidadeSelecionada.cnpj_franqueado || '')}</div>
                     </div>
                   </div>
-                  
-                  <div className="space-y-4">
-                    <h4 className="font-medium text-gray-800">Endereço</h4>
+
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-800 mb-3">Dados da Unidade</h4>
                     <div className="space-y-2 text-sm">
-                      <div><span className="font-medium">Cidade:</span> {unidadeSelecionada.cidade}</div>
-                      <div><span className="font-medium">Estado:</span> {unidadeSelecionada.estado}</div>
-                      <div><span className="font-medium">Status:</span> {unidadeSelecionada.status_unidade}</div>
+                      <div><strong>Código:</strong> {unidadeSelecionada.codigo_unidade || 'N/A'}</div>
+                      <div><strong>Status:</strong> {unidadeSelecionada.status_unidade || 'N/A'}</div>
+                      <div><strong>Data de Abertura:</strong> {unidadeSelecionada.data_abertura ? formatarData(unidadeSelecionada.data_abertura) : 'N/A'}</div>
+                      <div><strong>Região:</strong> {unidadeSelecionada.regiao || 'N/A'}</div>
                     </div>
                   </div>
                 </div>
+
+                {unidadeSelecionada.endereco && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-800 mb-3">Endereço</h4>
+                    <p className="text-sm text-gray-700">{unidadeSelecionada.endereco}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {abaDetalhes === 'unidade' && !unidadeSelecionada && (
+              <div className="text-center py-8">
+                <p className="text-gray-500">Dados da unidade não encontrados</p>
               </div>
             )}
           </div>
