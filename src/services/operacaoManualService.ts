@@ -3,6 +3,7 @@ import { OperacaoManual, CobrancaManual, TrativativaManual, NotificacaoManual, C
 import { CobrancaService } from './cobrancaService';
 import { TrativativasService } from './tratativasService';
 import { DocumentosService } from './documentosService';
+import { NotificacaoAutomaticaService } from './notificacaoAutomaticaService';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -12,11 +13,13 @@ export class OperacaoManualService {
   private cobrancaService: CobrancaService;
   private tratativasService: TrativativasService;
   private documentosService: DocumentosService;
+  private notificacaoService: NotificacaoAutomaticaService;
 
   constructor() {
     this.cobrancaService = new CobrancaService();
     this.tratativasService = new TrativativasService();
     this.documentosService = new DocumentosService();
+    this.notificacaoService = new NotificacaoAutomaticaService();
   }
 
   /**
@@ -75,6 +78,14 @@ export class OperacaoManualService {
         usuario,
         `Cobrança cadastrada manualmente: ${dados.tipo_cobranca} - ${dados.descricao_cobranca}. Justificativa: ${justificativa}`
       );
+
+      // Envia notificação automática para nova cobrança manual
+      try {
+        await this.notificacaoService.enviarNotificacaoNovaCobranca(cobranca.id);
+      } catch (notifError) {
+        console.warn('Erro ao enviar notificação automática:', notifError);
+        // Não falha o cadastro por erro de notificação
+      }
 
       return cobranca.id;
     } catch (error) {

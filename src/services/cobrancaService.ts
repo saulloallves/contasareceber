@@ -10,6 +10,7 @@ import {
 } from "../utils/planilhaProcessor";
 import { supabase } from "./databaseService";
 import { comparacaoPlanilhaService, ResultadoComparacao } from "./comparacaoPlanilhaService";
+import { NotificacaoAutomaticaService } from "./notificacaoAutomaticaService";
 
 export class CobrancaService {
   /**
@@ -20,6 +21,12 @@ export class CobrancaService {
   ): Promise<ResultadoComparacao> {
     return await comparacaoPlanilhaService.compararComUltimaPlanilha(dadosNovaPlanilha);
   }
+
+  constructor() {
+    this.notificacaoService = new NotificacaoAutomaticaService();
+  }
+
+  private notificacaoService: NotificacaoAutomaticaService;
 
   /**
    * Processa importação de planilha e atualiza banco de dados
@@ -324,6 +331,14 @@ export class CobrancaService {
         dadosEnviados: novaCobranca,
       });
       throw new Error(`Erro ao inserir cobrança: ${error.message}`);
+    }
+
+    // Envia notificação automática para nova cobrança
+    try {
+      await this.notificacaoService.enviarNotificacaoNovaCobranca(novaCobranca.id);
+    } catch (notifError) {
+      console.warn('Erro ao enviar notificação automática:', notifError);
+      // Não falha a importação por erro de notificação
     }
   }
 

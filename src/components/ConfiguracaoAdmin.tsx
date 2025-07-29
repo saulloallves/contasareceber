@@ -18,6 +18,7 @@ import {
   Bug,
   Users,
   Shield,
+  Bell,
 } from "lucide-react";
 import { ConfiguracaoService } from "../services/configuracaoService";
 import { ConfiguracaoCobranca, LogSistema } from "../types/configuracao";
@@ -25,7 +26,7 @@ import { GestaoUsuarios } from "./Usuarios/GestaoUsuarios";
 
 export function ConfiguracaoAdmin() {
   const [abaSelecionada, setAbaSelecionada] = useState<
-    "configuracoes" | "usuarios" | "logs" | "seguranca"
+    "configuracoes" | "usuarios" | "logs" | "seguranca" | "notificacoes"
   >("configuracoes");
   const [config, setConfig] = useState<ConfiguracaoCobranca | null>(null);
   const [configOriginal, setConfigOriginal] =
@@ -43,6 +44,12 @@ export function ConfiguracaoAdmin() {
     acao: "",
     dataInicio: "",
     dataFim: "",
+  });
+  const [configNotificacao, setConfigNotificacao] = useState({
+    whatsapp_ativo: true,
+    email_ativo: true,
+    enviar_apenas_em_atraso: false,
+    valor_minimo_notificacao: 0
   });
 
   const configuracaoService = new ConfiguracaoService();
@@ -269,6 +276,7 @@ export function ConfiguracaoAdmin() {
               { id: "usuarios", label: "Gestão de Usuários", icon: Users },
               { id: "logs", label: "Logs e Auditoria", icon: Shield },
               { id: "seguranca", label: "Segurança", icon: Shield },
+              { id: "notificacoes", label: "Notificações Automáticas", icon: Bell },
             ].map((aba) => {
               const Icon = aba.icon;
               return (
