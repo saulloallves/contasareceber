@@ -56,7 +56,40 @@ export function PainelOperacional() {
 
   // Templates de mensagem padrão
   const templatesPadrao = {
-    padrao: 'Mensagem padrão'
+    padrao: `Olá, {{cliente}}!
+
+Consta um débito da sua unidade, vencido em {{data_vencimento}}.
+Valor atualizado até hoje: *{{valor_atualizado}}*
+
+Deseja regularizar? Entre em contato conosco.
+
+_Esta é uma mensagem do sistema de cobrança._`,
+    
+    formal: `Prezado(a) {{cliente}},
+
+Identificamos pendência financeira em aberto referente à sua unidade {{codigo_unidade}}.
+
+Dados da pendência:
+- Valor original: {{valor_original}}
+- Valor atualizado: {{valor_atualizado}}
+- Data de vencimento: {{data_vencimento}}
+- Dias em atraso: {{dias_atraso}}
+
+Solicitamos regularização no prazo de 5 dias úteis.
+
+Atenciosamente,
+Equipe Financeira`,
+
+    urgente: `🚨 ATENÇÃO {{cliente}}
+
+Sua unidade {{codigo_unidade}} possui débito VENCIDO há {{dias_atraso}} dias.
+
+💰 Valor: {{valor_atualizado}}
+📅 Vencimento: {{data_vencimento}}
+
+⚠️ Regularize HOJE para evitar bloqueios!
+
+Entre em contato: (11) 99999-9999`
   };
 
   useEffect(() => {
