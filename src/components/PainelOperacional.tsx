@@ -119,6 +119,42 @@ Entre em contato: (11) 99999-9999`
     setModalAberto('simular');
   };
 
+  const abrirModalDetalhes = async (cobranca: any) => {
+    setCobrancaSelecionada(cobranca);
+    setAbaDetalhes('cobranca');
+    
+    // Busca dados da unidade
+    try {
+      const unidade = await unidadesService.buscarUnidadePorCodigo(cobranca.cnpj);
+      setUnidadeSelecionada(unidade);
+    } catch (error) {
+      console.error('Erro ao buscar dados da unidade:', error);
+      setUnidadeSelecionada(null);
+    }
+    
+    setModalAberto('detalhes');
+  };
+
+  const abrirModalMensagem = async (cobranca: any) => {
+    setCobrancaSelecionada(cobranca);
+    setFormMensagem({
+      template: 'padrao',
+      mensagem_personalizada: '',
+      canal: 'whatsapp'
+    });
+    
+    // Busca dados da unidade para templates
+    try {
+      const unidade = await unidadesService.buscarUnidadePorCodigo(cobranca.cnpj);
+      setUnidadeSelecionada(unidade);
+    } catch (error) {
+      console.error('Erro ao buscar dados da unidade:', error);
+      setUnidadeSelecionada(null);
+    }
+    
+    setModalAberto('mensagem');
+  };
+
   const simularParcelamento = async () => {
     if (!cobrancaSelecionada || !formSimulacao.data_primeira_parcela) {
       alert('Data da primeira parcela é obrigatória');
@@ -400,12 +436,14 @@ Entre em contato: (11) 99999-9999`
                           </button>
                         )}
                         <button
+                          onClick={() => abrirModalDetalhes(cobranca)}
                           className="text-blue-600 hover:text-blue-900"
                           title="Ver detalhes"
                         >
                           <Eye className="w-5 h-5" />
                         </button>
                         <button
+                          onClick={() => abrirModalMensagem(cobranca)}
                           className="text-purple-600 hover:text-purple-900"
                           title="Enviar mensagem"
                         >
