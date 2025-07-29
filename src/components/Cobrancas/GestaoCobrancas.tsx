@@ -17,6 +17,7 @@ import {
   ArrowUp,
   ArrowDown,
   AlertTriangle,
+  Info,
 } from "lucide-react";
 import { CobrancaFranqueado } from "../../types/cobranca";
 import { cobrancaService } from "../../services/cobrancaService";
@@ -378,15 +379,9 @@ export function GestaoCobrancas() {
       const dadosAtualizacao: Partial<CobrancaFranqueado> = {
         status: formData.status as any
       };
-      const dadosAtualizacao: any = {
-        status: formStatus.status
-      };
       
-      if (formStatus.status === 'quitado' && formStatus.valor_recebido) {
-        dadosAtualizacao.valor_recebido = formStatus.valor_recebido;
-      }
-      
-      await cobrancaService.atualizarCobranca(cobrancaSelecionada.id!, dadosAtualizacao);
+      if (formData.status === 'quitado' && formData.valor_recebido) {
+        dadosAtualizacao.valor_recebido = formData.valor_recebido;
       }
 
       await cobrancaService.atualizarCobranca(cobrancaSelecionada.id, dadosAtualizacao);
@@ -773,13 +768,13 @@ export function GestaoCobrancas() {
                             >
                               <CheckCircle className="w-4 h-4" />
                             </button>
-                          <button
-                            onClick={() => abrirModalStatus(cobranca)}
-                            className="text-purple-600 hover:text-purple-900"
-                            title="Alterar status"
-                          >
+                            <button
+                              onClick={() => abrirModalStatus(cobranca)}
+                              className="text-purple-600 hover:text-purple-900"
+                              title="Alterar status"
+                            >
                               <Clock className="w-4 h-4" />
-                          </button>
+                            </button>
                           </>
                         )}
                         <button
@@ -1309,8 +1304,7 @@ export function GestaoCobrancas() {
                     // Gera e baixa relatório de comparação
                     const relatorio =
                       comparacaoPlanilhaService.gerarRelatorioComparacao(
-                    !formData.valor_original ||
-                    (formData.status === 'quitado' && !formData.valor_recebido)
+                        resultadoComparacao
                       );
                     const blob = new Blob([relatorio], {
                       type: "text/plain;charset=utf-8",
