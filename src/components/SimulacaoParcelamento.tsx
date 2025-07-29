@@ -687,7 +687,7 @@ export function SimulacaoParcelamento() {
       {/* Modal de Proposta */}
       {modalAberto === "proposta" && simulacaoAtual && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      {modalAberto === "detalhes" && propostaSelecionada && (
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold">
                 Gerar Proposta de Parcelamento
@@ -832,6 +832,27 @@ export function SimulacaoParcelamento() {
               >
                 Cancelar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Detalhes */}
+      {modalAberto === "detalhes" && propostaSelecionada && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold">Detalhes da Proposta</h3>
+              <button
+                onClick={() => setModalAberto(null)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            {/* Conteúdo dos detalhes aqui */}
+            <div className="space-y-4">
+              <p>Detalhes da proposta selecionada...</p>
             </div>
           </div>
         </div>
