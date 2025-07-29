@@ -49,7 +49,10 @@ export function ConfiguracaoAdmin() {
     whatsapp_ativo: true,
     email_ativo: true,
     enviar_apenas_em_atraso: false,
-    valor_minimo_notificacao: 0
+    valor_minimo_notificacao: 0,
+    template_whatsapp: '',
+    template_email_assunto: '',
+    template_email_corpo: ''
   });
 
   const configuracaoService = new ConfiguracaoService();
@@ -197,9 +200,13 @@ export function ConfiguracaoAdmin() {
 
   return (
     <div className="max-w-full mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-lg p-8">
+               {/* Variáveis Disponíveis */}
+               <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center">
+                 <p className="text-sm text-gray-600 mb-4">
+                   Use essas variáveis nos templates acima. Elas serão substituídas automaticamente pelos dados reais:
+                 </p>
+                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
               <Settings className="w-7 h-7 text-white" />
             </div>
@@ -222,16 +229,30 @@ export function ConfiguracaoAdmin() {
                 <Download className="w-4 h-4 mr-2" />
                 Exportar
               </button>
-              <button
-                onClick={resetarConfiguracao}
-                disabled={salvando}
-                className="flex items-center px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50"
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
+                       <code className="text-blue-600 font-mono text-xs">
+                         {variavel}
+                       </code>
+                       <div className="text-xs text-gray-500 mt-1">
+                         {variavel === '{{cliente}}' && 'Nome do franqueado'}
+                         {variavel === '{{codigo_unidade}}' && 'Código da unidade'}
+                         {variavel === '{{cnpj}}' && 'CNPJ formatado'}
+                         {variavel === '{{valor_original}}' && 'Valor original'}
+                         {variavel === '{{valor_atualizado}}' && 'Valor com juros'}
+                         {variavel === '{{data_vencimento}}' && 'Data de vencimento'}
+                         {variavel === '{{dias_atraso}}' && 'Dias em atraso'}
+                         {variavel === '{{tipo_cobranca}}' && 'Tipo da cobrança'}
+                         {variavel === '{{data_atual}}' && 'Data atual'}
+                         {variavel === '{{link_negociacao}}' && 'Link para negociar'}
+                       </div>
+                     </div>
                 Resetar
               </button>
+                 <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                   <p className="text-sm text-yellow-800">
+                     💡 <strong>Dica:</strong> Clique em qualquer variável acima para copiá-la e cole no template desejado.
+                   </p>
+                 </div>
               <button
-                onClick={salvarConfiguracao}
                 disabled={salvando || !alteracoesPendentes}
                 className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -846,7 +867,8 @@ export function ConfiguracaoAdmin() {
                 </div>
               </div>
 
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
+             <div className="space-y-8">
+               {/* Configurações Gerais */}
                 <h4 className="font-semibold text-gray-800 mb-4">Variáveis Disponíveis</h4>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   {[
@@ -872,6 +894,157 @@ export function ConfiguracaoAdmin() {
               </div>
             </div>
 
+               {/* Template WhatsApp */}
+               <div className="bg-white border border-gray-200 rounded-lg p-6">
+                 <h4 className="font-semibold text-gray-800 mb-4 flex items-center">
+                   <MessageSquare className="w-5 h-5 text-green-600 mr-2" />
+                   Template WhatsApp
+                 </h4>
+                 
+                 <div className="space-y-4">
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-2">
+                       Mensagem do WhatsApp
+                     </label>
+                     <textarea
+                       value={configNotificacao.template_whatsapp || `Olá, {{cliente}}! 👋
+ 
+ Uma nova cobrança foi registrada para sua unidade {{codigo_unidade}}.
+ 
+ 📋 *Detalhes:*
+ • Valor: {{valor_atualizado}}
+ • Vencimento: {{data_vencimento}}
+ • Tipo: {{tipo_cobranca}}
+ 
+ Para negociar ou esclarecer dúvidas, entre em contato conosco.
+ 
+ _Mensagem automática do sistema de cobrança_`}
+                       onChange={(e) => setConfigNotificacao({
+                         ...configNotificacao,
+                         template_whatsapp: e.target.value
+                       })}
+                       rows={12}
+                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                       placeholder="Digite a mensagem do WhatsApp..."
+                     />
+                   </div>
+                   
+                   <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                     <h5 className="font-medium text-green-800 mb-2">Preview WhatsApp:</h5>
+                     <div className="bg-white rounded-lg p-3 border border-green-300 max-w-sm">
+                       <div className="text-sm text-gray-800 whitespace-pre-line">
+                         {(configNotificacao.template_whatsapp || `Olá, João Silva! 👋
+ 
+ Uma nova cobrança foi registrada para sua unidade CP001.
+ 
+ 📋 *Detalhes:*
+ • Valor: R$ 1.250,00
+ • Vencimento: 15/02/2024
+ • Tipo: Royalties
+ 
+ Para negociar ou esclarecer dúvidas, entre em contato conosco.
+ 
+ _Mensagem automática do sistema de cobrança_`)
+                           .replace(/\{\{cliente\}\}/g, 'João Silva')
+                           .replace(/\{\{codigo_unidade\}\}/g, 'CP001')
+                           .replace(/\{\{valor_atualizado\}\}/g, 'R$ 1.250,00')
+                           .replace(/\{\{data_vencimento\}\}/g, '15/02/2024')
+                           .replace(/\{\{tipo_cobranca\}\}/g, 'Royalties')
+                           .replace(/\{\{cnpj\}\}/g, '12.345.678/0001-99')
+                           .replace(/\{\{dias_atraso\}\}/g, '5')
+                           .replace(/\{\{data_atual\}\}/g, new Date().toLocaleDateString('pt-BR'))
+                         }
+                       </div>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+ 
+               {/* Template Email */}
+               <div className="bg-white border border-gray-200 rounded-lg p-6">
+                 <h4 className="font-semibold text-gray-800 mb-4 flex items-center">
+                   <Mail className="w-5 h-5 text-blue-600 mr-2" />
+                   Template Email
+                 </h4>
+                 
+                 <div className="space-y-4">
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-2">
+                       Assunto do Email
+                     </label>
+                     <input
+                       type="text"
+                       value={configNotificacao.template_email_assunto || 'Nova Cobrança Registrada - {{codigo_unidade}}'}
+                       onChange={(e) => setConfigNotificacao({
+                         ...configNotificacao,
+                         template_email_assunto: e.target.value
+                       })}
+                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                       placeholder="Assunto do email..."
+                     />
+                   </div>
+                   
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-2">
+                       Corpo do Email
+                     </label>
+                     <textarea
+                       value={configNotificacao.template_email_corpo || `Prezado(a) {{cliente}},
+ 
+ Informamos que foi registrada uma nova cobrança para sua unidade {{codigo_unidade}}.
+ 
+ Detalhes da Cobrança:
+ - Valor: {{valor_atualizado}}
+ - Data de Vencimento: {{data_vencimento}}
+ - Tipo: {{tipo_cobranca}}
+ 
+ Para esclarecimentos ou negociação, entre em contato através dos nossos canais oficiais.
+ 
+ Atenciosamente,
+ Equipe Financeira`}
+                       onChange={(e) => setConfigNotificacao({
+                         ...configNotificacao,
+                         template_email_corpo: e.target.value
+                       })}
+                       rows={10}
+                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                       placeholder="Digite o corpo do email..."
+                     />
+                   </div>
+                   
+                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                     <h5 className="font-medium text-blue-800 mb-2">Preview Email:</h5>
+                     <div className="bg-white rounded-lg p-4 border border-blue-300">
+                       <div className="border-b border-gray-200 pb-2 mb-3">
+                         <strong>Assunto:</strong> {(configNotificacao.template_email_assunto || 'Nova Cobrança Registrada - {{codigo_unidade}}')
+                           .replace(/\{\{codigo_unidade\}\}/g, 'CP001')
+                         }
+                       </div>
+                       <div className="text-sm text-gray-800 whitespace-pre-line">
+                         {(configNotificacao.template_email_corpo || `Prezado(a) {{cliente}},
+ 
+ Informamos que foi registrada uma nova cobrança para sua unidade {{codigo_unidade}}.
+ 
+ Detalhes da Cobrança:
+ - Valor: {{valor_atualizado}}
+ - Data de Vencimento: {{data_vencimento}}
+ - Tipo: {{tipo_cobranca}}
+ 
+ Para esclarecimentos ou negociação, entre em contato através dos nossos canais oficiais.
+ 
+ Atenciosamente,
+ Equipe Financeira`)
+                           .replace(/\{\{cliente\}\}/g, 'João Silva')
+                           .replace(/\{\{codigo_unidade\}\}/g, 'CP001')
+                           .replace(/\{\{valor_atualizado\}\}/g, 'R$ 1.250,00')
+                           .replace(/\{\{data_vencimento\}\}/g, '15/02/2024')
+                           .replace(/\{\{tipo_cobranca\}\}/g, 'Royalties')
+                         }
+                       </div>
+                     </div>
+                   </div>
+                 </div>
+               </div>
             <button
               className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
