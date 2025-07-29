@@ -65,6 +65,15 @@ export function GestaoCobrancas() {
     useState(false); // Controlar a exibição de inadimplentes
   const [errosImportacao, setErrosImportacao] = useState<string[]>([]);
   const [modalErrosAberto, setModalErrosAberto] = useState(false);
+  const [mensagemFeedback, setMensagemFeedback] = useState<{
+    tipo: 'sucesso' | 'erro' | 'info';
+    texto: string;
+  } | null>(null);
+
+  const mostrarMensagem = (tipo: 'sucesso' | 'erro' | 'info', texto: string) => {
+    setMensagemFeedback({ tipo, texto });
+    setTimeout(() => setMensagemFeedback(null), 5000);
+  };
 
   // Carrega as cobranças ao montar o componente e quando os filtros ou ordenação mudam
   useEffect(() => {
@@ -304,16 +313,26 @@ export function GestaoCobrancas() {
    * Função para salvar a cobrança (criação ou edição)
    */
   const salvarCobranca = async () => {
+    if (!formData.cnpj || !formData.cliente || !formData.valor_original) {
+      alert('CNPJ, cliente e valor original são obrigatórios');
+      return;
+    }
+
     try {
       if (modalAberto === "criar") {
         console.log("Criando cobrança:", formData);
+        // TODO: Implementar criação de cobrança
       } else {
-        console.log("Editando cobrança:", formData);
+        if (cobrancaSelecionada?.id) {
+          await cobrancaService.atualizarCobranca(cobrancaSelecionada.id, formData);
+          mostrarMensagem("sucesso", "Cobrança atualizada com sucesso!");
+        }
       }
       fecharModal();
       carregarCobrancas();
     } catch (error) {
       console.error("Erro ao salvar cobrança:", error);
+      mostrarMensagem("erro", `Erro ao salvar cobrança: ${error}`);
     }
   };
 
@@ -332,14 +351,18 @@ export function GestaoCobrancas() {
 
   /**
    * Função para marcar a cobrança como quitada
-   * (Falta a integração com o serviço de atualização de cobranças, apenas um exemplo de como poderia ser implementado)
    */
   const marcarQuitado = async (id: string) => {
     try {
-      console.log("Marcando como quitado:", id);
+      await cobrancaService.atualizarCobranca(id, { 
+        status: 'quitado',
+        valor_recebido: cobrancas.find(c => c.id === id)?.valor_atualizado || 0
+      });
+      mostrarMensagem("sucesso", "Cobrança marcada como quitada!");
       carregarCobrancas();
     } catch (error) {
       console.error("Erro ao marcar como quitado:", error);
+      mostrarMensagem("erro", `Erro ao marcar como quitado: ${error}`);
     }
   };
 
@@ -504,6 +527,26 @@ export function GestaoCobrancas() {
             </label>
           </div>
         </div>
+
+        {/* Mensagem de feedback */}
+        {mensagemFeedback && (
+          <div className={`mb-6 p-4 rounded-lg flex items-center ${
+            mensagemFeedback.tipo === 'sucesso' 
+              ? 'bg-green-50 border border-green-200 text-green-800' 
+              : mensagemFeedback.tipo === 'erro'
+              ? 'bg-red-50 border border-red-200 text-red-800'
+              : 'bg-blue-50 border border-blue-200 text-blue-800'
+          }`}>
+            {mensagemFeedback.tipo === 'sucesso' ? (
+              <CheckCircle className="w-5 h-5 mr-2" />
+            ) : mensagemFeedback.tipo === 'erro' ? (
+              <AlertTriangle className="w-5 h-5 mr-2" />
+            ) : (
+              <Info className="w-5 h-5 mr-2" />
+            )}
+            {mensagemFeedback.texto}
+          </div>
+        )}
 
         {/* Tabela de Cobranças */}
         <div className="overflow-x-auto">
