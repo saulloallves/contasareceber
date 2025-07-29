@@ -3,7 +3,7 @@ import {
   Home, Building2, DollarSign, Calendar, Scale, BarChart3, 
   Settings, Users, ChevronLeft, ChevronRight, Menu, X, FileText, 
   Zap, Shield, 
-  Receipt, CircleDollarSign, Calculator
+  Receipt, CircleDollarSign, Calculator, Mail
 } from 'lucide-react';
 
 interface SidebarProps {
