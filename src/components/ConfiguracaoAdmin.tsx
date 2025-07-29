@@ -237,14 +237,15 @@ export function ConfiguracaoAdmin() {
                          {variavel === '{{link_negociacao}}' && 'Link para negociar'}
                        </div>
                      </div>
+              <button
+                onClick={resetarConfiguracao}
+                className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
                 Resetar
               </button>
-                 <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                   <p className="text-sm text-yellow-800">
-                     💡 <strong>Dica:</strong> Clique em qualquer variável acima para copiá-la e cole no template desejado.
-                   </p>
-                 </div>
               <button
+                onClick={salvarConfiguracao}
                 disabled={salvando || !alteracoesPendentes}
                 className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
