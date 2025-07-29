@@ -41,6 +41,7 @@ export interface DashboardData {
 export interface IndicadoresMensais {
   total_em_aberto_mes: number;
   total_pago_mes: number;
+  total_negociando_mes: number;
   percentual_inadimplencia: number;
   unidades_inadimplentes: number;
   ticket_medio_dividas: number;

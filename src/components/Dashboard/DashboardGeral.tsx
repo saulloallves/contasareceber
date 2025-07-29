@@ -7,7 +7,7 @@ import {
 import { DashboardService } from '../../services/dashboardService';
 
 export function DashboardGeral() {
-  const [dados, setDados] = useState<any>(null);
+  const [indicadores, setIndicadores] = useState<any>(null);
   const [carregando, setCarregando] = useState(true);
   const [filtros, setFiltros] = useState({
     periodo: '30',
@@ -24,8 +24,8 @@ export function DashboardGeral() {
   const carregarDados = async () => {
     setCarregando(true);
     try {
-      const dadosDashboard = await dashboardService.buscarDadosDashboard(filtros);
-      setDados(dadosDashboard);
+      const indicadoresMensais = await dashboardService.buscarIndicadoresMensais();
+      setIndicadores(indicadoresMensais);
     } catch (error) {
       console.error('Erro ao carregar dashboard:', error);
     } finally {
@@ -40,6 +40,21 @@ export function DashboardGeral() {
     }).format(valor);
   };
 
+  const formatarPercentual = (valor: number) => {
+    return `${valor.toFixed(1)}%`;
+  };
+
+  const getVariacaoIcon = (valor: number) => {
+    if (valor > 0) return <TrendingUp className="w-4 h-4" />;
+    if (valor < 0) return <TrendingDown className="w-4 h-4" />;
+    return null;
+  };
+
+  const getVariacaoColor = (valor: number) => {
+    if (valor > 0) return 'text-green-600';
+    if (valor < 0) return 'text-red-600';
+    return 'text-gray-600';
+  };
   if (carregando) {
     return (
       <div className="flex items-center justify-center min-h-96">
@@ -51,6 +66,16 @@ export function DashboardGeral() {
     );
   }
 
+  if (!indicadores) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+          <p className="text-gray-600">Erro ao carregar dados do dashboard</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -121,7 +146,7 @@ export function DashboardGeral() {
             <div>
               <p className="text-sm font-medium text-red-700">Total Inadimplentes</p>
               <p className="text-3xl font-bold text-red-600">
-                {dados?.visaoGeral?.totalEmAberto ? formatarMoeda(dados.visaoGeral.totalEmAberto) : 'R$ 0,00'}
+                {formatarMoeda(indicadores.total_em_aberto_mes)}
               </p>
             </div>
             <div className="p-2 bg-red-500 rounded-full">
@@ -129,7 +154,10 @@ export function DashboardGeral() {
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className="text-red-600 font-semibold">↑ 12%</span>
+            <span className={`flex items-center font-semibold ${getVariacaoColor(indicadores.comparativo_mes_anterior.variacao_em_aberto)}`}>
+              {getVariacaoIcon(indicadores.comparativo_mes_anterior.variacao_em_aberto)}
+              <span className="ml-1">{Math.abs(indicadores.comparativo_mes_anterior.variacao_em_aberto).toFixed(1)}%</span>
+            </span>
             <span className="text-red-500 ml-2">vs. mês anterior</span>
           </div>
         </div>
@@ -139,7 +167,7 @@ export function DashboardGeral() {
             <div>
               <p className="text-sm font-medium text-green-700">Valor Recuperado</p>
               <p className="text-3xl font-bold text-green-600">
-                {dados?.visaoGeral?.totalQuitado ? formatarMoeda(dados.visaoGeral.totalQuitado) : 'R$ 0,00'}
+                {formatarMoeda(indicadores.total_pago_mes)}
               </p>
             </div>
             <div className="p-2 bg-green-500 rounded-full">
@@ -147,7 +175,10 @@ export function DashboardGeral() {
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className="text-green-600 font-semibold">↑ 8%</span>
+            <span className={`flex items-center font-semibold ${getVariacaoColor(indicadores.comparativo_mes_anterior.variacao_pago)}`}>
+              {getVariacaoIcon(indicadores.comparativo_mes_anterior.variacao_pago)}
+              <span className="ml-1">{Math.abs(indicadores.comparativo_mes_anterior.variacao_pago).toFixed(1)}%</span>
+            </span>
             <span className="text-green-500 ml-2">vs. mês anterior</span>
           </div>
         </div>
@@ -157,7 +188,7 @@ export function DashboardGeral() {
             <div>
               <p className="text-sm font-medium text-yellow-700">Em Negociação</p>
               <p className="text-3xl font-bold text-yellow-600">
-                {dados?.visaoGeral?.totalNegociando ? formatarMoeda(dados.visaoGeral.totalNegociando) : 'R$ 0,00'}
+                {formatarMoeda(indicadores.total_negociando_mes)}
               </p>
             </div>
             <div className="p-2 bg-yellow-500 rounded-full">
@@ -165,8 +196,10 @@ export function DashboardGeral() {
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className="text-yellow-600 font-semibold">→ 0%</span>
-            <span className="text-yellow-500 ml-2">vs. mês anterior</span>
+            <span className="text-yellow-600 font-semibold">
+              {formatarPercentual(indicadores.percentual_inadimplencia)}
+            </span>
+            <span className="text-yellow-500 ml-2">% Inadimplência</span>
           </div>
         </div>
 
@@ -174,15 +207,17 @@ export function DashboardGeral() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-blue-700">Unidades Ativas</p>
-              <p className="text-3xl font-bold text-blue-600">247</p>
+              <p className="text-3xl font-bold text-blue-600">{indicadores.unidades_inadimplentes}</p>
             </div>
             <div className="p-2 bg-blue-500 rounded-full">
               <Users className="w-7 h-7 text-white" />
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className="text-blue-600 font-semibold">↑ 3%</span>
-            <span className="text-blue-500 ml-2">vs. mês anterior</span>
+            <span className="text-blue-600 font-semibold">
+              {formatarMoeda(indicadores.ticket_medio_dividas)}
+            </span>
+            <span className="text-blue-500 ml-2">Ticket Médio</span>
           </div>
         </div>
       </div>
@@ -202,8 +237,12 @@ export function DashboardGeral() {
                 <AlertTriangle className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="font-semibold text-red-800">5 unidades ignoraram 3 tentativas de cobrança</p>
-                <p className="text-sm text-red-600">Valor total: R$ 47.500,00</p>
+                <p className="font-semibold text-red-800">
+                  {indicadores.unidades_inadimplentes} unidades com débitos em aberto
+                </p>
+                <p className="text-sm text-red-600">
+                  Valor total: {formatarMoeda(indicadores.total_em_aberto_mes)}
+                </p>
               </div>
             </div>
             <button className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors shadow-md">
@@ -217,8 +256,12 @@ export function DashboardGeral() {
                 <Clock className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="font-semibold text-yellow-800">12 reuniões agendadas para esta semana</p>
-                <p className="text-sm text-yellow-600">3 ainda não confirmadas</p>
+                <p className="font-semibold text-yellow-800">
+                  Cobranças em negociação
+                </p>
+                <p className="text-sm text-yellow-600">
+                  Valor: {formatarMoeda(indicadores.total_negociando_mes)}
+                </p>
               </div>
             </div>
             <button className="px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700 transition-colors shadow-md">
@@ -232,12 +275,16 @@ export function DashboardGeral() {
                 <Calendar className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="font-semibold text-blue-800">Relatório mensal pronto para envio</p>
-                <p className="text-sm text-blue-600">Referente ao mês anterior</p>
+                <p className="font-semibold text-blue-800">
+                  Taxa de recuperação mensal
+                </p>
+                <p className="text-sm text-blue-600">
+                  {formatarPercentual(indicadores.percentual_recuperacao)}
+                </p>
               </div>
             </div>
             <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors shadow-md">
-              Enviar
+              Ver Relatório
             </button>
           </div>
         </div>
