@@ -449,7 +449,7 @@ export class CobrancaService {
     let query = supabase.from("cobrancas_franqueados").select(
       `
         *,
-        unidades_franqueadas:unidade_id_fk (
+        unidades_franqueadas!unidade_id_fk (
           codigo_unidade,
           nome_franqueado,
           cidade,
