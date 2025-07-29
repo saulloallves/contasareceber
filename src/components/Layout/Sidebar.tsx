@@ -53,6 +53,13 @@ export function Sidebar({
       description: "Operações diárias de cobrança",
     },
     {
+      id: "simulacao-parcelamento",
+      label: "Simulação Parcelamento",
+      icon: Calculator,
+      permissions: ["admin", "financeiro", "cobranca"],
+      description: "Propostas automáticas de parcelamento",
+    },
+    {
       id: "unidades",
       label: "Unidades",
       icon: Building2,

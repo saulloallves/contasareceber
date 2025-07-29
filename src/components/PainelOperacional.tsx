@@ -12,7 +12,6 @@ import {
   ChevronUp,
   RefreshCw,
   X,
-  Calculator,
   Send,
   Mail,
 } from "lucide-react";
@@ -207,6 +206,92 @@ export function PainelOperacional() {
     } finally {
       setProcessando(null);
     }
+  };
+
+  const simularParcelamento = async () => {
+    if (!cobrancaSelecionada || !formParcelamento.data_primeira_parcela) return;
+
+    setProcessando('parcelamento');
+    try {
+      const simulacao = await simulacaoService.simularParcelamento({
+        titulo_id: cobrancaSelecionada.id!,
+        valor_atualizado: cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original,
+        quantidade_parcelas: formParcelamento.quantidade_parcelas,
+        data_primeira_parcela: formParcelamento.data_primeira_parcela,
+        valor_entrada: formParcelamento.valor_entrada
+      });
+
+      setSimulacaoAtual(simulacao);
+      setModalAberto('proposta');
+    } catch (error) {
+      console.error('Erro ao simular parcelamento:', error);
+      alert('Erro ao simular parcelamento');
+    } finally {
+      setProcessando(null);
+    }
+  };
+
+  const gerarProposta = async () => {
+    if (!simulacaoAtual || formProposta.canais_envio.length === 0) return;
+
+    setProcessando('proposta');
+    try {
+      // Salvar simulação
+      const simulacaoSalva = await simulacaoService.salvarSimulacao(simulacaoAtual);
+
+      // Gerar e enviar proposta pelos canais selecionados
+      for (const canal of formProposta.canais_envio) {
+        if (canal === 'whatsapp' && cobrancaSelecionada?.telefone) {
+          const mensagem = gerarMensagemProposta(simulacaoAtual);
+          await whatsappService.enviarMensagemWhatsApp(cobrancaSelecionada.telefone, mensagem);
+        }
+        // Implementar envio por email quando necessário
+      }
+
+      // Registrar tratativa
+      await tratativasService.registrarProposta(
+        cobrancaSelecionada!.id!,
+        'usuario_atual',
+        simulacaoSalva.id!,
+        formProposta.canais_envio,
+        formProposta.observacoes
+      );
+
+      alert('Proposta enviada com sucesso!');
+      setModalAberto(null);
+      setSimulacaoAtual(null);
+      carregarCobrancas();
+    } catch (error) {
+      console.error('Erro ao gerar proposta:', error);
+      alert('Erro ao gerar proposta');
+    } finally {
+      setProcessando(null);
+    }
+  };
+
+  const gerarMensagemProposta = (simulacao: SimulacaoParcelamento): string => {
+    const valorFormatado = formatarMoeda(simulacao.valor_atualizado);
+    const parcelasFormatadas = simulacao.parcelas.map(p => 
+      `${p.numero}ª parcela: ${formatarMoeda(p.valor)} (venc: ${formatarData(p.data_vencimento)})`
+    ).join('\n');
+
+    return `🏢 *Proposta de Parcelamento*
+
+Olá, ${cobrancaSelecionada?.cliente}!
+
+Preparamos uma proposta especial para regularização do seu débito:
+
+💰 *Valor atualizado:* ${valorFormatado}
+📊 *Parcelamento:* ${simulacao.quantidade_parcelas}x de ${formatarMoeda(simulacao.parcelas[0].valor)}
+${simulacao.valor_entrada && simulacao.valor_entrada > 0 ? `💳 *Entrada:* ${formatarMoeda(simulacao.valor_entrada)}\n` : ''}
+📅 *Cronograma:*
+${parcelasFormatadas}
+
+💡 *Total do parcelamento:* ${formatarMoeda(simulacao.valor_total_parcelamento)}
+
+Para aceitar esta proposta, entre em contato conosco.
+
+_Esta é uma proposta automática do sistema de cobrança._`;
   };
 
   const gerarMensagemCobranca = (cobranca: CobrancaFranqueado): string => {
@@ -930,6 +1015,231 @@ _Esta é uma mensagem automática do sistema de cobrança._`;
                   Cancelar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Simulação de Parcelamento */}
+      {modalAberto === "parcelamento" && cobrancaSelecionada && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold">Simulação de Parcelamento</h3>
+              <button onClick={() => setModalAberto(null)} className="text-gray-500 hover:text-gray-700">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-6">
+              {/* Dados da Cobrança */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-medium text-gray-800 mb-2">Dados da Cobrança:</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>Cliente: {cobrancaSelecionada.cliente}</div>
+                  <div>CNPJ: {cobrancaSelecionada.cnpj}</div>
+                  <div>Valor Original: {formatarMoeda(cobrancaSelecionada.valor_original)}</div>
+                  <div>Valor Atualizado: {formatarMoeda(cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original)}</div>
+                </div>
+              </div>
+
+              {/* Parâmetros do Parcelamento */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Quantidade de Parcelas
+                  </label>
+                  <select
+                    value={formParcelamento.quantidade_parcelas}
+                    onChange={(e) => setFormParcelamento({...formParcelamento, quantidade_parcelas: parseInt(e.target.value)})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value={2}>2x</option>
+                    <option value={3}>3x</option>
+                    <option value={4}>4x</option>
+                    <option value={5}>5x</option>
+                    <option value={6}>6x</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Data da Primeira Parcela *
+                  </label>
+                  <input
+                    type="date"
+                    value={formParcelamento.data_primeira_parcela}
+                    onChange={(e) => setFormParcelamento({...formParcelamento, data_primeira_parcela: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Valor de Entrada (opcional)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formParcelamento.valor_entrada}
+                    onChange={(e) => setFormParcelamento({...formParcelamento, valor_entrada: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    placeholder="0,00"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={simularParcelamento}
+                disabled={processando === 'parcelamento' || !formParcelamento.data_primeira_parcela}
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+              >
+                {processando === 'parcelamento' ? 'Simulando...' : 'Simular Parcelamento'}
+              </button>
+              <button
+                onClick={() => setModalAberto(null)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Proposta */}
+      {modalAberto === "proposta" && simulacaoAtual && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold">Gerar Proposta de Parcelamento</h3>
+              <button onClick={() => setModalAberto(null)} className="text-gray-500 hover:text-gray-700">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-6">
+              {/* Resumo da Simulação */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <h4 className="font-medium text-purple-800 mb-2">Resumo da Simulação:</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>Valor Atualizado: {formatarMoeda(simulacaoAtual.valor_atualizado)}</div>
+                  <div>Parcelas: {simulacaoAtual.quantidade_parcelas}x {formatarMoeda(simulacaoAtual.parcelas[0].valor)}</div>
+                  <div>Juros: {simulacaoAtual.percentual_juros_parcela}%</div>
+                  <div>Total: {formatarMoeda(simulacaoAtual.valor_total_parcelamento)}</div>
+                </div>
+              </div>
+
+              {/* Cronograma */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h5 className="font-medium mb-2">Cronograma de Pagamentos:</h5>
+                <div className="space-y-1 text-sm">
+                  {simulacaoAtual.valor_entrada && simulacaoAtual.valor_entrada > 0 && (
+                    <div className="flex justify-between font-medium text-green-600">
+                      <span>Entrada:</span>
+                      <span>{formatarMoeda(simulacaoAtual.valor_entrada)}</span>
+                    </div>
+                  )}
+                  {simulacaoAtual.parcelas.map((parcela, index) => (
+                    <div key={index} className="flex justify-between">
+                      <span>Parcela {parcela.numero} ({formatarData(parcela.data_vencimento)}):</span>
+                      <span>{formatarMoeda(parcela.valor)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Canais de Envio */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Canais de Envio
+                </label>
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="whatsapp"
+                      checked={formProposta.canais_envio.includes('whatsapp')}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormProposta({
+                            ...formProposta,
+                            canais_envio: [...formProposta.canais_envio, 'whatsapp']
+                          });
+                        } else {
+                          setFormProposta({
+                            ...formProposta,
+                            canais_envio: formProposta.canais_envio.filter(c => c !== 'whatsapp')
+                          });
+                        }
+                      }}
+                      className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <label htmlFor="whatsapp" className="ml-2 text-sm text-gray-700 flex items-center">
+                      <MessageSquare className="w-4 h-4 mr-1 text-green-600" />
+                      WhatsApp
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="email"
+                      checked={formProposta.canais_envio.includes('email')}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormProposta({
+                            ...formProposta,
+                            canais_envio: [...formProposta.canais_envio, 'email']
+                          });
+                        } else {
+                          setFormProposta({
+                            ...formProposta,
+                            canais_envio: formProposta.canais_envio.filter(c => c !== 'email')
+                          });
+                        }
+                      }}
+                      className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <label htmlFor="email" className="ml-2 text-sm text-gray-700 flex items-center">
+                      <Mail className="w-4 h-4 mr-1 text-blue-600" />
+                      Email
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Observações */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Observações (opcional)
+                </label>
+                <textarea
+                  value={formProposta.observacoes}
+                  onChange={(e) => setFormProposta({...formProposta, observacoes: e.target.value})}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  placeholder="Observações adicionais para a proposta..."
+                />
+              </div>
+            </div>
+            
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={gerarProposta}
+                disabled={processando === 'proposta' || formProposta.canais_envio.length === 0}
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+              >
+                <Send className="w-4 h-4 mr-2 inline" />
+                {processando === 'proposta' ? 'Enviando...' : 'Gerar e Enviar Proposta'}
+              </button>
+              <button
+                onClick={() => setModalAberto(null)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </div>

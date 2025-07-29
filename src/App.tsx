@@ -51,6 +51,8 @@ function App() {
         return <GestaoUsuarios />;
       case "operacional":
         return <PainelOperacional />;
+      case "simulacao-parcelamento":
+        return <SimulacaoParcelamento />;
       case "importacao":
         return <ImportacaoPlanilha />;
       case "unidades":
