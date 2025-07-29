@@ -753,6 +753,132 @@ export function ConfiguracaoAdmin() {
             </div>
           </div>
         )}
+
+        {abaSelecionada === "notificacoes" && (
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-gray-800">
+              Configurações de Notificação Automática
+            </h3>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+              <div className="flex items-center">
+                <Bell className="w-6 h-6 text-blue-600 mr-3" />
+                <div>
+                  <h4 className="font-semibold text-blue-800">
+                    Notificação Automática de Novas Cobranças
+                  </h4>
+                  <p className="text-blue-700 text-sm mt-1">
+                    O sistema enviará automaticamente WhatsApp e/ou Email quando uma nova cobrança for registrada
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <h4 className="font-semibold text-gray-800 mb-4">Configurações Gerais</h4>
+                
+                <div className="space-y-4">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="whatsapp_ativo"
+                      checked={configNotificacao.whatsapp_ativo}
+                      onChange={(e) => setConfigNotificacao({
+                        ...configNotificacao,
+                        whatsapp_ativo: e.target.checked
+                      })}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <label htmlFor="whatsapp_ativo" className="ml-2 text-sm font-medium text-gray-700">
+                      Enviar notificação via WhatsApp
+                    </label>
+                  </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="email_ativo"
+                      checked={configNotificacao.email_ativo}
+                      onChange={(e) => setConfigNotificacao({
+                        ...configNotificacao,
+                        email_ativo: e.target.checked
+                      })}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <label htmlFor="email_ativo" className="ml-2 text-sm font-medium text-gray-700">
+                      Enviar notificação via Email
+                    </label>
+                  </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="apenas_em_atraso"
+                      checked={configNotificacao.enviar_apenas_em_atraso}
+                      onChange={(e) => setConfigNotificacao({
+                        ...configNotificacao,
+                        enviar_apenas_em_atraso: e.target.checked
+                      })}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <label htmlFor="apenas_em_atraso" className="ml-2 text-sm font-medium text-gray-700">
+                      Enviar apenas para cobranças em atraso
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Valor mínimo para notificação (R$)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={configNotificacao.valor_minimo_notificacao}
+                      onChange={(e) => setConfigNotificacao({
+                        ...configNotificacao,
+                        valor_minimo_notificacao: parseFloat(e.target.value) || 0
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="0,00"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <h4 className="font-semibold text-gray-800 mb-4">Variáveis Disponíveis</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {[
+                    '{{cliente}}',
+                    '{{codigo_unidade}}',
+                    '{{cnpj}}',
+                    '{{valor_original}}',
+                    '{{valor_atualizado}}',
+                    '{{data_vencimento}}',
+                    '{{dias_atraso}}',
+                    '{{tipo_cobranca}}',
+                    '{{data_atual}}',
+                    '{{link_negociacao}}'
+                  ].map((variavel) => (
+                    <code
+                      key={variavel}
+                      className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs"
+                    >
+                      {variavel}
+                    </code>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <button
+              className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Salvar Configurações de Notificação
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
