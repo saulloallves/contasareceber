@@ -118,6 +118,17 @@ Entre em contato: (11) 99999-9999`
       valor_entrada: 0
     });
     setSimulacaoAtual(null);
+    
+    // Busca dados da unidade para ter disponível no envio de email
+    unidadesService.buscarUnidadePorCnpj(cobranca.cnpj)
+      .then(unidade => {
+        setUnidadeSelecionada(unidade);
+      })
+      .catch(error => {
+        console.error('Erro ao buscar dados da unidade:', error);
+        setUnidadeSelecionada(null);
+      });
+    
     setModalAberto('simular');
   };
 
