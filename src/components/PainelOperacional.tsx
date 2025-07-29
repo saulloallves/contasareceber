@@ -7,6 +7,7 @@ import {
 import { CobrancaService } from '../services/cobrancaService';
 import { SimulacaoParcelamentoService } from '../services/simulacaoParcelamentoService';
 import { UnidadesService } from '../services/unidadesService';
+import { EmailService } from '../services/emailService';
 import { formatarMoeda, formatarData, formatarCNPJCPF } from '../utils/formatters';
 
 export function PainelOperacional() {
@@ -53,6 +54,7 @@ export function PainelOperacional() {
   const cobrancaService = new CobrancaService();
   const simulacaoService = new SimulacaoParcelamentoService();
   const unidadesService = new UnidadesService();
+  const emailService = new EmailService();
 
   // Templates de mensagem padrão
   const templatesPadrao = {
@@ -202,8 +204,14 @@ Entre em contato: (11) 99999-9999`
       }
 
       if (formProposta.canais_envio.includes('email')) {
-        const sucessoEmail = await simulacaoService.enviarPropostaEmail(proposta.id!);
-        resultados.push(`Email: ${sucessoEmail ? 'Enviado' : 'Falha'}`);
+        // Envia email real da proposta
+        const resultadoEmail = await emailService.enviarPropostaParcelamento(
+          proposta.id!,
+          simulacaoAtual,
+          unidadeSelecionada,
+          cobrancaSelecionada
+        );
+        resultados.push(`Email: ${resultadoEmail.sucesso ? 'Enviado' : `Falha - ${resultadoEmail.erro}`}`);
       }
 
       alert(`Proposta gerada e enviada!\n${resultados.join('\n')}`);
@@ -223,32 +231,39 @@ Entre em contato: (11) 99999-9999`
       return;
     }
 
-    const mensagemFinal = formMensagem.template === 'personalizada' 
-      ? formMensagem.mensagem_personalizada 
-      : aplicarVariaveis(templatesPadrao[formMensagem.template as keyof typeof templatesPadrao]);
-
-    if (!mensagemFinal.trim()) {
-      alert('Digite uma mensagem');
+    if (formMensagem.template === 'personalizada' && !formMensagem.mensagem_personalizada.trim()) {
+      alert('Digite uma mensagem personalizada');
       return;
     }
 
     setProcessando(true);
     try {
       if (formMensagem.canal === 'whatsapp') {
-        // Simula envio WhatsApp
+        // WhatsApp será implementado posteriormente
+        const mensagemFinal = formMensagem.template === 'personalizada' 
+          ? formMensagem.mensagem_personalizada 
+          : aplicarVariaveis(templatesPadrao[formMensagem.template as keyof typeof templatesPadrao]);
+          
         console.log('Enviando WhatsApp:', {
           telefone: unidadeSelecionada.telefone_franqueado,
           mensagem: mensagemFinal
         });
         alert('Mensagem enviada via WhatsApp!');
       } else {
-        // Simula envio Email
-        console.log('Enviando Email:', {
-          email: unidadeSelecionada.email_franqueado,
-          assunto: 'Cobrança Pendente',
-          mensagem: mensagemFinal
-        });
-        alert('Mensagem enviada via Email!');
+        // Envia email real
+        const resultado = await emailService.enviarMensagemCobranca(
+          cobrancaSelecionada.id,
+          formMensagem.template as 'padrao' | 'formal' | 'urgente' | 'personalizada',
+          formMensagem.mensagem_personalizada,
+          unidadeSelecionada,
+          cobrancaSelecionada
+        );
+        
+        if (resultado.sucesso) {
+          alert('✅ Email enviado com sucesso!');
+        } else {
+          alert(`❌ Erro ao enviar email: ${resultado.erro}`);
+        }
       }
       
       fecharModal();
