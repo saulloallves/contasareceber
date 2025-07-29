@@ -1,13 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
 import { 
-  TrendingUp, Users, Calendar, AlertTriangle,
+  TrendingUp, TrendingDown, Target, Users, Calendar, AlertTriangle,
   CheckCircle, Clock, RefreshCw, Filter, Download
 } from 'lucide-react';
 import { DashboardService } from '../../services/dashboardService';
+import { IndicadoresMensais } from '../../types/dashboard';
 
 export function DashboardGeral() {
-  const [indicadores, setIndicadores] = useState<any>(null);
+  const [indicadores, setIndicadores] = useState<IndicadoresMensais | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [filtros, setFiltros] = useState({
     periodo: '30',
@@ -24,8 +25,9 @@ export function DashboardGeral() {
   const carregarDados = async () => {
     setCarregando(true);
     try {
-      const indicadoresMensais = await dashboardService.buscarIndicadoresMensais();
-      setIndicadores(indicadoresMensais);
+      const indicadoresData = await dashboardService.buscarIndicadoresMensais();
+      
+      setIndicadores(indicadoresData);
     } catch (error) {
       console.error('Erro ao carregar dashboard:', error);
     } finally {
@@ -146,7 +148,7 @@ export function DashboardGeral() {
             <div>
               <p className="text-sm font-medium text-red-700">Total Inadimplentes</p>
               <p className="text-3xl font-bold text-red-600">
-                {formatarMoeda(indicadores.total_em_aberto_mes)}
+                {formatarMoeda(indicadores.totalEmAberto)}
               </p>
             </div>
             <div className="p-2 bg-red-500 rounded-full">
@@ -154,11 +156,11 @@ export function DashboardGeral() {
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className={`flex items-center font-semibold ${getVariacaoColor(indicadores.comparativo_mes_anterior.variacao_em_aberto)}`}>
-              {getVariacaoIcon(indicadores.comparativo_mes_anterior.variacao_em_aberto)}
-              <span className="ml-1">{Math.abs(indicadores.comparativo_mes_anterior.variacao_em_aberto).toFixed(1)}%</span>
+            <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoEmAberto)}`}>
+              {getVariacaoIcon(indicadores.variacaoEmAberto)}
+              {formatarPercentual(Math.abs(indicadores.variacaoEmAberto))}
             </span>
-            <span className="text-red-500 ml-2">vs. mês anterior</span>
+            <span className="text-gray-500 ml-2">vs. mês anterior</span>
           </div>
         </div>
 
@@ -167,7 +169,7 @@ export function DashboardGeral() {
             <div>
               <p className="text-sm font-medium text-green-700">Valor Recuperado</p>
               <p className="text-3xl font-bold text-green-600">
-                {formatarMoeda(indicadores.total_pago_mes)}
+                {formatarMoeda(indicadores.totalQuitado)}
               </p>
             </div>
             <div className="p-2 bg-green-500 rounded-full">
@@ -175,11 +177,11 @@ export function DashboardGeral() {
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className={`flex items-center font-semibold ${getVariacaoColor(indicadores.comparativo_mes_anterior.variacao_pago)}`}>
-              {getVariacaoIcon(indicadores.comparativo_mes_anterior.variacao_pago)}
-              <span className="ml-1">{Math.abs(indicadores.comparativo_mes_anterior.variacao_pago).toFixed(1)}%</span>
+            <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoQuitado)}`}>
+              {getVariacaoIcon(indicadores.variacaoQuitado)}
+              {formatarPercentual(Math.abs(indicadores.variacaoQuitado))}
             </span>
-            <span className="text-green-500 ml-2">vs. mês anterior</span>
+            <span className="text-gray-500 ml-2">vs. mês anterior</span>
           </div>
         </div>
 
@@ -188,7 +190,7 @@ export function DashboardGeral() {
             <div>
               <p className="text-sm font-medium text-yellow-700">Em Negociação</p>
               <p className="text-3xl font-bold text-yellow-600">
-                {formatarMoeda(indicadores.total_negociando_mes)}
+                {formatarMoeda(indicadores.totalNegociando)}
               </p>
             </div>
             <div className="p-2 bg-yellow-500 rounded-full">
@@ -196,28 +198,31 @@ export function DashboardGeral() {
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className="text-yellow-600 font-semibold">
-              {formatarPercentual(indicadores.percentual_inadimplencia)}
+            <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoNegociando)}`}>
+              {getVariacaoIcon(indicadores.variacaoNegociando)}
+              {formatarPercentual(Math.abs(indicadores.variacaoNegociando))}
             </span>
-            <span className="text-yellow-500 ml-2">% Inadimplência</span>
+            <span className="text-gray-500 ml-2">vs. mês anterior</span>
           </div>
         </div>
 
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg p-6 border border-blue-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-blue-700">Unidades Ativas</p>
-              <p className="text-3xl font-bold text-blue-600">{indicadores.unidades_inadimplentes}</p>
+              <p className="text-sm font-medium text-blue-700">Unidades Inadimplentes</p>
+              <p className="text-3xl font-bold text-blue-600">{indicadores.unidadesInadimplentes}</p>
+              <p className="text-xs text-blue-500 mt-1">Ticket médio: {formatarMoeda(indicadores.ticketMedio)}</p>
             </div>
             <div className="p-2 bg-blue-500 rounded-full">
               <Users className="w-7 h-7 text-white" />
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className="text-blue-600 font-semibold">
-              {formatarMoeda(indicadores.ticket_medio_dividas)}
+            <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoUnidades)}`}>
+              {getVariacaoIcon(indicadores.variacaoUnidades)}
+              {formatarPercentual(Math.abs(indicadores.variacaoUnidades))}
             </span>
-            <span className="text-blue-500 ml-2">Ticket Médio</span>
+            <span className="text-gray-500 ml-2">vs. mês anterior</span>
           </div>
         </div>
       </div>
@@ -231,24 +236,29 @@ export function DashboardGeral() {
           Alertas Automáticos
         </h3>
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-5 bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-xl shadow-sm">
-            <div className="flex items-center">
-              <div className="p-2 bg-red-500 rounded-full mr-4">
-                <AlertTriangle className="w-5 h-5 text-white" />
+          {indicadores.alertasAtivos.length > 0 ? (
+            indicadores.alertasAtivos.map((alerta, index) => (
+              <div key={index} className="flex items-center justify-between p-5 bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-xl shadow-sm">
+                <div className="flex items-center">
+                  <div className="p-2 bg-red-500 rounded-full mr-4">
+                    <AlertTriangle className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-red-800">{alerta.titulo}</p>
+                    <p className="text-sm text-red-600">Valor total: {formatarMoeda(alerta.valor)}</p>
+                  </div>
+                </div>
+                <button className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors shadow-md">
+                  {alerta.acao}
+                </button>
               </div>
-              <div>
-                <p className="font-semibold text-red-800">
-                  {indicadores.unidades_inadimplentes} unidades com débitos em aberto
-                </p>
-                <p className="text-sm text-red-600">
-                  Valor total: {formatarMoeda(indicadores.total_em_aberto_mes)}
-                </p>
-              </div>
+            ))
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
+              <p>Nenhum alerta ativo no momento</p>
             </div>
-            <button className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors shadow-md">
-              Ver Detalhes
-            </button>
-          </div>
+          )}
           
           <div className="flex items-center justify-between p-5 bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-xl shadow-sm">
             <div className="flex items-center">
@@ -256,12 +266,8 @@ export function DashboardGeral() {
                 <Clock className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="font-semibold text-yellow-800">
-                  Cobranças em negociação
-                </p>
-                <p className="text-sm text-yellow-600">
-                  Valor: {formatarMoeda(indicadores.total_negociando_mes)}
-                </p>
+                <p className="font-semibold text-yellow-800">{indicadores.proximasReunioesCount} reuniões agendadas para esta semana</p>
+                <p className="text-sm text-yellow-600">Próximos 7 dias</p>
               </div>
             </div>
             <button className="px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700 transition-colors shadow-md">
@@ -275,12 +281,8 @@ export function DashboardGeral() {
                 <Calendar className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="font-semibold text-blue-800">
-                  Taxa de recuperação mensal
-                </p>
-                <p className="text-sm text-blue-600">
-                  {formatarPercentual(indicadores.percentual_recuperacao)}
-                </p>
+                <p className="font-semibold text-blue-800">Relatório mensal pronto para envio</p>
+                <p className="text-sm text-blue-600">{indicadores.acoesRecentesCount} ações nas últimas 24h</p>
               </div>
             </div>
             <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors shadow-md">
