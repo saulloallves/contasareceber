@@ -1,10 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './databaseService';
 import { BloqueioUnidade, ConfiguracaoBloqueio, HistoricoBloqueio, FiltrosBloqueio, EstatisticasBloqueio, CriterioBloqueio, NotificacaoBloqueio, TipoAcesso } from '../types/bloqueio';
 import { TrativativasService } from './tratativasService';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export class BloqueioService {
   private tratativasService: TrativativasService;

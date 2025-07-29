@@ -1,13 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './databaseService';
 import { OperacaoManual, CobrancaManual, TrativativaManual, NotificacaoManual, CancelamentoManual, FiltrosOperacaoManual, EstatisticasOperacaoManual } from '../types/operacaoManual';
 import { CobrancaService } from './cobrancaService';
 import { TrativativasService } from './tratativasService';
 import { DocumentosService } from './documentosService';
 import { NotificacaoAutomaticaService } from './notificacaoAutomaticaService';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export class OperacaoManualService {
   private cobrancaService: CobrancaService;

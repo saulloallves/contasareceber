@@ -1,10 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './databaseService';
 import { CardCobranca, ColunaKanban, MovimentacaoCard, FiltrosKanban, EstatisticasKanban, LogMovimentacao } from '../types/kanban';
 import { TrativativasService } from './tratativasService';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export class KanbanService {
   private tratativasService: TrativativasService;

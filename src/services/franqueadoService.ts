@@ -1,9 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './databaseService';
 import { AuthFranqueado, LogAcessoFranqueado, DadosFranqueado, SolicitacaoAuth, RespostaAuth } from '../types/franqueado';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export class FranqueadoService {
   /**

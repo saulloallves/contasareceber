@@ -18,7 +18,7 @@ import {
   EstatisticasDocumentos,
   ChecklistDocumentos,
 } from "../types/documentos";
-import supabase from "../lib/supabaseClient";
+import { supabase } from "../services/databaseService";
 
 interface GeradorDocumentosProps {
   tituloId?: string;

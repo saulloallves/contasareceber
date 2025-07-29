@@ -1,10 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './databaseService';
 import { AcordoParcelamento, ParcelaAcordo, SimulacaoParcelamento, ConfiguracaoAcordos, HistoricoAceite, FiltrosAcordos, EstatisticasAcordos, ValidacaoAcordo } from '../types/acordos';
 import { TrativativasService } from './tratativasService';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export class AcordosService {
   private tratativasService: TrativativasService;

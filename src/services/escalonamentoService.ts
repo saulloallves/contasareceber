@@ -1,10 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './databaseService';
 import { EscalonamentoCobranca, CriterioEscalonamento, FiltrosEscalonamento, EstatisticasEscalonamento, PontuacaoRisco, EventoRisco, ConfiguracaoRisco, AlertaAtivo, MonitoramentoRisco, GatilhoAutomatico, AcaoPendente, RegistroGatilho, DashboardRiscos } from '../types/escalonamento';
 import { TrativativasService } from './tratativasService';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export class EscalonamentoService {
   private tratativasService: TrativativasService;
