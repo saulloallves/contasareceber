@@ -12,6 +12,9 @@ import {
   ChevronUp,
   RefreshCw,
   X,
+  Calculator,
+  Send,
+  Mail,
 } from "lucide-react";
 import { CobrancaService } from "../services/cobrancaService";
 import { TrativativasService } from "../services/tratativasService";
