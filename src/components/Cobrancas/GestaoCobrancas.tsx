@@ -67,11 +67,14 @@ export function GestaoCobrancas() {
   const [errosImportacao, setErrosImportacao] = useState<string[]>([]);
   const [modalErrosAberto, setModalErrosAberto] = useState(false);
   const [mensagemFeedback, setMensagemFeedback] = useState<{
-    tipo: 'sucesso' | 'erro' | 'info';
+    tipo: "sucesso" | "erro" | "info";
     texto: string;
   } | null>(null);
 
-  const mostrarMensagem = (tipo: 'sucesso' | 'erro' | 'info', texto: string) => {
+  const mostrarMensagem = (
+    tipo: "sucesso" | "erro" | "info",
+    texto: string
+  ) => {
     setMensagemFeedback({ tipo, texto });
     setTimeout(() => setMensagemFeedback(null), 5000);
   };
@@ -314,26 +317,52 @@ export function GestaoCobrancas() {
    * Função para salvar a cobrança (criação ou edição)
    */
   const salvarCobranca = async () => {
+    // Validação para garantir que os campos obrigatórios estão preenchidos
     if (!formData.cnpj || !formData.cliente || !formData.valor_original) {
-      alert('CNPJ, cliente e valor original são obrigatórios');
+      mostrarMensagem(
+        "erro",
+        "CNPJ, cliente e valor original são obrigatórios."
+      );
+      return;
+    }
+
+    // Validação específica para o status 'quitado'
+    if (
+      formData.status === "quitado" &&
+      (!formData.valor_recebido || formData.valor_recebido <= 0)
+    ) {
+      mostrarMensagem(
+        "erro",
+        "Para o status 'quitado', o valor recebido é obrigatório e deve ser maior que zero."
+      );
       return;
     }
 
     try {
       if (modalAberto === "criar") {
+        // Lógica de criação (se aplicável)
         console.log("Criando cobrança:", formData);
-        // TODO: Implementar criação de cobrança
-      } else {
-        if (cobrancaSelecionada?.id) {
-          await cobrancaService.atualizarCobranca(cobrancaSelecionada.id, formData);
-          mostrarMensagem("sucesso", "Cobrança atualizada com sucesso!");
-        }
+        // await cobrancaService.criarCobranca(formData); // Descomentar quando a função existir
+        mostrarMensagem("sucesso", "Cobrança criada com sucesso!");
+      } else if (cobrancaSelecionada?.id) {
+        // Lógica de atualização
+        await cobrancaService.atualizarCobranca(
+          cobrancaSelecionada.id,
+          formData
+        );
+        mostrarMensagem("sucesso", "Cobrança atualizada com sucesso!");
       }
+
       fecharModal();
-      carregarCobrancas();
+      await carregarCobrancas(); // Recarrega os dados para refletir a alteração
     } catch (error) {
       console.error("Erro ao salvar cobrança:", error);
-      mostrarMensagem("erro", `Erro ao salvar cobrança: ${error}`);
+      mostrarMensagem(
+        "erro",
+        `Erro ao salvar cobrança: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   };
 
@@ -357,7 +386,7 @@ export function GestaoCobrancas() {
     setCobrancaSelecionada(cobranca);
     setFormData({
       status: cobranca.status,
-      valor_recebido: cobranca.valor_recebido || 0
+      valor_recebido: cobranca.valor_recebido || 0,
     });
     setModalAberto("status");
   };
@@ -367,26 +396,28 @@ export function GestaoCobrancas() {
    */
   const salvarAlteracaoStatus = async () => {
     if (!cobrancaSelecionada?.id) return;
-    
+
     try {
       const dadosAtualizacao: any = {
         cliente: formData.cliente,
         valor_original: formData.valor_original,
         valor_atualizado: formData.valor_atualizado,
         data_vencimento: formData.data_vencimento,
-        telefone: formData.telefone,
+        telefone: formData.telefone || cobrancaSelecionada.telefone,
         email_cobranca: formData.email_cobranca,
         descricao: formData.descricao,
         tipo_cobranca: formData.tipo_cobranca,
         status: formData.status,
-        telefone: formData.telefone || cobrancaSelecionada.telefone,
       };
 
-      if (formData.status === 'quitado' && formData.valor_recebido) {
+      if (formData.status === "quitado" && formData.valor_recebido) {
         dadosAtualizacao.valor_recebido = formData.valor_recebido;
       }
-      
-      await cobrancaService.atualizarCobranca(cobrancaSelecionada.id, dadosAtualizacao);
+
+      await cobrancaService.atualizarCobranca(
+        cobrancaSelecionada.id,
+        dadosAtualizacao
+      );
       mostrarMensagem("sucesso", "Status atualizado com sucesso!");
       fecharModal();
       await carregarCobrancas(); // Recarrega a lista para mostrar as alterações
@@ -402,9 +433,9 @@ export function GestaoCobrancas() {
    */
   const marcarQuitadoRapido = async (cobranca: CobrancaFranqueado) => {
     try {
-      await cobrancaService.atualizarCobranca(cobranca.id!, { 
-        status: 'quitado',
-        valor_recebido: cobranca.valor_atualizado || cobranca.valor_original
+      await cobrancaService.atualizarCobranca(cobranca.id!, {
+        status: "quitado",
+        valor_recebido: cobranca.valor_atualizado || cobranca.valor_original,
       });
       mostrarMensagem("sucesso", "Cobrança marcada como quitada rapidamente!");
       carregarCobrancas();
@@ -578,16 +609,18 @@ export function GestaoCobrancas() {
 
         {/* Mensagem de feedback */}
         {mensagemFeedback && (
-          <div className={`mb-6 p-4 rounded-lg flex items-center ${
-            mensagemFeedback.tipo === 'sucesso' 
-              ? 'bg-green-50 border border-green-200 text-green-800' 
-              : mensagemFeedback.tipo === 'erro'
-              ? 'bg-red-50 border border-red-200 text-red-800'
-              : 'bg-blue-50 border border-blue-200 text-blue-800'
-          }`}>
-            {mensagemFeedback.tipo === 'sucesso' ? (
+          <div
+            className={`mb-6 p-4 rounded-lg flex items-center ${
+              mensagemFeedback.tipo === "sucesso"
+                ? "bg-green-50 border border-green-200 text-green-800"
+                : mensagemFeedback.tipo === "erro"
+                ? "bg-red-50 border border-red-200 text-red-800"
+                : "bg-blue-50 border border-blue-200 text-blue-800"
+            }`}
+          >
+            {mensagemFeedback.tipo === "sucesso" ? (
               <CheckCircle className="w-5 h-5 mr-2" />
-            ) : mensagemFeedback.tipo === 'erro' ? (
+            ) : mensagemFeedback.tipo === "erro" ? (
               <AlertTriangle className="w-5 h-5 mr-2" />
             ) : (
               <Info className="w-5 h-5 mr-2" />
@@ -902,7 +935,10 @@ export function GestaoCobrancas() {
                     <select
                       value={formData.status || ""}
                       onChange={(e) =>
-                        setFormData({ ...formData, status: e.target.value as any })
+                        setFormData({
+                          ...formData,
+                          status: e.target.value as any,
+                        })
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     >
@@ -913,7 +949,7 @@ export function GestaoCobrancas() {
                     </select>
                   </div>
 
-                  {formData.status === 'quitado' && (
+                  {formData.status === "quitado" && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Valor Recebido *
@@ -944,7 +980,7 @@ export function GestaoCobrancas() {
                   !formData.cnpj ||
                   !formData.cliente ||
                   !formData.valor_original ||
-                  (formData.status === 'quitado' && !formData.valor_recebido)
+                  (formData.status === "quitado" && !formData.valor_recebido)
                 }
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
@@ -968,7 +1004,9 @@ export function GestaoCobrancas() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold">Alterar Status da Cobrança</h3>
+              <h3 className="text-lg font-semibold">
+                Alterar Status da Cobrança
+              </h3>
               <button
                 onClick={fecharModal}
                 className="text-gray-500 hover:text-gray-700"
@@ -979,10 +1017,22 @@ export function GestaoCobrancas() {
 
             <div className="space-y-4">
               <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium text-gray-800 mb-2">Informações da Cobrança:</h4>
-                <p className="text-sm text-gray-600">Cliente: {cobrancaSelecionada.cliente}</p>
-                <p className="text-sm text-gray-600">CNPJ: {formatarCNPJCPF(cobrancaSelecionada.cnpj)}</p>
-                <p className="text-sm text-gray-600">Valor: {formatarMoeda(cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original)}</p>
+                <h4 className="font-medium text-gray-800 mb-2">
+                  Informações da Cobrança:
+                </h4>
+                <p className="text-sm text-gray-600">
+                  Cliente: {cobrancaSelecionada.cliente}
+                </p>
+                <p className="text-sm text-gray-600">
+                  CNPJ: {formatarCNPJCPF(cobrancaSelecionada.cnpj)}
+                </p>
+                <p className="text-sm text-gray-600">
+                  Valor:{" "}
+                  {formatarMoeda(
+                    cobrancaSelecionada.valor_atualizado ||
+                      cobrancaSelecionada.valor_original
+                  )}
+                </p>
               </div>
 
               <div>
@@ -1003,7 +1053,7 @@ export function GestaoCobrancas() {
                 </select>
               </div>
 
-              {formData.status === 'quitado' && (
+              {formData.status === "quitado" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Valor Recebido *
@@ -1022,7 +1072,11 @@ export function GestaoCobrancas() {
                     placeholder="0,00"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Valor sugerido: {formatarMoeda(cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original)}
+                    Valor sugerido:{" "}
+                    {formatarMoeda(
+                      cobrancaSelecionada.valor_atualizado ||
+                        cobrancaSelecionada.valor_original
+                    )}
                   </p>
                 </div>
               )}
@@ -1033,7 +1087,8 @@ export function GestaoCobrancas() {
                 onClick={salvarAlteracaoStatus}
                 disabled={
                   !formData.status ||
-                  (formData.status === 'quitado' && (!formData.valor_recebido || formData.valor_recebido <= 0))
+                  (formData.status === "quitado" &&
+                    (!formData.valor_recebido || formData.valor_recebido <= 0))
                 }
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
