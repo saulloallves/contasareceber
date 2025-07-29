@@ -14,6 +14,7 @@ import {
   X,
   Send,
   Mail,
+  Calculator,
 } from "lucide-react";
 import { CobrancaService } from "../services/cobrancaService";
 import { TrativativasService } from "../services/tratativasService";
@@ -739,6 +740,24 @@ _Esta é uma mensagem automática do sistema de cobrança._`;
                             title="Marcar como quitado"
                           >
                             <CheckCircle className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        {cobranca.status !== "quitado" && (
+                          <button
+                            onClick={() => {
+                              setCobrancaSelecionada(cobranca);
+                              setModalAberto("parcelamento");
+                              setFormParcelamento({
+                                quantidade_parcelas: 3,
+                                data_primeira_parcela: '',
+                                valor_entrada: 0
+                              });
+                            }}
+                            className="text-purple-600 hover:text-purple-900"
+                            title="Simular parcelamento"
+                          >
+                            <Calculator className="w-4 h-4" />
                           </button>
                         )}
 
