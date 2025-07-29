@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from './databaseService';
 import { IndicadoresMensais } from '../types/dashboard';
 
 export class DashboardService {
