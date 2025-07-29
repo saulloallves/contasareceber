@@ -16,7 +16,9 @@ import {
 import { CobrancaService } from "../services/cobrancaService";
 import { TrativativasService } from "../services/tratativasService";
 import { WhatsAppService } from "../services/whatsappService";
+import { SimulacaoParcelamentoService } from "../services/simulacaoParcelamentoService";
 import { CobrancaFranqueado } from "../types/cobranca";
+import { SimulacaoParcelamento } from "../types/simulacaoParcelamento";
 import { HistoricoTratativas } from "./HistoricoTratativas";
 
 export function PainelOperacional() {
@@ -44,13 +46,24 @@ export function PainelOperacional() {
   const [cobrancaSelecionada, setCobrancaSelecionada] =
     useState<CobrancaFranqueado | null>(null);
   const [modalAberto, setModalAberto] = useState<
-    "historico" | "quitacao" | "observacao" | "mensagem" | null
+    "historico" | "quitacao" | "observacao" | "mensagem" | "parcelamento" | "proposta" | null
   >(null);
   const [dadosModal, setDadosModal] = useState<any>({});
   const [processando, setProcessando] = useState<string | null>(null);
+  const [simulacaoAtual, setSimulacaoAtual] = useState<SimulacaoParcelamento | null>(null);
+  const [formParcelamento, setFormParcelamento] = useState({
+    quantidade_parcelas: 3,
+    data_primeira_parcela: '',
+    valor_entrada: 0
+  });
+  const [formProposta, setFormProposta] = useState({
+    canais_envio: ['whatsapp'] as ('whatsapp' | 'email')[],
+    observacoes: ''
+  });
 
   const cobrancaService = new CobrancaService();
   const tratativasService = new TrativativasService();
+  const simulacaoService = new SimulacaoParcelamentoService();
   const whatsappService = new WhatsAppService({
     token: localStorage.getItem("whatsapp_token") || "",
     phone_number_id: localStorage.getItem("whatsapp_phone_id") || "",
