@@ -136,6 +136,13 @@ export function Sidebar({
       permissions: ["admin"],
       description: "Parâmetros do sistema",
     },
+    {
+      id: "config-email",
+      label: "Configuração Email",
+      icon: Mail,
+      permissions: ["admin"],
+      description: "Configurar envio de emails",
+    },
   ];
 
   const hasPermission = (itemPermissions: string[]) => {

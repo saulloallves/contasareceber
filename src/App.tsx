@@ -82,6 +82,8 @@ function App() {
         return <ModuloIntegracoes />;
       case "admin":
         return <ConfiguracaoAdmin />;
+      case 'config-email':
+        return <ConfiguracaoEmail />;
       case "auditoria":
         return <AuditoriaLogs />;
       case "templates-juridicos":
