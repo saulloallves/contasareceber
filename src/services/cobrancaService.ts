@@ -526,10 +526,17 @@ export class CobrancaService {
    */
   async atualizarCobranca(id: string, dadosAtualizacao: Partial<CobrancaFranqueado>) {
     try {
+      // Remove propriedades que não são colunas da tabela cobrancas_franqueados
+      const { 
+        unidades_franqueadas, 
+        created_at, 
+        ...dadosLimpos 
+      } = dadosAtualizacao as any;
+
       const { data, error } = await supabase
         .from('cobrancas_franqueados')
         .update({
-          ...dadosAtualizacao,
+          ...dadosLimpos,
           data_ultima_atualizacao: new Date().toISOString()
         })
         .eq('id', id)
