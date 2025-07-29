@@ -217,6 +217,67 @@ Entre em contato: (11) 99999-9999`
     }
   };
 
+  const enviarMensagem = async () => {
+    if (!cobrancaSelecionada || !unidadeSelecionada) {
+      alert('Dados da cobrança ou unidade não encontrados');
+      return;
+    }
+
+    const mensagemFinal = formMensagem.template === 'personalizada' 
+      ? formMensagem.mensagem_personalizada 
+      : aplicarVariaveis(templatesPadrao[formMensagem.template as keyof typeof templatesPadrao]);
+
+    if (!mensagemFinal.trim()) {
+      alert('Digite uma mensagem');
+      return;
+    }
+
+    setProcessando(true);
+    try {
+      if (formMensagem.canal === 'whatsapp') {
+        // Simula envio WhatsApp
+        console.log('Enviando WhatsApp:', {
+          telefone: unidadeSelecionada.telefone_franqueado,
+          mensagem: mensagemFinal
+        });
+        alert('Mensagem enviada via WhatsApp!');
+      } else {
+        // Simula envio Email
+        console.log('Enviando Email:', {
+          email: unidadeSelecionada.email_franqueado,
+          assunto: 'Cobrança Pendente',
+          mensagem: mensagemFinal
+        });
+        alert('Mensagem enviada via Email!');
+      }
+      
+      fecharModal();
+    } catch (error) {
+      alert(`Erro ao enviar mensagem: ${error}`);
+    } finally {
+      setProcessando(false);
+    }
+  };
+
+  const aplicarVariaveis = (template: string) => {
+    if (!cobrancaSelecionada || !unidadeSelecionada) return template;
+    
+    const variaveis = {
+      '{{cliente}}': cobrancaSelecionada.cliente,
+      '{{codigo_unidade}}': unidadeSelecionada.codigo_unidade || cobrancaSelecionada.cnpj,
+      '{{valor_original}}': formatarMoeda(cobrancaSelecionada.valor_original),
+      '{{valor_atualizado}}': formatarMoeda(cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original),
+      '{{data_vencimento}}': formatarData(cobrancaSelecionada.data_vencimento),
+      '{{dias_atraso}}': (cobrancaSelecionada.dias_em_atraso || 0).toString()
+    };
+
+    let mensagem = template;
+    Object.entries(variaveis).forEach(([chave, valor]) => {
+      mensagem = mensagem.replace(new RegExp(chave.replace(/[{}]/g, '\\$&'), 'g'), valor);
+    });
+    return mensagem;
+  };
+
   const fecharModal = () => {
     setModalAberto(null);
     setCobrancaSelecionada(null);
