@@ -329,7 +329,6 @@ export function GestaoCobrancas() {
           mostrarMensagem("sucesso", "Cobrança atualizada com sucesso!");
         }
       }
-      await carregarCobrancas(); // Recarrega a lista para mostrar as alterações
       fecharModal();
       carregarCobrancas();
     } catch (error) {
@@ -376,8 +375,8 @@ export function GestaoCobrancas() {
     }
 
     try {
-      const dadosAtualizacao: Partial<CobrancaFranqueado> = {
-        status: formData.status as any
+      const dadosAtualizacao: any = {
+        status: formData.status
       };
       
       if (formData.status === 'quitado' && formData.valor_recebido) {
