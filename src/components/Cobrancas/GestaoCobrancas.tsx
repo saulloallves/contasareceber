@@ -378,13 +378,14 @@ export function GestaoCobrancas() {
       const dadosAtualizacao: any = {
         status: formData.status
       };
-      
-      if (formData.status === 'quitado' && formData.valor_recebido) {
-        dadosAtualizacao.valor_recebido = formData.valor_recebido;
-      }
+      const dadosAtualizacao: any = {
+        status: formStatus.status,
+        telefone: formStatus.telefone || cobrancaSelecionada.telefone,
+      };
 
-      await cobrancaService.atualizarCobranca(cobrancaSelecionada.id, dadosAtualizacao);
-      mostrarMensagem("sucesso", "Status da cobrança atualizado com sucesso!");
+      if (formStatus.status === 'quitado' && formStatus.valor_recebido) {
+        dadosAtualizacao.valor_recebido = formStatus.valor_recebido;
+      }
       fecharModal();
       await carregarCobrancas(); // Recarrega a lista para mostrar as alterações
       carregarCobrancas();
