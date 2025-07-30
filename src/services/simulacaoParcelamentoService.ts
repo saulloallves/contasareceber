@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "./databaseService";
 import {
@@ -10,6 +11,11 @@ import {
   EstatisticasParcelamento,
 } from "../types/simulacaoParcelamento";
 import { TrativativasService } from "./tratativasService";
+import {
+  evolutionApiService,
+  SendTextMessagePayload,
+} from "./evolutionApiService";
+import { emailService } from "./emailService";
 
 export class SimulacaoParcelamentoService {
   private tratativasService: TrativativasService;
@@ -51,7 +57,8 @@ export class SimulacaoParcelamentoService {
       const config = await this.buscarConfiguracao();
 
       // Validação de valor mínimo
-      const valorAtualizado = cobranca.valor_atualizado || cobranca.valor_original;
+      const valorAtualizado =
+        cobranca.valor_atualizado || cobranca.valor_original;
       if (valorAtualizado < 500) {
         throw new Error("Valor mínimo para parcelamento é R$ 500,00");
       }
@@ -77,12 +84,12 @@ export class SimulacaoParcelamentoService {
 
       for (let i = 1; i <= quantidadeParcelas; i++) {
         const valorBaseParcela = valorParcelar / quantidadeParcelas;
-        
+
         // Calcula multa (10%) e juros de mora (1.5%)
-        const multa = valorBaseParcela * 0.10; // 10% de multa
+        const multa = valorBaseParcela * 0.1; // 10% de multa
         const jurosMora = valorBaseParcela * 0.015; // 1.5% de juros de mora
         const jurosAplicado = multa + jurosMora;
-        
+
         const valorParcela = valorBaseParcela + jurosAplicado;
 
         // Calcula data de vencimento
@@ -239,7 +246,7 @@ export class SimulacaoParcelamentoService {
         `Proposta de parcelamento gerada: ${
           simulacao.quantidade_parcelas
         }x com juros de ${
-          simulacao.percentual_juros_parcela
+          simulacao.percentual_juros_mora
         }%. Válida até ${dataExpiracao.toLocaleDateString("pt-BR")}`
       );
 
@@ -254,6 +261,7 @@ export class SimulacaoParcelamentoService {
    * Envia proposta via WhatsApp
    */
   async enviarPropostaWhatsApp(propostaId: string): Promise<boolean> {
+    let logId: string | null = null;
     try {
       const { data: proposta } = await supabase
         .from("propostas_parcelamento")
@@ -275,65 +283,86 @@ export class SimulacaoParcelamentoService {
       }
 
       const telefone = (proposta as any).cobrancas_franqueados
-        .unidades_franqueadas.telefone_franqueado;
+        ?.unidades_franqueadas?.telefone_franqueado;
 
       if (!telefone) {
-        throw new Error("Telefone não cadastrado");
+        throw new Error("Telefone não cadastrado para esta unidade.");
       }
 
-      // Busca configurações do WhatsApp
-      const { data: configWhatsApp } = await supabase
-        .from("configuracoes_sistema")
-        .select("valor")
-        .in("chave", ["whatsapp_token", "whatsapp_phone_id"]);
+      const telefoneFormatado = telefone.replace(/\D/g, "");
+      const instanceName = "automacoes_backup";
 
-      if (!configWhatsApp || configWhatsApp.length < 2) {
-        throw new Error("Configurações do WhatsApp não encontradas");
+      const payload: SendTextMessagePayload = {
+        instanceName,
+        number: telefoneFormatado,
+        text: proposta.mensagem_proposta,
+      };
+
+      // Pré-registra a tentativa de envio no log
+      const { data: logData, error: logError } = await supabase
+        .from("logs_envio_whatsapp")
+        .insert({
+          destinatario: telefoneFormatado,
+          mensagem_enviada: proposta.mensagem_proposta,
+          instancia_evolution: instanceName,
+          sucesso: false, // Começa como falha
+        })
+        .select("id")
+        .single();
+
+      if (logError) {
+        console.error("Erro ao pré-registrar log do WhatsApp:", logError);
+      } else {
+        logId = logData.id;
       }
 
-      const token = configWhatsApp.find(
-        (c) => c.chave === "whatsapp_token"
-      )?.valor;
-      const phoneId = configWhatsApp.find(
-        (c) => c.chave === "whatsapp_phone_id"
-      )?.valor;
-
-      // Formata telefone
-      const telefoneFormatado = this.formatarTelefone(telefone);
-
-      // Envia mensagem
-      const response = await fetch(
-        `https://graph.facebook.com/v18.0/${phoneId}/messages`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            messaging_product: "whatsapp",
-            to: telefoneFormatado,
-            type: "text",
-            text: {
-              body: proposta.mensagem_proposta,
-            },
-          }),
-        }
+      const evolutionResponse = await evolutionApiService.sendTextMessage(
+        payload
       );
 
-      if (!response.ok) {
-        throw new Error("Erro ao enviar WhatsApp");
+      // Atualiza o log com sucesso
+      if (logId) {
+        await supabase
+          .from("logs_envio_whatsapp")
+          .update({
+            sucesso: true,
+            evolution_message_id: evolutionResponse?.key?.id || "N/A",
+          })
+          .eq("id", logId);
       }
 
-      // Atualiza data de envio
       await supabase
         .from("propostas_parcelamento")
-        .update({ data_envio: new Date().toISOString() })
+        .update({
+          data_envio: new Date().toISOString(),
+          canais_envio: Array.from(
+            new Set([...proposta.canais_envio, "whatsapp"])
+          ),
+        })
         .eq("id", propostaId);
 
       return true;
     } catch (error) {
-      console.error("Erro ao enviar WhatsApp:", error);
+      console.error(
+        "Erro ao enviar proposta via WhatsApp (API Evolution):",
+        error
+      );
+      // Atualiza o log com o erro
+      if (logId) {
+        let errorMessage = "Erro desconhecido";
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        } else {
+          errorMessage = String(error);
+        }
+        await supabase
+          .from("logs_envio_whatsapp")
+          .update({
+            sucesso: false,
+            erro_detalhes: errorMessage,
+          })
+          .eq("id", logId);
+      }
       return false;
     }
   }
@@ -343,15 +372,18 @@ export class SimulacaoParcelamentoService {
    */
   async enviarPropostaEmail(propostaId: string): Promise<boolean> {
     try {
-      const { data: proposta } = await supabase
+      const { data: proposta, error: propostaError } = await supabase
         .from("propostas_parcelamento")
         .select(
           `
           *,
-          cobrancas_franqueados (
+          simulacoes_parcelamento!inner(*, parcelas(*)),
+          cobrancas_franqueados!inner (
             cliente,
-            unidades_franqueadas (
-              email_franqueado
+            unidades_franqueadas!inner (
+              email_franqueado,
+              codigo_unidade,
+              nome_franqueado
             )
           )
         `
@@ -359,36 +391,57 @@ export class SimulacaoParcelamentoService {
         .eq("id", propostaId)
         .single();
 
-      if (!proposta) {
-        throw new Error("Proposta não encontrada");
+      if (propostaError || !proposta) {
+        throw new Error(`Proposta não encontrada: ${propostaError?.message}`);
       }
 
       const email = (proposta as any).cobrancas_franqueados.unidades_franqueadas
         .email_franqueado;
-
       if (!email) {
-        throw new Error("Email não cadastrado");
+        throw new Error("Email não cadastrado para a unidade.");
       }
 
       const config = await this.buscarConfiguracao();
-      const cliente = (proposta as any).cobrancas_franqueados.cliente;
 
-      // Em produção, integrar com serviço de email real
-      console.log("Enviando email:", {
-        para: email,
-        assunto: config.template_email_assunto.replace("{{cliente}}", cliente),
-        corpo: proposta.mensagem_proposta,
-      });
+      // Usa o método do emailService para gerar o corpo do e-mail
+      const template = emailService.gerarTemplatePropostaParcelamento(
+        (proposta as any).simulacoes_parcelamento,
+        (proposta as any).cobrancas_franqueados.unidades_franqueadas,
+        (proposta as any).cobrancas_franqueados
+      );
 
-      // Atualiza data de envio
+      const dadosEmail = {
+        destinatario: email,
+        nome_destinatario: (proposta as any).cobrancas_franqueados
+          .unidades_franqueadas.nome_franqueado,
+        assunto: template.assunto,
+        corpo_html: template.corpo_html,
+        corpo_texto: template.corpo_texto,
+      };
+
+      // Envia o e-mail
+      const resultadoEnvio = await emailService.enviarEmail(dadosEmail);
+
+      if (!resultadoEnvio.sucesso) {
+        throw new Error(
+          resultadoEnvio.erro || "Erro desconhecido ao enviar e-mail."
+        );
+      }
+
+      // Atualiza data de envio na sua base de dados
       await supabase
         .from("propostas_parcelamento")
-        .update({ data_envio: new Date().toISOString() })
+        .update({
+          data_envio: new Date().toISOString(),
+          canais_envio: Array.from(
+            new Set([...proposta.canais_envio, "email"])
+          ),
+        })
         .eq("id", propostaId);
 
       return true;
     } catch (error) {
-      console.error("Erro ao enviar email:", error);
+      console.error("Erro ao enviar proposta por email:", error);
       return false;
     }
   }
@@ -404,7 +457,6 @@ export class SimulacaoParcelamentoService {
     observacoes?: string
   ): Promise<void> {
     try {
-      // Busca dados da proposta
       const { data: proposta } = await supabase
         .from("propostas_parcelamento")
         .select("*")
@@ -415,7 +467,6 @@ export class SimulacaoParcelamentoService {
         throw new Error("Proposta não encontrada");
       }
 
-      // Atualiza status da proposta
       await supabase
         .from("propostas_parcelamento")
         .update({
@@ -427,7 +478,6 @@ export class SimulacaoParcelamentoService {
         })
         .eq("id", propostaId);
 
-      // Registra aceite para auditoria
       const registroAceite: Omit<RegistroAceite, "id" | "created_at"> = {
         proposta_id: propostaId,
         titulo_id: proposta.titulo_id,
@@ -444,7 +494,6 @@ export class SimulacaoParcelamentoService {
         .from("registros_aceite_parcelamento")
         .insert(registroAceite);
 
-      // Registra tratativa
       await this.tratativasService.registrarObservacao(
         proposta.titulo_id,
         "franqueado",
@@ -454,7 +503,6 @@ export class SimulacaoParcelamentoService {
         "negociando"
       );
 
-      // Aqui você pode integrar com sistema de geração de boletos
       console.log("Proposta aceita! Gerar boletos para as parcelas.");
     } catch (error) {
       console.error("Erro ao registrar aceite:", error);
@@ -572,8 +620,8 @@ export class SimulacaoParcelamentoService {
       // Retorna configuração padrão
       return {
         id: "default",
-        percentual_juros_parcela: 10.0, // 10% por parcela
-        valor_minimo_parcela: 100.0,
+        percentual_juros_parcela: 10.0,
+        valor_minimo_parcela: 100.0, // CORRIGIDO
         quantidade_maxima_parcelas: 6,
         percentual_entrada_minimo: 20.0,
         dias_entre_parcelas: 30,
@@ -622,6 +670,8 @@ Para aceitar, responda este email confirmando.
 Atenciosamente,
 Equipe Financeira`,
         ativo: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
     }
 
@@ -649,7 +699,7 @@ Equipe Financeira`,
         : "",
       "{{quantidade_parcelas}}": simulacao.quantidade_parcelas.toString(),
       "{{valor_parcela}}": this.formatarMoeda(simulacao.parcelas[0].valor),
-      "{{percentual_juros}}": simulacao.percentual_juros_parcela.toString(),
+      "{{percentual_juros}}": simulacao.percentual_juros_mora.toString(),
       "{{valor_total}}": this.formatarMoeda(simulacao.valor_total_parcelamento),
       "{{data_primeira_parcela}}": new Date(
         simulacao.data_primeira_parcela
@@ -665,7 +715,6 @@ Equipe Financeira`,
       mensagem = mensagem.replace(regex, valor);
     });
 
-    // Remove blocos condicionais se não há entrada
     if (!simulacao.valor_entrada) {
       mensagem = mensagem.replace(/{{#entrada}}.*?{{\/entrada}}/g, "");
     } else {
@@ -679,18 +728,10 @@ Equipe Financeira`,
    * Métodos auxiliares
    */
   private formatarMoeda(valor: number): string {
-    return new Intl.NumberFormat("pt-BR", {
+    return valor.toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
-    }).format(valor);
-  }
-
-  private formatarTelefone(telefone: string): string {
-    const apenasNumeros = telefone.replace(/\D/g, "");
-    if (apenasNumeros.length === 11) {
-      return `55${apenasNumeros}`;
-    }
-    return apenasNumeros;
+    });
   }
 
   /**
