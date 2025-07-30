@@ -127,21 +127,12 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
             </button>
             <button
               type="button"
-              disabled={loading}
-              className="w-full flex items-center justify-center px-4 py-2 bg-[#2eaee6] text-white rounded-lg hover:bg-[#1e7499] disabled:opacity-50 transition-all duration-300"
-            >
-              Cadastrar-se
-            </button>
-          </div>
-          <div className="mt-4 flex items-center justify-center">
-            <button
-              type="button"
               onClick={handleDemoLogin}
               disabled={loading}
               className="w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-all duration-300"
             >
               <Shield className="w-5 h-5 mr-2" />
-              {loading ? "Carregando..." : "Acessar Modo Demo"}
+              {loading ? "Carregando..." : "Modo Demo"}
             </button>
           </div>
         </form>

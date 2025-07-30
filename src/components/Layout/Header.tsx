@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState } from "react";
 import { Bell, LogOut, Settings, Maximize, Moon, Sun } from "lucide-react";
+import { useAuth } from "../Auth/AuthProvider"; // Importa o hook
 
 interface HeaderProps {
   user?: {
@@ -14,6 +15,7 @@ interface HeaderProps {
 export function Header({ user, notifications = 0 }: HeaderProps) {
   const [darkMode, setDarkMode] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const { signOut } = useAuth(); // Obtém a função signOut
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -23,6 +25,11 @@ export function Header({ user, notifications = 0 }: HeaderProps) {
       document.exitFullscreen();
       setFullscreen(false);
     }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    window.location.reload(); // Recarrega a página para redirecionar para o login
   };
 
   return (
@@ -86,6 +93,7 @@ export function Header({ user, notifications = 0 }: HeaderProps) {
                 <Settings className="w-4 h-4" />
               </button>
               <button
+                onClick={handleLogout} // Adiciona o evento de clique
                 className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                 title="Sair"
               >
