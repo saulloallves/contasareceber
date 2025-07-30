@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Bell, User, LogOut, Settings, Maximize, Moon, Sun } from 'lucide-react';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { useState } from "react";
+import { Bell, LogOut, Settings, Maximize, Moon, Sun } from "lucide-react";
 
 interface HeaderProps {
   user?: {
@@ -38,16 +39,20 @@ export function Header({ user, notifications = 0 }: HeaderProps) {
 
         <div className="flex items-center space-x-2">
           {/* Theme Toggle */}
-          <button 
+          <button
             onClick={() => setDarkMode(!darkMode)}
             className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
             title="Alternar tema"
           >
-            {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            {darkMode ? (
+              <Sun className="w-5 h-5" />
+            ) : (
+              <Moon className="w-5 h-5" />
+            )}
           </button>
 
           {/* Fullscreen Toggle */}
-          <button 
+          <button
             onClick={toggleFullscreen}
             className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
             title="Tela cheia"
@@ -60,7 +65,7 @@ export function Header({ user, notifications = 0 }: HeaderProps) {
             <Bell className="w-5 h-5" />
             {notifications > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
-                {notifications > 9 ? '9+' : notifications}
+                {notifications > 9 ? "9+" : notifications}
               </span>
             )}
           </button>
@@ -69,20 +74,18 @@ export function Header({ user, notifications = 0 }: HeaderProps) {
           <div className="flex items-center space-x-3 border-l border-gray-200 pl-4">
             <div className="text-right">
               <p className="text-sm font-medium text-gray-900">
-                {user?.name || 'Usuário'}
+                {user?.name || "Usuário"}
               </p>
-              <p className="text-xs text-gray-500">
-                {user?.role || 'Admin'}
-              </p>
+              <p className="text-xs text-gray-500">{user?.role || "Admin"}</p>
             </div>
             <div className="flex items-center space-x-1">
-              <button 
+              <button
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Configurações"
               >
                 <Settings className="w-4 h-4" />
               </button>
-              <button 
+              <button
                 className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                 title="Sair"
               >
