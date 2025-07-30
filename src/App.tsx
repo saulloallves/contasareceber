@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect } from "react";
 import { AuthProvider, useAuth } from "./components/Auth/AuthProvider";
 import { SimpleAuth } from "./components/Auth/SimpleAuth";
@@ -43,6 +44,16 @@ function AppContent() {
 
   // Simula dados do usuário logado
   const userPermissions = ["admin"]; // Exemplo de permissões
+
+  // Mapeia o usuário do Supabase para o formato esperado pelo Header/Layout
+  const mappedUser = user
+    ? {
+        name: user.user_metadata?.name || user.name || user.email || "Usuário",
+        email: user.email,
+        role: user.user_metadata?.role || user.role || "Admin",
+        id: user.id,
+      }
+    : undefined;
 
   // Se ainda está carregando, mostra loading
   if (loading) {
@@ -101,7 +112,7 @@ function AppContent() {
         return <ModuloIntegracoes />;
       case "admin":
         return <ConfiguracaoAdmin />;
-      case 'config-email':
+      case "config-email":
         return <EmailConfiguration />;
       case "auditoria":
         return <AuditoriaLogs />;
@@ -153,6 +164,7 @@ function AppContent() {
       activeTab={activeTab}
       onTabChange={setActiveTab}
       userPermissions={userPermissions}
+      user={mappedUser}
     >
       {renderContent()}
     </Layout>
