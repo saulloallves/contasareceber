@@ -1,10 +1,24 @@
 import { useState } from "react";
-import { 
-  Home, Building2, DollarSign, Calendar, Scale, BarChart3, 
-  Settings, Users, ChevronLeft, ChevronRight, Menu, X, FileText, 
-  Zap, Shield, 
-  Receipt, CircleDollarSign, Calculator, Mail
-} from 'lucide-react';
+import {
+  Home,
+  Building2,
+  DollarSign,
+  Calendar,
+  Scale,
+  BarChart3,
+  Settings,
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  Menu,
+  X,
+  FileText,
+  Zap,
+  Shield,
+  Receipt,
+  CircleDollarSign,
+  Calculator,
+} from "lucide-react";
 
 interface SidebarProps {
   activeTab: string;
@@ -135,13 +149,6 @@ export function Sidebar({
       icon: Settings,
       permissions: ["admin"],
       description: "Parâmetros do sistema",
-    },
-    {
-      id: "config-email",
-      label: "Configuração Email",
-      icon: Mail,
-      permissions: ["admin"],
-      description: "Configurar envio de emails",
     },
   ];
 

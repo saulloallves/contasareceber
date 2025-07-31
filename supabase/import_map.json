@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "src/": "../src/",
+    "src/types/": "../src/types/",
+    "src/utils/": "../src/utils/",
+    "src/services/": "../src/services/"
+  }
+}

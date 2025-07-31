@@ -1,6 +1,15 @@
 import { supabase } from './databaseService';
 import { ScoreRisco, ComponentesScore, HistoricoScore, ConfiguracaoScore, FiltrosScore, EstatisticasScore, EventoScore } from '../types/scoreRisco';
 
+export interface CriteriosJuridico {
+  valor_minimo: number;
+  cobracas_ignoradas_periodo: number;
+  periodo_dias_cobrancas: number;
+  score_risco_maximo: number;
+  reincidencia_meses: number;
+  considera_acordo_descumprido: boolean;
+}
+
 export class ScoreRiscoService {
   /**
    * Calcula score de risco para uma unidade
@@ -486,6 +495,237 @@ export class ScoreRiscoService {
     } catch (error) {
       console.error('Erro ao exportar scores:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Verifica se uma unidade atende aos novos critérios para acionamento jurídico
+   * Critérios definidos pelo chefe:
+   * 1. Valor em aberto superior a R$ 5.000
+   * 2. 3 ou mais cobranças ignoradas em 15 dias
+   * 3. Score de risco igual a zero
+   * 4. Acordo firmado e descumprido
+   * 5. Reincidência em período de 6 meses
+   */
+  async verificarCriteriosJuridico(cnpjUnidade: string): Promise<{
+    atende: boolean;
+    criterios: {
+      valorSuperior5k: boolean;
+      cobrancasIgnoradas: boolean;
+      scoreZero: boolean;
+      acordoDescumprido: boolean;
+      reincidencia: boolean;
+    };
+    detalhes: {
+      valorTotal: number;
+      numeroCobrancasIgnoradas: number;
+      scoreAtual: number;
+      temAcordoDescumprido: boolean;
+      temReincidencia: boolean;
+    };
+  }> {
+    try {
+      // 1. Verifica valor total em aberto
+      const { data: cobrancasAbertas } = await supabase
+        .from("cobrancas_franqueados")
+        .select("valor_original, valor_atualizado")
+        .eq("cnpj", cnpjUnidade)
+        .eq("status", "em_aberto");
+
+      const valorTotal = (cobrancasAbertas || []).reduce(
+        (total, cobranca) => total + (cobranca.valor_atualizado || cobranca.valor_original),
+        0
+      );
+
+      // 2. Verifica cobranças ignoradas nos últimos 15 dias
+      const dataLimite = new Date();
+      dataLimite.setDate(dataLimite.getDate() - 15);
+
+      const { data: cobrancasIgnoradas } = await supabase
+        .from("cobrancas_franqueados")
+        .select("id")
+        .eq("cnpj", cnpjUnidade)
+        .eq("status", "em_aberto")
+        .eq("aviso_de_debito_enviado", true)
+        .is("resposta_cliente", null)
+        .gte("data_ultimo_envio", dataLimite.toISOString());
+
+      // 3. Verifica score de risco atual
+      const { data: scoreRisco } = await supabase
+        .from("score_risco_unidades")
+        .select("score_atual")
+        .eq("cnpj_unidade", cnpjUnidade)
+        .single();
+
+      // 4. Verifica acordos descumpridos
+      const { data: acordosDescumpridos } = await supabase
+        .from("acordos_parcelamento")
+        .select("id")
+        .eq("cnpj_cliente", cnpjUnidade)
+        .eq("status", "descumprido");
+
+      // 5. Verifica reincidência nos últimos 6 meses
+      const dataReincidencia = new Date();
+      dataReincidencia.setMonth(dataReincidencia.getMonth() - 6);
+
+      const { data: escalonamentosAnteriores } = await supabase
+        .from("escalonamentos_cobranca")
+        .select("id")
+        .eq("cnpj_unidade", cnpjUnidade)
+        .eq("nivel", "juridico")
+        .gte("created_at", dataReincidencia.toISOString());
+
+      // Avalia critérios
+      const criterios = {
+        valorSuperior5k: valorTotal > 5000,
+        cobrancasIgnoradas: (cobrancasIgnoradas?.length || 0) >= 3,
+        scoreZero: scoreRisco?.score_atual === 0,
+        acordoDescumprido: (acordosDescumpridos?.length || 0) > 0,
+        reincidencia: (escalonamentosAnteriores?.length || 0) > 0,
+      };
+
+      const detalhes = {
+        valorTotal,
+        numeroCobrancasIgnoradas: cobrancasIgnoradas?.length || 0,
+        scoreAtual: scoreRisco?.score_atual || -1,
+        temAcordoDescumprido: criterios.acordoDescumprido,
+        temReincidencia: criterios.reincidencia,
+      };
+
+      // Para atender aos critérios, deve ter TODOS os critérios básicos:
+      // - Valor superior a 5k
+      // - 3+ cobranças ignoradas
+      // - Score zero
+      // E pelo menos UM dos critérios adicionais:
+      // - Acordo descumprido OU reincidência
+      const atende = 
+        criterios.valorSuperior5k &&
+        criterios.cobrancasIgnoradas &&
+        criterios.scoreZero &&
+        (criterios.acordoDescumprido || criterios.reincidencia);
+
+      return { atende, criterios, detalhes };
+    } catch (error) {
+      console.error("Erro ao verificar critérios jurídico:", error);
+      return {
+        atende: false,
+        criterios: {
+          valorSuperior5k: false,
+          cobrancasIgnoradas: false,
+          scoreZero: false,
+          acordoDescumprido: false,
+          reincidencia: false,
+        },
+        detalhes: {
+          valorTotal: 0,
+          numeroCobrancasIgnoradas: 0,
+          scoreAtual: -1,
+          temAcordoDescumprido: false,
+          temReincidencia: false,
+        },
+      };
+    }
+  }
+
+  /**
+   * Lista unidades que atendem aos critérios de acionamento jurídico
+   */
+  async listarUnidadesElegiveis(): Promise<Array<{
+    cnpj: string;
+    nome_franqueado: string;
+    valor_total_aberto: number;
+    score_atual: number;
+    cobrancas_ignoradas: number;
+    tem_acordo_descumprido: boolean;
+    tem_reincidencia: boolean;
+    atende_criterios: boolean;
+  }>> {
+    try {
+      // Busca unidades com score zero primeiro (pré-requisito)
+      const { data: unidadesComScoreZero } = await supabase
+        .from("score_risco_unidades")
+        .select("cnpj_unidade")
+        .eq("score_atual", 0);
+
+      if (!unidadesComScoreZero) return [];
+
+      const resultados = [];
+      
+      // Limita a verificação a 50 unidades para não sobrecarregar
+      for (const unidade of unidadesComScoreZero.slice(0, 50)) {
+        const criterios = await this.verificarCriteriosJuridico(unidade.cnpj_unidade);
+        
+        // Busca nome da unidade
+        const { data: dadosUnidade } = await supabase
+          .from("unidades_franqueadas")
+          .select("nome_franqueado")
+          .eq("cnpj", unidade.cnpj_unidade)
+          .single();
+
+        resultados.push({
+          cnpj: unidade.cnpj_unidade,
+          nome_franqueado: dadosUnidade?.nome_franqueado || "Não informado",
+          valor_total_aberto: criterios.detalhes.valorTotal,
+          score_atual: criterios.detalhes.scoreAtual,
+          cobrancas_ignoradas: criterios.detalhes.numeroCobrancasIgnoradas,
+          tem_acordo_descumprido: criterios.detalhes.temAcordoDescumprido,
+          tem_reincidencia: criterios.detalhes.temReincidencia,
+          atende_criterios: criterios.atende,
+        });
+      }
+
+      // Ordena por critérios atendidos primeiro, depois por valor
+      return resultados.sort((a, b) => {
+        if (a.atende_criterios && !b.atende_criterios) return -1;
+        if (!a.atende_criterios && b.atende_criterios) return 1;
+        return b.valor_total_aberto - a.valor_total_aberto;
+      });
+    } catch (error) {
+      console.error("Erro ao listar unidades elegíveis:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Busca unidades com score zero (primeiro critério para jurídico)
+   */
+  async listarUnidadesScoreZero(): Promise<Array<{
+    cnpj_unidade: string;
+    nome_franqueado: string;
+    score_atual: number;
+    nivel_risco: string;
+    ultima_atualizacao: string;
+  }>> {
+    try {
+      const { data: unidades, error } = await supabase
+        .from("score_risco_unidades")
+        .select(`
+          cnpj_unidade,
+          score_atual,
+          nivel_risco,
+          ultima_atualizacao,
+          unidades_franqueadas!score_risco_unidades_cnpj_unidade_fkey (
+            nome_franqueado
+          )
+        `)
+        .eq("score_atual", 0)
+        .order("ultima_atualizacao", { ascending: false });
+
+      if (error) {
+        console.error("Erro ao buscar unidades com score zero:", error);
+        return [];
+      }
+
+      return (unidades || []).map(u => ({
+        cnpj_unidade: u.cnpj_unidade,
+        nome_franqueado: (u as any).unidades_franqueadas?.nome_franqueado || "Não informado",
+        score_atual: u.score_atual,
+        nivel_risco: u.nivel_risco,
+        ultima_atualizacao: u.ultima_atualizacao,
+      }));
+    } catch (error) {
+      console.error("Erro ao listar unidades com score zero:", error);
+      return [];
     }
   }
 }
