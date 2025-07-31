@@ -20,10 +20,18 @@ import {
 } from "lucide-react";
 import { JuridicoService } from "../services/juridicoService";
 import { FiltrosJuridico, EstatisticasJuridico } from "../types/juridico";
+import { reunioesJuridicoService } from "../services/reunioesJuridicoService";
+import { evolutionApiService } from "../services/evolutionApiService";
+import { supabase } from "../services/databaseService";
 
 export function PainelJuridico() {
   const [abaSelecionada, setAbaSelecionada] = useState<
-    "escalonamentos" | "notificacoes" | "documentos" | "log" | "configuracao"
+    | "escalonamentos"
+    | "reunioes"
+    | "notificacoes"
+    | "documentos"
+    | "log"
+    | "configuracao"
   >("escalonamentos");
   const [escalonamentos, setEscalonamentos] = useState<any[]>([]);
   const [notificacoes, setNotificacoes] = useState<any[]>([]);
@@ -48,6 +56,13 @@ export function PainelJuridico() {
     evolucao_mensal: [],
   });
   const [arquivo, setArquivo] = useState<File | null>(null);
+  const [reunioesJuridico, setReunioesJuridico] = useState<any[]>([]);
+  const [carregandoReunioes, setCarregandoReunioes] = useState(false);
+  const [editandoReuniaoId, setEditandoReuniaoId] = useState<string | null>(
+    null
+  );
+  const [presencaTemp, setPresencaTemp] = useState<boolean | null>(null);
+  const [tratativaTemp, setTratativaTemp] = useState<string>("");
 
   const juridicoService = useMemo(() => new JuridicoService(), []);
 
@@ -87,6 +102,22 @@ export function PainelJuridico() {
   useEffect(() => {
     carregarDados();
   }, [carregarDados]);
+
+  // Carregar reuniões jurídicas ao montar
+  useEffect(() => {
+    async function fetchReunioes() {
+      setCarregandoReunioes(true);
+      try {
+        const dados = await reunioesJuridicoService.listarReunioesJuridico();
+        setReunioesJuridico(dados);
+      } catch (e) {
+        setReunioesJuridico([]);
+      } finally {
+        setCarregandoReunioes(false);
+      }
+    }
+    fetchReunioes();
+  }, []);
 
   const abrirModalNotificacao = (unidade?: any) => {
     setItemSelecionado(unidade);
@@ -360,6 +391,107 @@ export function PainelJuridico() {
     }).format(valor);
   };
 
+  // Função para salvar presença/tratativa
+  async function salvarPresencaTratativa(id: string) {
+    if (presencaTemp === null) {
+      alert("Selecione presença ou ausência.");
+      return;
+    }
+    setProcessando(true);
+    try {
+      await reunioesJuridicoService.atualizarPresencaTratativa(
+        id,
+        presencaTemp,
+        tratativaTemp
+      );
+      setEditandoReuniaoId(null);
+      setPresencaTemp(null);
+      setTratativaTemp("");
+      // Atualiza lista
+      const dados = await reunioesJuridicoService.listarReunioesJuridico();
+      setReunioesJuridico(dados);
+    } catch (e) {
+      alert("Erro ao salvar presença/tratativa");
+    } finally {
+      setProcessando(false);
+    }
+  }
+
+  // Função para enviar WhatsApp jurídico e registrar
+  async function enviarWhatsAppJuridico(notificacao: any) {
+    setProcessando(true);
+    try {
+      const numeroOriginal =
+        notificacao.unidades_franqueadas?.telefone_franqueado;
+      if (!numeroOriginal) throw new Error("Telefone não cadastrado");
+      let numero = numeroOriginal.replace(/\D/g, ""); // remove tudo que não for número
+      if (!numero.startsWith("55")) {
+        numero = "55" + numero;
+      }
+      const mensagem = notificacao.conteudo_notificacao;
+      // Envia WhatsApp
+      await evolutionApiService.sendTextMessage({
+        instanceName: "automacoes_backup",
+        number: numero,
+        text: mensagem,
+      });
+      // Registra envio
+      await supabase.from("envios_mensagem").insert({
+        canal: "whatsapp",
+        destinatario: numero,
+        mensagem_enviada: mensagem,
+        status_envio: "sucesso",
+        data_envio: new Date().toISOString(),
+        tipo_envio: "juridico",
+        referencia: notificacao.id,
+        cnpj: notificacao.cnpj_unidade,
+      });
+      alert("WhatsApp enviado com sucesso!");
+      carregarDados();
+    } catch (error) {
+      alert("Erro ao enviar WhatsApp: " + error);
+    } finally {
+      setProcessando(false);
+    }
+  }
+
+  // Função para buscar notificações multicanal jurídicas
+  async function buscarNotificacoesJuridicas(filtros: any) {
+    // Busca e-mail e WhatsApp
+    const { data, error } = await supabase
+      .from("envios_mensagem")
+      .select("*", { count: "exact" })
+      .eq("tipo_envio", "juridico")
+      .order("data_envio", { ascending: false });
+    if (error) return [];
+    return data || [];
+  }
+
+  // Substitua a busca de notificações na useEffect:
+  useEffect(() => {
+    async function fetchNotificacoes() {
+      setCarregando(true);
+      try {
+        const notificacoesData = await buscarNotificacoesJuridicas(filtros);
+        setNotificacoes(notificacoesData);
+      } catch {
+        setNotificacoes([]);
+      } finally {
+        setCarregando(false);
+      }
+    }
+    if (abaSelecionada === "notificacoes") fetchNotificacoes();
+  }, [abaSelecionada, filtros]);
+
+  const abas = [
+    { id: "escalonamentos", label: "Escalonamentos Ativos", icon: Users },
+    { id: "reunioes", label: "Reuniões Jurídicas", icon: Clock },
+    { id: "notificacoes", label: "Notificações", icon: FileText },
+    { id: "documentos", label: "Documentos", icon: Upload },
+    { id: "log", label: "Log de Ações", icon: Clock },
+    { id: "configuracao", label: "Configuração", icon: Settings },
+  ];
+
   return (
     <div className="max-w-full mx-auto p-6">
       <div className="bg-white rounded-lg shadow-lg p-8">
@@ -440,17 +572,7 @@ export function PainelJuridico() {
         {/* Navegação por abas */}
         <div className="border-b border-gray-200 mb-8">
           <nav className="-mb-px flex space-x-8">
-            {[
-              {
-                id: "escalonamentos",
-                label: "Escalonamentos Ativos",
-                icon: Users,
-              },
-              { id: "notificacoes", label: "Notificações", icon: FileText },
-              { id: "documentos", label: "Documentos", icon: Upload },
-              { id: "log", label: "Log de Ações", icon: Clock },
-              { id: "configuracao", label: "Configuração", icon: Settings },
-            ].map((aba) => {
+            {abas.map((aba) => {
               const Icon = aba.icon;
               return (
                 <button
@@ -661,6 +783,175 @@ export function PainelJuridico() {
           </div>
         )}
 
+        {abaSelecionada === "reunioes" && (
+          <div className="overflow-x-auto">
+            <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center">
+              <Clock className="w-5 h-5 mr-2 text-red-600" /> Gestão de Reuniões
+              Jurídicas
+            </h2>
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Unidade
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Status
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Data/Hora
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Link
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Presença
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Tratativas
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Ações
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {carregandoReunioes ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-4">
+                      <RefreshCw className="w-6 h-6 animate-spin text-red-600 mx-auto" />
+                    </td>
+                  </tr>
+                ) : reunioesJuridico.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-4 text-gray-500">
+                      Nenhuma reunião jurídica encontrada
+                    </td>
+                  </tr>
+                ) : (
+                  reunioesJuridico.map((r) => (
+                    <tr key={r.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        {r.unidades_franqueadas?.nome_franqueado || "-"}
+                        <br />
+                        <span className="text-xs text-gray-500">
+                          {r.unidades_franqueadas?.codigo_unidade || "-"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                          {r.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        {r.data_hora_reuniao
+                          ? formatarData(r.data_hora_reuniao)
+                          : "-"}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        {r.link_calendly ? (
+                          <a
+                            href={r.link_calendly}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 underline"
+                          >
+                            Agendar
+                          </a>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        {editandoReuniaoId === r.id ? (
+                          <select
+                            value={
+                              presencaTemp === null
+                                ? ""
+                                : presencaTemp
+                                ? "sim"
+                                : "nao"
+                            }
+                            onChange={(e) =>
+                              setPresencaTemp(e.target.value === "sim")
+                            }
+                            className="border rounded px-2 py-1"
+                          >
+                            <option value="">Selecione</option>
+                            <option value="sim">Compareceu</option>
+                            <option value="nao">Não Compareceu</option>
+                          </select>
+                        ) : r.presenca_franqueado === true ? (
+                          <span className="text-green-700 font-semibold">
+                            Compareceu
+                          </span>
+                        ) : r.presenca_franqueado === false ? (
+                          <span className="text-red-700 font-semibold">
+                            Ausente
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        {editandoReuniaoId === r.id ? (
+                          <textarea
+                            value={tratativaTemp}
+                            onChange={(e) => setTratativaTemp(e.target.value)}
+                            rows={2}
+                            className="border rounded px-2 py-1 w-full"
+                            placeholder="Descreva as tratativas..."
+                          />
+                        ) : (
+                          <span className="text-gray-700 text-sm">
+                            {r.tratativas_acordadas || (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        {editandoReuniaoId === r.id ? (
+                          <>
+                            <button
+                              onClick={() => salvarPresencaTratativa(r.id)}
+                              disabled={processando}
+                              className="px-3 py-1 bg-green-600 text-white rounded mr-2"
+                            >
+                              Salvar
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditandoReuniaoId(null);
+                                setPresencaTemp(null);
+                                setTratativaTemp("");
+                              }}
+                              className="px-3 py-1 bg-gray-400 text-white rounded"
+                            >
+                              Cancelar
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setEditandoReuniaoId(r.id);
+                              setPresencaTemp(r.presenca_franqueado);
+                              setTratativaTemp(r.tratativas_acordadas || "");
+                            }}
+                            className="px-3 py-1 bg-blue-600 text-white rounded"
+                          >
+                            Editar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {abaSelecionada === "notificacoes" && (
           <div className="space-y-4">
             {carregando ? (
@@ -669,94 +960,65 @@ export function PainelJuridico() {
               </div>
             ) : notificacoes.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                Nenhuma notificação encontrada
+                Nenhuma notificação jurídica encontrada
               </div>
             ) : (
-              notificacoes.map((notificacao) => (
+              notificacoes.map((envio) => (
                 <div
-                  key={notificacao.id}
+                  key={envio.id}
                   className="border border-gray-200 rounded-lg p-6"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <h3 className="text-lg font-semibold text-gray-800">
-                        {notificacao.unidades_franqueadas?.nome_franqueado}
+                        {envio.canal === "whatsapp" ? "WhatsApp" : "E-mail"}
                       </h3>
                       <p className="text-sm text-gray-600">
-                        CNPJ: {notificacao.cnpj_unidade}
+                        Destinatário: {envio.destinatario}
                       </p>
                       <p className="text-sm text-gray-600">
-                        Tipo:{" "}
-                        {notificacao.tipo_notificacao
-                          .replace("_", " ")
-                          .toUpperCase()}
+                        CNPJ: {envio.cnpj}
                       </p>
                       <p className="text-sm text-gray-600">
-                        Enviada em: {formatarData(notificacao.data_envio)}
+                        Enviado em: {formatarData(envio.data_envio)}
                       </p>
                     </div>
                     <div className="flex items-center space-x-2">
                       <span
                         className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          notificacao.respondido
+                          envio.status_envio === "sucesso"
                             ? "bg-green-100 text-green-800"
                             : "bg-yellow-100 text-yellow-800"
                         }`}
                       >
-                        {notificacao.respondido ? "Respondida" : "Aguardando"}
+                        {envio.status_envio === "sucesso"
+                          ? "Enviado"
+                          : "Pendente"}
                       </span>
                       <span
                         className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          notificacao.status_envio === "enviado"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-gray-100 text-gray-800"
+                          envio.canal === "whatsapp"
+                            ? "bg-green-50 text-green-700"
+                            : "bg-blue-50 text-blue-700"
                         }`}
                       >
-                        {notificacao.status_envio.toUpperCase()}
+                        {envio.canal.toUpperCase()}
                       </span>
                     </div>
                   </div>
-
                   <div className="bg-gray-50 rounded-lg p-4 mb-4">
                     <p className="text-sm text-gray-700 whitespace-pre-line">
-                      {notificacao.conteudo_notificacao.substring(0, 300)}...
+                      {envio.mensagem_enviada?.substring(0, 300)}...
                     </p>
                   </div>
-
-                  {notificacao.data_prazo_resposta && (
-                    <div className="mb-4 text-sm text-gray-600">
-                      <Clock className="w-4 h-4 inline mr-1" />
-                      Prazo de resposta:{" "}
-                      {new Date(
-                        notificacao.data_prazo_resposta
-                      ).toLocaleDateString("pt-BR")}
-                    </div>
-                  )}
-
                   <div className="flex space-x-3">
-                    <button
-                      onClick={() => baixarPDF(notificacao)}
-                      className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-                    >
-                      <Download className="w-4 h-4 mr-1" />
-                      PDF
-                    </button>
-                    {notificacao.status_envio === "pendente" && (
+                    {envio.canal === "whatsapp" ? null : (
                       <button
-                        onClick={() => enviarNotificacao(notificacao)}
+                        onClick={() => enviarWhatsAppJuridico(envio)}
                         className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                        disabled={processando}
                       >
-                        <Send className="w-4 h-4 mr-1" />
-                        Enviar
-                      </button>
-                    )}
-                    {!notificacao.respondido && (
-                      <button
-                        onClick={() => abrirModalResposta(notificacao)}
-                        className="flex items-center px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm"
-                      >
-                        <CheckCircle className="w-4 h-4 mr-1" />
-                        Marcar Respondida
+                        <Send className="w-4 h-4 mr-1" /> Enviar WhatsApp
                       </button>
                     )}
                   </div>
