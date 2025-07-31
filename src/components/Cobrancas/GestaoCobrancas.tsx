@@ -38,7 +38,7 @@ export function GestaoCobrancas() {
   const [cobrancas, setCobrancas] = useState<CobrancaFranqueado[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [modalAberto, setModalAberto] = useState<
-    "criar" | "editar" | "upload" | "status" | null
+    "criar" | "editar" | "upload" | "status" | "quitacao" | null
   >(null);
   const [cobrancaSelecionada, setCobrancaSelecionada] =
     useState<CobrancaFranqueado | null>(null);
@@ -52,6 +52,12 @@ export function GestaoCobrancas() {
   const [modalComparacaoAberto, setModalComparacaoAberto] = useState(false);
   const [usuario] = useState("admin"); // Em produção, pegar do contexto de autenticação
   const [formData, setFormData] = useState<Partial<CobrancaFranqueado>>({});
+  const [formQuitacao, setFormQuitacao] = useState({
+    valorPago: 0,
+    formaPagamento: "",
+    observacoes: "",
+    dataRecebimento: new Date().toISOString().split('T')[0]
+  });
   const [filtros, setFiltros] = useState({
     status: "",
     busca: "",
@@ -429,16 +435,77 @@ export function GestaoCobrancas() {
   };
 
   /**
+   * Função para abrir modal de quitação detalhado
+   */
+  const abrirModalQuitacao = (cobranca: CobrancaFranqueado) => {
+    setCobrancaSelecionada(cobranca);
+    setFormQuitacao({
+      valorPago: cobranca.valor_atualizado || cobranca.valor_original,
+      formaPagamento: "",
+      observacoes: "",
+      dataRecebimento: new Date().toISOString().split('T')[0]
+    });
+    setModalAberto("quitacao");
+  };
+
+  /**
+   * Função para processar quitação detalhada
+   */
+  const processarQuitacao = async () => {
+    if (!cobrancaSelecionada?.id) return;
+
+    if (!formQuitacao.formaPagamento) {
+      mostrarMensagem("erro", "Forma de pagamento é obrigatória");
+      return;
+    }
+
+    if (formQuitacao.valorPago <= 0) {
+      mostrarMensagem("erro", "Valor pago deve ser maior que zero");
+      return;
+    }
+
+    try {
+      const resultado = await cobrancaService.quitarCobranca(
+        cobrancaSelecionada.id,
+        formQuitacao.valorPago,
+        formQuitacao.formaPagamento,
+        usuario,
+        formQuitacao.observacoes,
+        formQuitacao.dataRecebimento
+      );
+
+      if (resultado.sucesso) {
+        mostrarMensagem("sucesso", resultado.mensagem);
+        setModalAberto(null);
+        carregarCobrancas();
+      } else {
+        mostrarMensagem("erro", resultado.mensagem);
+      }
+    } catch (error) {
+      console.error("Erro ao processar quitação:", error);
+      mostrarMensagem("erro", `Erro ao processar quitação: ${error}`);
+    }
+  };
+
+  /**
    * Função para marcar rapidamente como quitado
    */
   const marcarQuitadoRapido = async (cobranca: CobrancaFranqueado) => {
     try {
-      await cobrancaService.atualizarCobranca(cobranca.id!, {
-        status: "quitado",
-        valor_recebido: cobranca.valor_atualizado || cobranca.valor_original,
-      });
-      mostrarMensagem("sucesso", "Cobrança marcada como quitada rapidamente!");
-      carregarCobrancas();
+      const resultado = await cobrancaService.quitarCobranca(
+        cobranca.id!,
+        cobranca.valor_atualizado || cobranca.valor_original,
+        "Não informado",
+        usuario,
+        "Quitação rápida via interface"
+      );
+
+      if (resultado.sucesso) {
+        mostrarMensagem("sucesso", resultado.mensagem);
+        carregarCobrancas();
+      } else {
+        mostrarMensagem("erro", resultado.mensagem);
+      }
     } catch (error) {
       console.error("Erro ao marcar como quitado:", error);
       mostrarMensagem("erro", `Erro ao marcar como quitado: ${error}`);
@@ -802,6 +869,13 @@ export function GestaoCobrancas() {
                               title="Marcar como quitado (rápido)"
                             >
                               <CheckCircle className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => abrirModalQuitacao(cobranca)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Quitação detalhada"
+                            >
+                              <Receipt className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => abrirModalStatus(cobranca)}
@@ -1431,6 +1505,138 @@ export function GestaoCobrancas() {
                 title="Limpa os erros da memória e esconde o botão de alerta"
               >
                 Limpar Erros e Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Quitação Detalhada */}
+      {modalAberto === "quitacao" && cobrancaSelecionada && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-800">
+                Quitação de Cobrança
+              </h2>
+            </div>
+            
+            <div className="px-6 py-4 space-y-4">
+              {/* Informações da Cobrança */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-medium text-gray-800 mb-2">Detalhes da Cobrança:</h3>
+                <p className="text-sm text-gray-600">
+                  <strong>Cliente:</strong> {cobrancaSelecionada.cliente}
+                </p>
+                <p className="text-sm text-gray-600">
+                  <strong>Valor Total:</strong> {formatarMoeda(cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original)}
+                </p>
+                {cobrancaSelecionada.valor_recebido && cobrancaSelecionada.valor_recebido > 0 && (
+                  <p className="text-sm text-gray-600">
+                    <strong>Já Pago:</strong> {formatarMoeda(cobrancaSelecionada.valor_recebido)}
+                  </p>
+                )}
+                <p className="text-sm text-gray-600">
+                  <strong>Saldo Devedor:</strong> {formatarMoeda((cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original) - (cobrancaSelecionada.valor_recebido || 0))}
+                </p>
+              </div>
+
+              {/* Formulário de Quitação */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Valor Pago <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formQuitacao.valorPago}
+                  onChange={(e) => setFormQuitacao({...formQuitacao, valorPago: parseFloat(e.target.value) || 0})}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0,00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Forma de Pagamento <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formQuitacao.formaPagamento}
+                  onChange={(e) => setFormQuitacao({...formQuitacao, formaPagamento: e.target.value})}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Selecione...</option>
+                  <option value="PIX">PIX</option>
+                  <option value="Transferência Bancária">Transferência Bancária</option>
+                  <option value="Boleto">Boleto</option>
+                  <option value="Cartão de Crédito">Cartão de Crédito</option>
+                  <option value="Cartão de Débito">Cartão de Débito</option>
+                  <option value="Dinheiro">Dinheiro</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Outros">Outros</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Data do Recebimento
+                </label>
+                <input
+                  type="date"
+                  value={formQuitacao.dataRecebimento}
+                  onChange={(e) => setFormQuitacao({...formQuitacao, dataRecebimento: e.target.value})}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Observações
+                </label>
+                <textarea
+                  value={formQuitacao.observacoes}
+                  onChange={(e) => setFormQuitacao({...formQuitacao, observacoes: e.target.value})}
+                  rows={3}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Informações adicionais sobre o pagamento..."
+                />
+              </div>
+
+              {/* Previsão do Resultado */}
+              {formQuitacao.valorPago > 0 && (
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <h4 className="text-sm font-medium text-blue-800 mb-1">
+                    Resultado da Operação:
+                  </h4>
+                  {formQuitacao.valorPago >= ((cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original) - (cobrancaSelecionada.valor_recebido || 0)) ? (
+                    <p className="text-sm text-green-700">
+                      ✅ <strong>Quitação Total</strong> - Processo será encerrado e confirmação enviada por WhatsApp
+                    </p>
+                  ) : (
+                    <p className="text-sm text-yellow-700">
+                      ⚠️ <strong>Pagamento Parcial</strong> - Restará: {formatarMoeda(
+                        ((cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original) - (cobrancaSelecionada.valor_recebido || 0)) - formQuitacao.valorPago
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setModalAberto(null)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={processarQuitacao}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2"
+              >
+                <Receipt className="w-4 h-4" />
+                <span>Registrar Quitação</span>
               </button>
             </div>
           </div>

@@ -35,6 +35,28 @@ export interface DadosPlanilha {
   status: string;
 }
 
+export interface QuitacaoCobranca {
+  cobrancaId: string;
+  valorPago: number;
+  formaPagamento: string;
+  dataRecebimento: string;
+  observacoes?: string;
+  usuario: string;
+}
+
+export interface ResultadoQuitacao {
+  sucesso: boolean;
+  mensagem: string;
+  isQuitacaoTotal?: boolean;
+  valorRestante?: number;
+}
+
+export interface ConfiguracaoMensagemQuitacao {
+  template_whatsapp: string;
+  instance_name: string;
+  enviar_automatico: boolean;
+}
+
 export interface TrativativaCobranca {
   id?: string;
   titulo_id: string;
