@@ -341,7 +341,7 @@ export class CobrancaService {
       if (unidade.telefone_franqueado) {
         console.log("Enviando WhatsApp para:", unidade.telefone_franqueado);
         await this.enviarWhatsApp({
-          instanceName: "crescieperdi",
+          instanceName: "automacoes_backup",
           number: unidade.telefone_franqueado,
           text: `🚨 NOTIFICAÇÃO EXTRAJUDICIAL\n\n${mensagem}`,
         });
@@ -425,12 +425,10 @@ export class CobrancaService {
           "Content-Type": "application/json",
           apikey: evolutionApiKey,
         },
-        // Ajustado para o corpo da requisição conforme a documentação fornecida
+        // Corpo da requisição conforme especificações fornecidas
         body: JSON.stringify({
           number: numeroLimpo,
-          textMessage: {
-            text: params.text,
-          },
+          text: params.text,
         }),
       });
 
