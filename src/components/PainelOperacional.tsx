@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useEffect } from "react";
 import {
@@ -423,24 +424,22 @@ Entre em contato: (11) 99999-9999`,
   };
 
   const podeAcionarJuridico = (cobranca: any) => {
-    const valorAtualizado = cobranca.valor_atualizado || cobranca.valor_original;
+    const valorAtualizado =
+      cobranca.valor_atualizado || cobranca.valor_original;
     const diasAtraso = cobranca.dias_em_atraso || 0;
-    
-    // MODO TESTE: Critérios relaxados para permitir testes manuais
-    // Comentado temporariamente para teste: && valorAtualizado > 5000
-    // Comentado temporariamente para teste: && diasAtraso >= 91
-    
-    // Critérios mínimos para aparecer o botão (para teste):
+
+    // Critérios para habilitar o acionamento jurídico
     return (
       cobranca.status === "em_aberto" &&
-      valorAtualizado > 0 // Qualquer valor para teste
-      // O sistema validará todos os critérios rigorosos no backend
+      valorAtualizado > 5000 &&
+      diasAtraso >= 91
     );
   };
 
   const acionarJuridico = async (cobranca: any) => {
-    const valorAtualizado = cobranca.valor_atualizado || cobranca.valor_original;
-    
+    const valorAtualizado =
+      cobranca.valor_atualizado || cobranca.valor_original;
+
     if (
       !confirm(
         `🚨 ACIONAMENTO JURÍDICO - ${cobranca.cliente}
@@ -744,15 +743,7 @@ Confirma o acionamento jurídico?`
                           <button
                             onClick={() => acionarJuridico(cobranca)}
                             className="text-red-600 hover:text-red-900"
-                            title={`⚠️ MODO TESTE - Acionar Jurídico
-AVISO: Todos os critérios serão validados no backend:
-• Valor mínimo: R$ 5.000 (atual: ${formatarMoeda(cobranca.valor_atualizado || cobranca.valor_original)})
-• 3+ cobranças ignoradas em 15 dias
-• Score de risco = 0
-• Acordo descumprido OU reincidência
-• Status em aberto há 91+ dias
-
-Clique para testar o fluxo completo!`}
+                            title="Acionar Jurídico"
                             disabled={processando}
                           >
                             <Scale className="w-5 h-5" />

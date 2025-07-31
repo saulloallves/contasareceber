@@ -15,7 +15,6 @@ import { GestaoAcordos } from "./components/GestaoAcordos";
 import { ScoreRisco } from "./components/ScoreRisco";
 import { GestaoBloqueios } from "./components/GestaoBloqueios";
 import { PainelJuridico } from "./components/PainelJuridico";
-import { ConfiguracaoWhatsApp } from "./components/ConfiguracaoWhatsApp";
 import { HistoricoEnvios } from "./components/HistoricoEnvios";
 import { ConfiguracaoAdmin } from "./components/ConfiguracaoAdmin";
 import { HistoricoTratativas } from "./components/HistoricoTratativas";
@@ -35,7 +34,6 @@ import { TemplatesJuridicos } from "./components/TemplatesJuridicos";
 import { KanbanCobranca } from "./components/KanbanCobranca";
 import { Layout } from "./components/Layout/Layout";
 import { SimulacaoParcelamento } from "./components/SimulacaoParcelamento";
-import { EmailConfiguration } from "./components/ConfiguracaoEmail";
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -112,8 +110,6 @@ function AppContent() {
         return <ModuloIntegracoes />;
       case "admin":
         return <ConfiguracaoAdmin />;
-      case "config-email":
-        return <EmailConfiguration />;
       case "auditoria":
         return <AuditoriaLogs />;
       case "templates-juridicos":

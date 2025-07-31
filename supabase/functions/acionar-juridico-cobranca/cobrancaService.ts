@@ -107,75 +107,6 @@ export class CobrancaService {
       // Define valor atualizado primeiro
       const valorAtualizado = cobranca.valor_atualizado || cobranca.valor_original;
       
-      // MODO TESTE: Para permitir testes manuais, defina MODO_TESTE=true
-      const MODO_TESTE = Deno.env.get("MODO_TESTE") === "true";
-      console.log("MODO TESTE:", MODO_TESTE);
-      
-      if (MODO_TESTE) {
-        console.log("🧪 MODO TESTE ATIVADO - Pulando validações rigorosas");
-        console.log("⚠️ Apenas para testes - Em produção todos os critérios serão validados");
-        
-        // No modo teste, pula direto para o processamento
-        const diasAtraso = cobranca.dias_em_atraso || 0;
-        const risco = "teste";
-        
-        console.log("Criando registro de escalonamento (MODO TESTE)...");
-        const { error: insertError } = await this.supabase.from("escalonamentos_cobranca").insert({
-          titulo_id: cobranca.id,
-          cnpj_unidade: cobranca.cnpj,
-          motivo_escalonamento: `⚠️ TESTE MANUAL - Acionamento para validação do fluxo`,
-          nivel: "juridico",
-          status: "pendente",
-          valor_total_envolvido: valorAtualizado,
-          quantidade_titulos: 1,
-          observacoes: `🧪 MODO TESTE - Escalonamento manual para validação. Data: ${new Date().toISOString()}`,
-        });
-
-        if (insertError) {
-          console.log("ERRO ao inserir escalonamento:", insertError);
-          return { sucesso: false, mensagem: `Erro ao criar escalonamento: ${insertError.message}` };
-        }
-
-        console.log("Escalonamento criado com sucesso (MODO TESTE)!");
-
-        // Atualiza status da cobrança
-        console.log("Atualizando status da cobrança...");
-        const { error: updateError } = await this.supabase
-          .from("cobrancas_franqueados")
-          .update({ status: "judicial", risco_juridico: risco })
-          .eq("id", cobranca.id);
-
-        if (updateError) {
-          console.log("ERRO ao atualizar cobrança:", updateError);
-        } else {
-          console.log("Status da cobrança atualizado!");
-        }
-
-        // Atualiza status jurídico da unidade
-        if (cobranca.unidades_franqueadas?.id) {
-          console.log("Atualizando status da unidade...");
-          const { error: unidadeUpdateError } = await this.supabase
-            .from("unidades_franqueadas")
-            .update({
-              juridico_status: "acionado",
-              data_ultimo_acionamento: new Date().toISOString(),
-            })
-            .eq("id", cobranca.unidades_franqueadas.id);
-
-          if (unidadeUpdateError) {
-            console.log("ERRO ao atualizar unidade:", unidadeUpdateError);
-          } else {
-            console.log("Status da unidade atualizado!");
-          }
-        }
-
-        console.log("=== SUCESSO (MODO TESTE) ===");
-        return {
-          sucesso: true,
-          mensagem: "🧪 TESTE: Cobrança acionada no jurídico com sucesso! Modo teste ativo - critérios não validados.",
-        };
-      }
-      
       // MODO PRODUÇÃO: Validações rigorosas
       console.log("📋 MODO PRODUÇÃO - Validando todos os critérios rigorosamente");
       
@@ -479,6 +410,14 @@ export class CobrancaService {
     }
 
     try {
+      // Limpa o número e garante o prefixo 55
+      let numeroLimpo = params.number.replace(/\D/g, "");
+      if (!numeroLimpo.startsWith("55")) {
+        numeroLimpo = "55" + numeroLimpo;
+      }
+      
+      console.log(`Preparando para enviar WhatsApp para o número formatado: ${numeroLimpo}`);
+
       const url = `${evolutionApiUrl}/message/sendText/${params.instanceName}`;
       const res = await fetch(url, {
         method: "POST",
@@ -486,18 +425,25 @@ export class CobrancaService {
           "Content-Type": "application/json",
           apikey: evolutionApiKey,
         },
+        // Ajustado para o corpo da requisição conforme a documentação fornecida
         body: JSON.stringify({
-          number: params.number,
-          options: { delay: 1200, presence: "composing" },
-          textMessage: { text: params.text },
+          number: numeroLimpo,
+          textMessage: {
+            text: params.text,
+          },
         }),
       });
 
       if (!res.ok) {
-        console.error("Erro ao enviar WhatsApp:", await res.text());
+        const errorResponse = await res.text();
+        console.error(`Erro ao enviar WhatsApp: Status ${res.status} - ${res.statusText}`);
+        console.error("Resposta da API:", errorResponse);
+      } else {
+        const data = await res.json();
+        console.log("WhatsApp enviado com sucesso:", data);
       }
     } catch (error) {
-      console.error("Erro no serviço de WhatsApp:", error);
+      console.error("Erro fatal no serviço de WhatsApp:", error);
     }
   }
 }

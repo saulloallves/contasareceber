@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Scale,
   FileText,
@@ -37,24 +37,24 @@ export function PainelJuridico() {
   const [itemSelecionado, setItemSelecionado] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
   const [processando, setProcessando] = useState(false);
-  const [estatisticas, setEstatisticas] = useState<EstatisticasJuridico | null>(
-    null
-  );
+  const [estatisticas, setEstatisticas] = useState<EstatisticasJuridico>({
+    total_notificados: 0,
+    total_em_analise: 0,
+    total_resolvidos: 0,
+    valor_total_acionado: 0,
+    taxa_resposta_notificacoes: 0,
+    tempo_medio_resolucao: 0,
+    por_motivo: {},
+    evolucao_mensal: [],
+  });
   const [arquivo, setArquivo] = useState<File | null>(null);
 
-  const juridicoService = new JuridicoService();
+  const juridicoService = useMemo(() => new JuridicoService(), []);
 
-  useEffect(() => {
-    carregarDados();
-  }, [abaSelecionada, filtros]);
-
-  const carregarDados = async () => {
+  const carregarDados = useCallback(async () => {
     setCarregando(true);
     try {
-      const [statsData] = await Promise.all([
-        juridicoService.buscarEstatisticas(),
-      ]);
-
+      const statsData = await juridicoService.buscarEstatisticas();
       setEstatisticas(statsData);
 
       switch (abaSelecionada) {
@@ -82,7 +82,11 @@ export function PainelJuridico() {
     } finally {
       setCarregando(false);
     }
-  };
+  }, [abaSelecionada, filtros, juridicoService]);
+
+  useEffect(() => {
+    carregarDados();
+  }, [carregarDados]);
 
   const abrirModalNotificacao = (unidade?: any) => {
     setItemSelecionado(unidade);
@@ -400,40 +404,38 @@ export function PainelJuridico() {
         </div>
 
         {/* Estatísticas */}
-        {estatisticas && (
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-            <div className="bg-orange-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-orange-600">
-                {estatisticas.total_notificados}
-              </div>
-              <div className="text-sm text-orange-800">Notificados</div>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+          <div className="bg-orange-50 rounded-lg p-4">
+            <div className="text-2xl font-bold text-orange-600">
+              {estatisticas.total_notificados}
             </div>
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-blue-600">
-                {estatisticas.total_em_analise}
-              </div>
-              <div className="text-sm text-blue-800">Em Análise</div>
-            </div>
-            <div className="bg-green-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-green-600">
-                {estatisticas.total_resolvidos}
-              </div>
-              <div className="text-sm text-green-800">Resolvidos</div>
-            </div>
-            <div className="bg-red-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-red-600">
-                {formatarMoeda(estatisticas.valor_total_acionado)}
-              </div>
-              <div className="text-sm text-red-800">Valor Acionado</div>
-            </div>
-            <div className="bg-purple-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-purple-600">
-                {estatisticas.taxa_resposta_notificacoes.toFixed(1)}%
-              </div>
-              <div className="text-sm text-purple-800">Taxa Resposta</div>
-            </div>
+            <div className="text-sm text-orange-800">Notificados</div>
           </div>
-        )}
+          <div className="bg-blue-50 rounded-lg p-4">
+            <div className="text-2xl font-bold text-blue-600">
+              {estatisticas.total_em_analise}
+            </div>
+            <div className="text-sm text-blue-800">Em Análise</div>
+          </div>
+          <div className="bg-green-50 rounded-lg p-4">
+            <div className="text-2xl font-bold text-green-600">
+              {estatisticas.total_resolvidos}
+            </div>
+            <div className="text-sm text-green-800">Resolvidos</div>
+          </div>
+          <div className="bg-red-50 rounded-lg p-4">
+            <div className="text-2xl font-bold text-red-600">
+              {formatarMoeda(estatisticas.valor_total_acionado)}
+            </div>
+            <div className="text-sm text-red-800">Valor Acionado</div>
+          </div>
+          <div className="bg-purple-50 rounded-lg p-4">
+            <div className="text-2xl font-bold text-purple-600">
+              {estatisticas.taxa_resposta_notificacoes.toFixed(1)}%
+            </div>
+            <div className="text-sm text-purple-800">Taxa Resposta</div>
+          </div>
+        </div>
 
         {/* Navegação por abas */}
         <div className="border-b border-gray-200 mb-8">

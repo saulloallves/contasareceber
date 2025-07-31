@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { supabase } from './databaseService';
 import { EscalonamentoCobranca, CriterioEscalonamento, FiltrosEscalonamento, EstatisticasEscalonamento, PontuacaoRisco, EventoRisco, ConfiguracaoRisco, AlertaAtivo, MonitoramentoRisco, GatilhoAutomatico, AcaoPendente, RegistroGatilho, DashboardRiscos } from '../types/escalonamento';
 import { TrativativasService } from './tratativasService';
@@ -455,19 +457,26 @@ export class EscalonamentoService {
       .single();
 
     if (cobranca) {
+      await supabase.from('escalonamentos_cobranca').insert({
+        titulo_id: cobranca.id,
+        cnpj_unidade: unidade.cnpj_unidade,
+        motivo_escalonamento: `Escalonamento automático por risco ${unidade.grau_risco}`,
+        enviado_para: 'juridico@crescieperdi.com',
+        nivel: 'juridico',
+        valor_total_envolvido: unidade.valor_em_risco,
+        quantidade_titulos: 1,
+        status: 'pendente',
+        documento_gerado: false,
+      });
+
+      // Atualiza o status jurídico da unidade para 'notificado'
       await supabase
-        .from('escalonamentos_cobranca')
-        .insert({
-          titulo_id: cobranca.id,
-          cnpj_unidade: unidade.cnpj_unidade,
-          motivo_escalonamento: `Escalonamento automático por risco ${unidade.grau_risco}`,
-          enviado_para: 'juridico@crescieperdi.com',
-          nivel: 'juridico',
-          valor_total_envolvido: unidade.valor_em_risco,
-          quantidade_titulos: 1,
-          status: 'pendente',
-          documento_gerado: false
-        });
+        .from('unidades_franqueadas')
+        .update({
+          juridico_status: 'notificado',
+          data_ultimo_acionamento: new Date().toISOString(),
+        })
+        .eq('codigo_unidade', unidade.cnpj_unidade);
     }
   }
 
