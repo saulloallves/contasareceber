@@ -8,7 +8,8 @@ import { NotificationsDropdown } from "./NotificationsDropdown";
 // Substituir import local por link web
 // import logo from "../../assets/logo-header.png";
 
-const LOGO_URL = "https://raw.githubusercontent.com/saulloallves/contasareceber/refs/heads/main/src/assets/logo-header.png";
+const LOGO_URL =
+  "https://raw.githubusercontent.com/saulloallves/contasareceber/refs/heads/main/src/assets/logo-header.png";
 
 interface HeaderProps {
   user?: {
@@ -61,7 +62,7 @@ export function Header({ user }: HeaderProps) {
       <div className="flex items-center justify-between">
         <div className="flex items-center">
           <h2 className="text-xl font-bold text-[#222222] mt-4">
-            Contas a Receber - 
+            Contas a Receber -
           </h2>
           <img
             src={LOGO_URL}
@@ -71,19 +72,6 @@ export function Header({ user }: HeaderProps) {
         </div>
 
         <div className="flex items-center space-x-2">
-          {/* Theme Toggle */}
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Alternar tema"
-          >
-            {darkMode ? (
-              <Sun className="w-5 h-5" />
-            ) : (
-              <Moon className="w-5 h-5" />
-            )}
-          </button>
-
           {/* Fullscreen Toggle */}
           <button
             onClick={toggleFullscreen}

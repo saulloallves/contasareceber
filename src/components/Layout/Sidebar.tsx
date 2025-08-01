@@ -171,7 +171,7 @@ export function Sidebar({
                 }}
                 className={`w-full flex items-center px-3 py-3 rounded-xl text-left transition-all duration-200 ${
                   isActive
-                    ? "bg-gradient-to-r from-[#ffc31b] to-[#c79800] text-white shadow-lg shadow-yellow-500/25 transform scale-[1.02]"
+                    ? "bg-gradient-to-r from-[#FFC31A] to-[#eeb414] text-white shadow-lg shadow-yellow-500/25 transform scale-[1.02]"
                     : "text-gray-300 hover:bg-gray-800 hover:text-white hover:transform hover:scale-[1.01]"
                 }`}
                 title={collapsed ? item.label : undefined}
@@ -304,7 +304,7 @@ export function Sidebar({
                       }}
                       className={`w-full flex items-center px-3 py-3 rounded-xl text-left transition-all duration-200 ${
                         isActive
-                          ? "bg-gradient-to-r from-[#ffc31b] to-[#fcc300] text-white shadow-lg shadow-yellow-500/25 transform scale-[1.02]"
+                          ? "bg-gradient-to-r from-[#FFC31A] to-[#eeb414] text-white shadow-lg shadow-yellow-500/25 transform scale-[1.02]"
                           : "text-gray-300 hover:bg-gray-800 hover:text-white"
                       }`}
                     >
