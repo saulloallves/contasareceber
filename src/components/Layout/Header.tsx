@@ -102,7 +102,7 @@ export function Header({ user }: HeaderProps) {
               <UserAccountDropdown user={user} />
             ) : (
               <div className="flex items-center space-x-2 text-gray-500">
-                <User className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-full bg-gray-300 animate-pulse"></div>
                 <span className="text-sm">Carregando...</span>
               </div>
             )}

@@ -199,7 +199,7 @@ export function UserAccountDropdown({ user }: UserAccountDropdownProps) {
       </div>
 
       {/* Settings Modal */}
-      {showSettingsModal && user && (
+      {showSettingsModal && (
         <UserSettingsModal
           user={user}
           isOpen={showSettingsModal}

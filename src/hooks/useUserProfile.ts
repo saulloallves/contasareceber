@@ -82,7 +82,7 @@ export function useUserProfile(userEmail?: string) {
   };
 
   const updateAvatar = async (file: File): Promise<string> => {
-    if (!userEmail) {
+    if (!userEmail || !profile) {
       throw new Error('Usuário não autenticado');
     }
 
@@ -96,15 +96,21 @@ export function useUserProfile(userEmail?: string) {
         throw new Error('Arquivo deve ser uma imagem');
       }
 
+      // Busca o user_id do Supabase Auth
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('Usuário não autenticado no Supabase');
+      }
+
       const fileExt = file.name.split('.').pop();
-      const fileName = `${userEmail.replace('@', '_').replace('.', '_')}-${Date.now()}.${fileExt}`;
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
       // Upload para Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(fileName, file, {
           cacheControl: '3600',
-          upsert: false
+          upsert: true
         });
 
       if (uploadError) {
@@ -116,15 +122,24 @@ export function useUserProfile(userEmail?: string) {
         .from('avatars')
         .getPublicUrl(fileName);
 
-      // Atualiza perfil com nova URL
-      await updateProfile({ avatar_url: urlData.publicUrl });
+      const avatarUrl = urlData.publicUrl;
 
-      // Atualiza também no auth metadata
-      await supabase.auth.updateUser({
-        data: { avatar_url: urlData.publicUrl }
-      });
+      // Atualiza perfil na tabela usuarios_sistema se existir
+      if (profile.id) {
+        await updateProfile({ avatar_url: avatarUrl });
+      }
 
-      return urlData.publicUrl;
+      // Atualiza também no auth metadata para sincronização
+      try {
+        await supabase.auth.updateUser({
+          data: { avatar_url: avatarUrl }
+        });
+      } catch (authError) {
+        console.warn('Aviso: Não foi possível atualizar avatar no auth metadata:', authError);
+        // Não falha o processo se não conseguir atualizar o metadata
+      }
+
+      return avatarUrl;
     } catch (err) {
       console.error('Erro ao fazer upload do avatar:', err);
       throw err;

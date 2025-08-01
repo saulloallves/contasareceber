@@ -183,6 +183,9 @@ export function UserSettingsModal({ user, isOpen, onClose }: UserSettingsModalPr
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Reset do input para permitir upload do mesmo arquivo novamente
+    event.target.value = '';
+
     // Validação do arquivo
     if (file.size > 2 * 1024 * 1024) { // 2MB
       setErrors(prev => ({ ...prev, general: 'Imagem deve ter no máximo 2MB' }));
@@ -194,13 +197,24 @@ export function UserSettingsModal({ user, isOpen, onClose }: UserSettingsModalPr
       return;
     }
 
+    // Limpa erros anteriores
+    setErrors(prev => ({ ...prev, general: undefined }));
     setUploadingAvatar(true);
     
     try {
       const avatarUrl = await updateAvatar(file);
       setFormData(prev => ({ ...prev, avatar_url: avatarUrl }));
-      setErrors(prev => ({ ...prev, general: undefined }));
+      
+      // Força refresh da imagem adicionando timestamp
+      const urlWithTimestamp = `${avatarUrl}?t=${Date.now()}`;
+      setFormData(prev => ({ ...prev, avatar_url: urlWithTimestamp }));
+      
+      // Feedback de sucesso
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      
     } catch (error) {
+      console.error('Erro no upload do avatar:', error);
       setErrors(prev => ({ ...prev, general: error instanceof Error ? error.message : 'Erro ao fazer upload da imagem' }));
     } finally {
       setUploadingAvatar(false);
@@ -354,22 +368,29 @@ export function UserSettingsModal({ user, isOpen, onClose }: UserSettingsModalPr
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingAvatar}
-                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors duration-150"
+                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
                     >
                       <Camera className="w-4 h-4 mr-2" />
                       {uploadingAvatar ? 'Enviando...' : 'Alterar Foto'}
                     </button>
                     <p className="text-xs text-gray-500 mt-2">
-                      JPG, PNG ou GIF. Máximo 2MB.
+                      JPG, PNG, GIF ou WebP. Máximo 2MB.
                     </p>
+                    {uploadingAvatar && (
+                      <div className="flex items-center mt-2 text-blue-600">
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <span className="text-sm">Fazendo upload...</span>
+                      </div>
+                    )}
                   </div>
                   
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
                     onChange={handleAvatarUpload}
                     className="hidden"
+                    disabled={uploadingAvatar}
                   />
                 </div>
 
