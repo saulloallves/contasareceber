@@ -557,10 +557,8 @@ export function TemplatesJuridicos() {
                     </li>
                     <li>• Reunião sem comparecimento → Nova notificação</li>
                     <li>• Status "Sem resposta" → Escalonamento jurídico</li>
-                    <li>• Débito &gt; R$ 5.000 → Proposta formal</li>
-                    <li>
-                      • Reincidência (3x/ano) → Template jurídico específico
-                    </li>
+                    <li>• Débito menor que R$ 5.000 → Proposta formal</li>
+                    <li>• Reincidência (3x/ano) → Template jurídico específico</li>
                   </ul>
                 </div>
               </div>

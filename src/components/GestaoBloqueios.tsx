@@ -313,8 +313,8 @@ export function GestaoBloqueios() {
                 🔴 Critérios Principais
               </h4>
               <ul className="space-y-1 text-gray-600">
-                <li>• Valor em aberto &gt; R$ 5.000</li>
-                <li>• Score de risco &lt; 50 pontos</li>
+                <li>• Valor em aberto menor que R$ 5.000</li>
+                <li>• Score de risco maior que 50 pontos</li>
                 <li>• Quebra de acordo anterior</li>
               </ul>
             </div>
