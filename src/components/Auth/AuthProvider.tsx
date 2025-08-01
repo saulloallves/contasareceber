@@ -161,11 +161,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         console.log('🔄 Auth state changed:', event, session?.user?.email);
         
-        // Evita loops desnecessários
-        if (event === 'TOKEN_REFRESHED') {
-          return;
-        }
-        
         setUser(session?.user ?? null);
         
         if (session?.user) {

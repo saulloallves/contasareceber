@@ -15,13 +15,13 @@ export interface UserProfile {
   updated_at?: string;
 }
 
-export function useUserProfile(userEmail?: string) {
+export function useUserProfile(userId?: string) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const loadProfile = async () => {
-    if (!userEmail) {
+    if (!userId) {
       setLoading(false);
       return;
     }
@@ -33,11 +33,11 @@ export function useUserProfile(userEmail?: string) {
       const { data, error: profileError } = await supabase
         .from('usuarios_sistema')
         .select('*')
-        .eq('email', userEmail)
+        .eq('id', userId)
         .maybeSingle();
 
       if (profileError) {
-        console.warn('Perfil não encontrado na tabela usuarios_sistema:', profileError);
+        console.warn('Perfil não encontrado para userId:', userId, profileError);
         // Não falha se não encontrar perfil
         setProfile(null);
         setLoading(false);
@@ -54,7 +54,7 @@ export function useUserProfile(userEmail?: string) {
   };
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
-    if (!userEmail || !profile) {
+    if (!userId || !profile) {
       throw new Error('Usuário não autenticado');
     }
 
@@ -65,7 +65,7 @@ export function useUserProfile(userEmail?: string) {
           ...updates,
           updated_at: new Date().toISOString()
         })
-        .eq('email', userEmail)
+        .eq('id', userId)
         .select()
         .single();
 
@@ -82,7 +82,7 @@ export function useUserProfile(userEmail?: string) {
   };
 
   const updateAvatar = async (file: File): Promise<string> => {
-    if (!userEmail || !profile) {
+    if (!userId) {
       throw new Error('Usuário não autenticado');
     }
 
@@ -96,14 +96,8 @@ export function useUserProfile(userEmail?: string) {
         throw new Error('Arquivo deve ser uma imagem');
       }
 
-      // Busca o user_id do Supabase Auth
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        throw new Error('Usuário não autenticado no Supabase');
-      }
-
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      const fileName = `${userId}/${Date.now()}.${fileExt}`;
 
       // Upload para Supabase Storage
       const { error: uploadError } = await supabase.storage
@@ -172,7 +166,7 @@ export function useUserProfile(userEmail?: string) {
 
   useEffect(() => {
     loadProfile();
-  }, [userEmail]);
+  }, [userId]);
 
   return {
     profile,
