@@ -4,6 +4,7 @@ import {
   Mail, Phone, Camera, Check, X, Loader2 
 } from 'lucide-react';
 import { UserSettingsModal } from './UserSettingsModal';
+import { useAuth } from '../Auth/AuthProvider';
 
 interface UserAccountDropdownProps {
   user: {
@@ -18,7 +19,9 @@ interface UserAccountDropdownProps {
 export function UserAccountDropdown({ user }: UserAccountDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { signOut } = useAuth();
 
   // Fecha dropdown ao clicar fora
   useEffect(() => {
@@ -45,14 +48,14 @@ export function UserAccountDropdown({ user }: UserAccountDropdownProps) {
   }, []);
 
   const handleLogout = async () => {
+    setLoggingOut(true);
+    setIsOpen(false);
     try {
-      const { supabase } = await import('../../lib/supabaseClient');
-      await supabase.auth.signOut();
-      // Não precisa recarregar, o AuthProvider vai lidar com isso
+      await signOut();
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
-      // Fallback: recarrega a página se der erro
-      window.location.reload();
+    } finally {
+      setLoggingOut(false);
     }
   };
 
@@ -82,6 +85,7 @@ export function UserAccountDropdown({ user }: UserAccountDropdownProps) {
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          disabled={loggingOut}
           aria-expanded={isOpen}
           aria-haspopup="true"
         >
@@ -99,7 +103,9 @@ export function UserAccountDropdown({ user }: UserAccountDropdownProps) {
               </div>
             )}
             {/* Status indicator */}
-            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 border-2 border-white rounded-full"></div>
+            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 border-2 border-white rounded-full ${
+              loggingOut ? 'bg-red-400' : 'bg-green-400'
+            }`}></div>
           </div>
 
           {/* User Info - Hidden on mobile */}
@@ -167,30 +173,24 @@ export function UserAccountDropdown({ user }: UserAccountDropdownProps) {
                 </div>
               </button>
 
-              <button
-                onClick={() => {
-                  setShowSettingsModal(true);
-                  setIsOpen(false);
-                }}
-                className="w-full flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-150"
-              >
-                <Edit className="w-4 h-4 mr-3 text-gray-400" />
-                <div className="text-left">
-                  <div className="font-medium">Editar Perfil</div>
-                  <div className="text-xs text-gray-500">Alterar dados pessoais</div>
-                </div>
-              </button>
 
               <div className="border-t border-gray-100 my-2"></div>
 
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors duration-150"
+                disabled={loggingOut}
+                className="w-full flex items-center px-4 py-3 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors duration-150"
               >
-                <LogOut className="w-4 h-4 mr-3" />
+                {loggingOut ? (
+                  <Loader2 className="w-4 h-4 mr-3 animate-spin" />
+                ) : (
+                  <LogOut className="w-4 h-4 mr-3" />
+                )}
                 <div className="text-left">
-                  <div className="font-medium">Sair da Conta</div>
-                  <div className="text-xs text-red-500">Encerrar sessão atual</div>
+                  <div className="font-medium">{loggingOut ? 'Saindo...' : 'Sair da Conta'}</div>
+                  <div className="text-xs text-red-500">
+                    {loggingOut ? 'Encerrando sessão...' : 'Encerrar sessão atual'}
+                  </div>
                 </div>
               </button>
             </div>
