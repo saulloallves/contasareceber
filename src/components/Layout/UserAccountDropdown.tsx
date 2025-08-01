@@ -46,12 +46,13 @@ export function UserAccountDropdown({ user }: UserAccountDropdownProps) {
 
   const handleLogout = async () => {
     try {
-      // Importa dinamicamente para evitar dependência circular
       const { supabase } = await import('../../lib/supabaseClient');
       await supabase.auth.signOut();
-      window.location.reload();
+      // Não precisa recarregar, o AuthProvider vai lidar com isso
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
+      // Fallback: recarrega a página se der erro
+      window.location.reload();
     }
   };
 

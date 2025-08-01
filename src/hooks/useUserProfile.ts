@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 export interface UserProfile {
-  id: string;
+  id?: string;
   nome_completo: string;
   email: string;
   telefone?: string;
   cargo?: string;
   nivel_permissao: string;
   avatar_url?: string;
-  ativo: boolean;
+  ativo?: boolean;
   ultimo_acesso?: string;
   created_at?: string;
   updated_at?: string;

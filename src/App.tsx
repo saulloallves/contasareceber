@@ -36,7 +36,7 @@ import { Layout } from "./components/Layout/Layout";
 import { SimulacaoParcelamento } from "./components/SimulacaoParcelamento";
 
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user, loading, profile } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [cnpjSelecionado, setCnpjSelecionado] = useState("");
 
@@ -44,14 +44,26 @@ function AppContent() {
   const userPermissions = ["admin"]; // Exemplo de permissões
 
   // Mapeia o usuário do Supabase para o formato esperado pelo Header/Layout
-  const mappedUser = user
+  const mappedUser = user && profile
     ? {
-        name: user.user_metadata?.name || user.name || user.email || "Usuário",
-        email: user.email,
-        role: user.user_metadata?.role || user.role || "Admin",
+        name: profile.nome_completo || user.user_metadata?.name || user.email || "Usuário",
+        email: profile.email || user.email || '',
+        role: profile.nivel_permissao || "Admin",
         id: user.id,
+        avatar_url: profile.avatar_url || user.user_metadata?.avatar_url
       }
     : undefined;
+
+  // Debug logs
+  useEffect(() => {
+    console.log('🔍 App State:', { 
+      hasUser: !!user, 
+      hasProfile: !!profile, 
+      loading, 
+      userEmail: user?.email,
+      profileName: profile?.nome_completo 
+    });
+  }, [user, profile, loading]);
 
   // Se ainda está carregando, mostra loading
   if (loading) {
@@ -60,6 +72,9 @@ function AppContent() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Carregando sistema...</p>
+          <p className="text-xs text-gray-400 mt-2">
+            {user ? `Carregando perfil de ${user.email}...` : 'Verificando autenticação...'}
+          </p>
         </div>
       </div>
     );

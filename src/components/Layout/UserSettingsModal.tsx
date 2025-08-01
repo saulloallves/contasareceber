@@ -233,7 +233,7 @@ export function UserSettingsModal({ user, isOpen, onClose }: UserSettingsModalPr
       setTimeout(() => {
         setSuccess(false);
         onClose();
-        window.location.reload(); // Recarrega para atualizar dados na interface
+        // Não precisa recarregar, o AuthProvider vai atualizar automaticamente
       }, 2000);
 
     } catch (error: any) {
