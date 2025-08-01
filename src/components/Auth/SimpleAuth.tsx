@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { LogIn, Shield } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
-import logo from "../../assets/logo-header.png";
+// import logo from "../../assets/logo-header.png";
+const LOGO_URL = "https://raw.githubusercontent.com/saulloallves/contasareceber/refs/heads/main/src/assets/logo-header.png";
 
 interface SimpleAuthProps {
   onAuthSuccess: () => void;
@@ -65,7 +66,7 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
       <div className="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full">
         <div className="text-center mb-8">
           <img
-            src={logo}
+            src={LOGO_URL}
             alt="Logo Cresci e Perdi"
             className="w-32 mx-auto mb-4"
           />

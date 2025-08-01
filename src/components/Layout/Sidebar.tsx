@@ -17,7 +17,10 @@ import {
   CircleDollarSign,
   Calculator,
 } from "lucide-react";
-import logo from "../../assets/favicon.png";
+// Substituir import local por link web
+// import logo from "../../assets/favicon.png";
+
+const FAVICON_URL = "https://raw.githubusercontent.com/saulloallves/contasareceber/refs/heads/main/src/assets/favicon.png";
 
 interface SidebarProps {
   activeTab: string;
@@ -133,7 +136,7 @@ export function Sidebar({
         {!collapsed && (
           <div className="flex items-center">
             <div className="w-12 h-auto rounded-lg flex items-center justify-center shadow-lg">
-              <img src={logo} alt="Logo" className="w-12 h-auto" />
+              <img src={FAVICON_URL} alt="Logo" className="w-12 h-auto" />
             </div>
             <div className="ml-3">
               <h1 className="text-lg font-bold text-white">Cresci e Perdi</h1>
@@ -271,7 +274,7 @@ export function Sidebar({
                       <DollarSign className="w-6 h-6 text-white" />
                   </div> */}
                   <div className="w-10 h-10 rounded-lg flex items-center justify-center shadow-lg">
-                    <img src={logo} alt="Logo" className="w-10 h-10" />
+                    <img src={FAVICON_URL} alt="Logo" className="w-10 h-10" />
                   </div>
                   <div className="ml-3">
                     <h1 className="text-lg font-bold text-white">

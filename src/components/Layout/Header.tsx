@@ -5,7 +5,10 @@ import { useAuth } from "../Auth/AuthProvider";
 import { Alerta } from "../../types/alertas";
 import { alertasService } from "../../services/alertasService";
 import { NotificationsDropdown } from "./NotificationsDropdown";
-import logo from "../../assets/logo-header.png";
+// Substituir import local por link web
+// import logo from "../../assets/logo-header.png";
+
+const LOGO_URL = "https://raw.githubusercontent.com/saulloallves/contasareceber/refs/heads/main/src/assets/logo-header.png";
 
 interface HeaderProps {
   user?: {
@@ -61,7 +64,7 @@ export function Header({ user }: HeaderProps) {
             Contas a Receber - 
           </h2>
           <img
-            src={logo}
+            src={LOGO_URL}
             alt="Logo Cresci e Perdi"
             className="w-20 h-auto ml-1"
           />
