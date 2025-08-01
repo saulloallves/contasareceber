@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useEffect } from "react";
-import { Bell, LogOut, Settings, Maximize, Moon, Sun } from "lucide-react";
+import { Bell, Maximize } from "lucide-react";
 import { useAuth } from "../Auth/AuthProvider";
 import { Alerta } from "../../types/alertas";
 import { alertasService } from "../../services/alertasService";
 import { NotificationsDropdown } from "./NotificationsDropdown";
+import { UserAccountDropdown } from "./UserAccountDropdown";
 // Substituir import local por link web
 // import logo from "../../assets/logo-header.png";
 
@@ -21,11 +22,9 @@ interface HeaderProps {
 }
 
 export function Header({ user }: HeaderProps) {
-  const [darkMode, setDarkMode] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
-  const { signOut } = useAuth();
 
   const fetchAlertas = async () => {
     try {
@@ -50,11 +49,6 @@ export function Header({ user }: HeaderProps) {
       document.exitFullscreen();
       setFullscreen(false);
     }
-  };
-
-  const handleLogout = async () => {
-    await signOut();
-    window.location.reload();
   };
 
   return (
@@ -103,29 +97,9 @@ export function Header({ user }: HeaderProps) {
             />
           )}
 
-          {/* User Menu */}
-          <div className="flex items-center space-x-3 border-l border-gray-200 pl-4">
-            <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">
-                {user?.name || "Usuário"}
-              </p>
-              <p className="text-xs text-gray-500">{user?.role || "Admin"}</p>
-            </div>
-            <div className="flex items-center space-x-1">
-              <button
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Configurações"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleLogout}
-                className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                title="Sair"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
+          {/* User Account Dropdown */}
+          <div className="border-l border-gray-200 pl-4">
+            {user && <UserAccountDropdown user={user} />}
           </div>
         </div>
       </div>
