@@ -9,6 +9,7 @@ import {
   Target, Zap, Eye, RefreshCw, Building2, Mail, Phone, MapPin,
   BarChart3, PieChart as PieChartIcon, Activity, Award
 } from 'lucide-react';
+import { supabase } from '../services/databaseService';
 import { RelatoriosService } from '../services/relatoriosService';
 import { RelatorioMensal, FiltroRelatorio, IndicadorEstrategico, RelatorioDetalhado } from '../types/relatorios';
 
