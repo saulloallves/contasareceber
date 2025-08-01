@@ -7,18 +7,17 @@ import {
   Scale,
   BarChart3,
   Settings,
-  Users,
   ChevronLeft,
   ChevronRight,
   Menu,
   X,
   FileText,
-  Zap,
   Shield,
   Receipt,
   CircleDollarSign,
   Calculator,
 } from "lucide-react";
+import logo from "../../assets/favicon.png";
 
 interface SidebarProps {
   activeTab: string;
@@ -88,13 +87,6 @@ export function Sidebar({
       description: "Agenda e negociações",
     },
     {
-      id: "documentos",
-      label: "Notificações",
-      icon: FileText,
-      permissions: ["admin", "financeiro", "juridico"],
-      description: "Documentos e comunicações",
-    },
-    {
       id: "juridico",
       label: "Jurídico",
       icon: Scale,
@@ -114,34 +106,6 @@ export function Sidebar({
       icon: BarChart3,
       permissions: ["admin", "financeiro", "juridico", "leitura"],
       description: "Análises e indicadores",
-    },
-    {
-      id: "indicadores",
-      label: "Indicadores Estratégicos",
-      icon: BarChart3,
-      permissions: ["admin", "financeiro", "juridico", "leitura"],
-      description: "Métricas e KPIs estratégicos",
-    },
-    {
-      id: "usuarios",
-      label: "Usuários",
-      icon: Users,
-      permissions: ["admin"],
-      description: "Controle de acesso",
-    },
-    {
-      id: "integracoes",
-      label: "Integrações",
-      icon: Zap,
-      permissions: ["admin"],
-      description: "APIs e automações",
-    },
-    {
-      id: "auditoria",
-      label: "Auditoria e Logs",
-      icon: Shield,
-      permissions: ["admin", "juridico"],
-      description: "Rastreamento de ações",
     },
     {
       id: "admin",
@@ -168,8 +132,8 @@ export function Sidebar({
       <div className="flex items-center justify-between p-4 border-b border-gray-700">
         {!collapsed && (
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
-              <DollarSign className="w-6 h-6 text-white" />
+            <div className="w-10 h-auto rounded-lg flex items-center justify-center shadow-lg">
+              <img src={logo} alt="Logo" className="w-10 h-10" />
             </div>
             <div className="ml-3">
               <h1 className="text-lg font-bold text-white">Cresci e Perdi</h1>
@@ -190,7 +154,7 @@ export function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto overflow-x-hidden">
+      <nav className="flex-1 p-3 pt-6 space-y-1 overflow-y-auto overflow-x-hidden">
         {filteredMenuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -204,7 +168,7 @@ export function Sidebar({
                 }}
                 className={`w-full flex items-center px-3 py-3 rounded-xl text-left transition-all duration-200 ${
                   isActive
-                    ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25 transform scale-[1.02]"
+                    ? "bg-gradient-to-r from-[#ffc31b] to-[#c79800] text-white shadow-lg shadow-yellow-500/25 transform scale-[1.02]"
                     : "text-gray-300 hover:bg-gray-800 hover:text-white hover:transform hover:scale-[1.01]"
                 }`}
                 title={collapsed ? item.label : undefined}
@@ -221,7 +185,7 @@ export function Sidebar({
                     <span className="font-medium text-sm block truncate">
                       {item.label}
                     </span>
-                    <span className="text-xs text-gray-400 block truncate">
+                    <span className="text-xs text-white block truncate">
                       {item.description}
                     </span>
                   </div>
@@ -255,8 +219,7 @@ export function Sidebar({
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                 <span>Sistema Online</span>
               </div>
-              <p>© 2025 Cresci e Perdi</p>
-              <p className="mt-1">Versão 1.0.0</p>
+              <p>© 2025 Cresci e Perdi - Versão 1.0.0</p>
             </div>
             <div className="flex items-center justify-center space-x-1 text-xs text-gray-500">
               <Shield className="w-3 h-3" />
@@ -304,8 +267,11 @@ export function Sidebar({
             <div className="bg-gray-900 text-white h-full">
               <div className="flex items-center justify-between p-4 border-b border-gray-700">
                 <div className="flex items-center">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
-                    <DollarSign className="w-6 h-6 text-white" />
+                  {/* <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
+                      <DollarSign className="w-6 h-6 text-white" />
+                  </div> */}
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shadow-lg">
+                    <img src={logo} alt="Logo" className="w-10 h-10" />
                   </div>
                   <div className="ml-3">
                     <h1 className="text-lg font-bold text-white">
@@ -321,7 +287,7 @@ export function Sidebar({
                   <X className="w-5 h-5 text-gray-300" />
                 </button>
               </div>
-              <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+              <nav className="flex-1 p-4 space-y-1 overflow-y-scroll">
                 {filteredMenuItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
@@ -335,7 +301,7 @@ export function Sidebar({
                       }}
                       className={`w-full flex items-center px-3 py-3 rounded-xl text-left transition-all duration-200 ${
                         isActive
-                          ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg"
+                          ? "bg-gradient-to-r from-[#ffc31b] to-[#fcc300] text-white shadow-lg shadow-yellow-500/25 transform scale-[1.02]"
                           : "text-gray-300 hover:bg-gray-800 hover:text-white"
                       }`}
                     >
@@ -350,7 +316,7 @@ export function Sidebar({
                         <span className="font-medium text-sm block truncate">
                           {item.label}
                         </span>
-                        <span className="text-xs text-gray-400 block truncate">
+                        <span className="text-xs text-white block truncate">
                           {item.description}
                         </span>
                       </div>

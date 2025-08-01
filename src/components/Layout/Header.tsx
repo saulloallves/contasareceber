@@ -5,6 +5,7 @@ import { useAuth } from "../Auth/AuthProvider";
 import { Alerta } from "../../types/alertas";
 import { alertasService } from "../../services/alertasService";
 import { NotificationsDropdown } from "./NotificationsDropdown";
+import logo from "../../assets/logo-header.png";
 
 interface HeaderProps {
   user?: {
@@ -53,15 +54,17 @@ export function Header({ user }: HeaderProps) {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
+    <header className="bg-white border-b border-gray-200 px-6 py-2 shadow-sm">
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <h2 className="text-xl font-semibold text-gray-800">
-            Sistema de Cobrança
+        <div className="flex items-center space-x-5">
+          <h2 className="text-xl font-bold text-[#222222] uppercase">
+            Contas a Receber
           </h2>
-          <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
-            Cresci e Perdi
-          </span>
+          <img
+            src={logo}
+            alt="Logo Cresci e Perdi"
+            className="w-12 mx-auto mb-3"
+          />
         </div>
 
         <div className="flex items-center space-x-2">
