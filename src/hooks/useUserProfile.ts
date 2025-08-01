@@ -119,9 +119,7 @@ export function useUserProfile(userId?: string) {
       const avatarUrl = urlData.publicUrl;
 
       // Atualiza perfil na tabela usuarios_sistema se existir
-      if (profile.id) {
-        await updateProfile({ avatar_url: avatarUrl });
-      }
+      await updateProfile({ avatar_url: avatarUrl });
 
       // Atualiza também no auth metadata para sincronização
       try {
