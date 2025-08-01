@@ -3,7 +3,6 @@ import {
   User, Settings, LogOut, ChevronDown, Edit, 
   Mail, Phone, Camera, Check, X, Loader2 
 } from 'lucide-react';
-import { useAuth } from '../Auth/AuthProvider';
 import { UserSettingsModal } from './UserSettingsModal';
 
 interface UserAccountDropdownProps {
@@ -20,7 +19,6 @@ export function UserAccountDropdown({ user }: UserAccountDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const { signOut } = useAuth();
 
   // Fecha dropdown ao clicar fora
   useEffect(() => {
@@ -48,7 +46,9 @@ export function UserAccountDropdown({ user }: UserAccountDropdownProps) {
 
   const handleLogout = async () => {
     try {
-      await signOut();
+      // Importa dinamicamente para evitar dependência circular
+      const { supabase } = await import('../../lib/supabaseClient');
+      await supabase.auth.signOut();
       window.location.reload();
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
@@ -198,7 +198,7 @@ export function UserAccountDropdown({ user }: UserAccountDropdownProps) {
       </div>
 
       {/* Settings Modal */}
-      {showSettingsModal && (
+      {showSettingsModal && user && (
         <UserSettingsModal
           user={user}
           isOpen={showSettingsModal}

@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useEffect } from "react";
 import { Bell, Maximize } from "lucide-react";
-import { useAuth } from "../Auth/AuthProvider";
 import { Alerta } from "../../types/alertas";
 import { alertasService } from "../../services/alertasService";
 import { NotificationsDropdown } from "./NotificationsDropdown";
@@ -99,7 +98,14 @@ export function Header({ user }: HeaderProps) {
 
           {/* User Account Dropdown */}
           <div className="border-l border-gray-200 pl-4">
-            {user && <UserAccountDropdown user={user} />}
+            {user ? (
+              <UserAccountDropdown user={user} />
+            ) : (
+              <div className="flex items-center space-x-2 text-gray-500">
+                <User className="w-5 h-5" />
+                <span className="text-sm">Carregando...</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

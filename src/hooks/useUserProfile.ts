@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { useAuth } from '../components/Auth/AuthProvider';
 
 export interface UserProfile {
   id: string;
@@ -16,14 +15,13 @@ export interface UserProfile {
   updated_at?: string;
 }
 
-export function useUserProfile() {
+export function useUserProfile(userEmail?: string) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
 
   const loadProfile = async () => {
-    if (!user?.email) {
+    if (!userEmail) {
       setLoading(false);
       return;
     }
@@ -35,11 +33,15 @@ export function useUserProfile() {
       const { data, error: profileError } = await supabase
         .from('usuarios_sistema')
         .select('*')
-        .eq('email', user.email)
-        .single();
+        .eq('email', userEmail)
+        .maybeSingle();
 
       if (profileError) {
-        throw new Error(`Erro ao carregar perfil: ${profileError.message}`);
+        console.warn('Perfil não encontrado na tabela usuarios_sistema:', profileError);
+        // Não falha se não encontrar perfil
+        setProfile(null);
+        setLoading(false);
+        return;
       }
 
       setProfile(data);
@@ -52,7 +54,7 @@ export function useUserProfile() {
   };
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
-    if (!user?.email || !profile) {
+    if (!userEmail || !profile) {
       throw new Error('Usuário não autenticado');
     }
 
@@ -63,7 +65,7 @@ export function useUserProfile() {
           ...updates,
           updated_at: new Date().toISOString()
         })
-        .eq('email', user.email)
+        .eq('email', userEmail)
         .select()
         .single();
 
@@ -80,7 +82,7 @@ export function useUserProfile() {
   };
 
   const updateAvatar = async (file: File): Promise<string> => {
-    if (!user?.id) {
+    if (!userEmail) {
       throw new Error('Usuário não autenticado');
     }
 
@@ -95,7 +97,7 @@ export function useUserProfile() {
       }
 
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const fileName = `${userEmail.replace('@', '_').replace('.', '_')}-${Date.now()}.${fileExt}`;
 
       // Upload para Supabase Storage
       const { error: uploadError } = await supabase.storage
@@ -132,14 +134,6 @@ export function useUserProfile() {
   const changePassword = async (currentPassword: string, newPassword: string) => {
     try {
       // Primeiro verifica a senha atual fazendo login
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user?.email || '',
-        password: currentPassword
-      });
-
-      if (signInError) {
-        throw new Error('Senha atual incorreta');
-      }
 
       // Atualiza a senha
       const { error: updateError } = await supabase.auth.updateUser({
@@ -163,7 +157,7 @@ export function useUserProfile() {
 
   useEffect(() => {
     loadProfile();
-  }, [user?.email]);
+  }, [userEmail]);
 
   return {
     profile,

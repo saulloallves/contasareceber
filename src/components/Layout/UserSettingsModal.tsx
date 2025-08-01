@@ -38,7 +38,7 @@ interface FormErrors {
 }
 
 export function UserSettingsModal({ user, isOpen, onClose }: UserSettingsModalProps) {
-  const { profile, updateProfile, updateAvatar, changePassword } = useUserProfile();
+  const { profile, updateProfile, updateAvatar, changePassword } = useUserProfile(user.email);
   const [formData, setFormData] = useState<FormData>({
     name: user.name || '',
     email: user.email || '',
