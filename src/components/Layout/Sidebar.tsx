@@ -132,8 +132,8 @@ export function Sidebar({
       <div className="flex items-center justify-between p-4 border-b border-gray-700">
         {!collapsed && (
           <div className="flex items-center">
-            <div className="w-10 h-auto rounded-lg flex items-center justify-center shadow-lg">
-              <img src={logo} alt="Logo" className="w-10 h-10" />
+            <div className="w-12 h-auto rounded-lg flex items-center justify-center shadow-lg">
+              <img src={logo} alt="Logo" className="w-12 h-auto" />
             </div>
             <div className="ml-3">
               <h1 className="text-lg font-bold text-white">Cresci e Perdi</h1>

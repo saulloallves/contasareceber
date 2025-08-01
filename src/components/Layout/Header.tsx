@@ -54,16 +54,16 @@ export function Header({ user }: HeaderProps) {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-2 shadow-sm">
+    <header className="bg-white border-b border-gray-200 px-6 py-3 shadow-sm">
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-5">
-          <h2 className="text-xl font-bold text-[#222222] uppercase">
-            Contas a Receber
+        <div className="flex items-center">
+          <h2 className="text-xl font-bold text-[#222222] mt-4">
+            Contas a Receber - 
           </h2>
           <img
             src={logo}
             alt="Logo Cresci e Perdi"
-            className="w-12 mx-auto mb-3"
+            className="w-20 h-auto ml-1"
           />
         </div>
 
