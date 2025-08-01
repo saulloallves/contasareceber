@@ -156,16 +156,6 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
       setLoading(false);
     }
   };
-        return;
-      }
-
-      onAuthSuccess();
-    } catch {
-      setError("Erro ao acessar modo demo");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -221,8 +211,7 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
 
           <div className="mt-4 pt-4 border-t border-gray-200 flex items-center gap-4">
             <button
-              type="button"
-              onClick={handleRegularLogin}
+              type="submit"
               disabled={loading}
               className="w-full flex items-center justify-center px-4 py-2 bg-[#ffc31b] text-white rounded-lg hover:bg-[#663912] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
             >
