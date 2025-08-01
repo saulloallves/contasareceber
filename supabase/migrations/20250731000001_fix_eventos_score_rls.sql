@@ -5,7 +5,7 @@
 DROP POLICY IF EXISTS "Admins can view score events" ON eventos_score;
 
 -- Cria nova política que permite INSERT e SELECT para usuários autenticados
-CREATE POLICY "Admins can manage score events" 
+CREATE POLICY IF NOT EXISTS "Admins can manage score events" 
 ON eventos_score 
 FOR ALL 
 TO authenticated 
@@ -13,14 +13,14 @@ USING (true)
 WITH CHECK (true);
 
 -- Também permite para funções do sistema (quando executadas por triggers)
-CREATE POLICY "System can insert score events" 
+CREATE POLICY IF NOT EXISTS "System can insert score events" 
 ON eventos_score 
 FOR INSERT 
 TO anon 
 WITH CHECK (true);
 
 -- Política para aplicações/serviços
-CREATE POLICY "Service role can manage score events" 
+CREATE POLICY IF NOT EXISTS "Service role can manage score events" 
 ON eventos_score 
 FOR ALL 
 TO service_role 
