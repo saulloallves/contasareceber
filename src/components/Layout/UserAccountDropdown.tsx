@@ -52,8 +52,11 @@ export function UserAccountDropdown({ user }: UserAccountDropdownProps) {
     setIsOpen(false);
     try {
       await signOut();
+      // Força redirecionamento após logout bem-sucedido
+      window.location.href = '/';
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
+      alert('Erro ao fazer logout. Tente novamente.');
     } finally {
       setLoggingOut(false);
     }

@@ -32,6 +32,14 @@ import { GestaoUsuarios } from "./components/Usuarios/GestaoUsuarios";
 import { AuditoriaLogs } from "./components/AuditoriaLogs";
 import { TemplatesJuridicos } from "./components/TemplatesJuridicos";
 import { KanbanCobranca } from "./components/KanbanCobranca";
+        // Se é um evento de logout, limpa tudo imediatamente
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          return;
+        }
+        
 import { Layout } from "./components/Layout/Layout";
 import { SimulacaoParcelamento } from "./components/SimulacaoParcelamento";
 
@@ -51,6 +59,11 @@ function AppContent() {
         role: profile.nivel_permissao || "Admin",
         id: user.id,
         avatar_url: profile.avatar_url || user.user_metadata?.avatar_url
+        
+        // Só define loading como false após processar tudo
+        if (mounted) {
+          setLoading(false);
+        }
       }
     : undefined;
 
@@ -72,9 +85,11 @@ function AppContent() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Carregando sistema...</p>
-          <p className="text-xs text-gray-400 mt-2">
-            {user ? `Carregando perfil de ${user.email}...` : 'Verificando autenticação...'}
-          </p>
+          {user && (
+            <p className="text-xs text-gray-400 mt-2">
+              Carregando perfil de {user.email}...
+            </p>
+          )}
         </div>
       </div>
     );
