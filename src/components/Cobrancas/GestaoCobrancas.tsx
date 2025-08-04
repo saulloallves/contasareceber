@@ -269,9 +269,7 @@ export function GestaoCobrancas() {
       if (resultadoImportacao.sucesso) {
         // Verificação de segurança para o ID da importação
         if (resultadoImportacao.importacao_id) {
-          await cobrancaService.verificarAcionamentoJuridico(
-            resultadoImportacao.importacao_id
-          );
+          await cobrancaService.verificarAcionamentoJuridico();
         }
         // Uso de optional chaining para segurança!
         const sucessoMsg = `Planilha processada com sucesso! ${
