@@ -561,10 +561,15 @@ export class CobrancaService {
 
       if (error) {
         // Se o erro for relacionado ao RLS da tabela eventos_score, apenas loga e tenta novamente
-        if (error.message?.includes("eventos_score") || 
-            error.message?.includes("row-level security")) {
-          console.warn("Aviso: Problema com registro de score detectado:", error.message);
-          
+        if (
+          error.message?.includes("eventos_score") ||
+          error.message?.includes("row-level security")
+        ) {
+          console.warn(
+            "Aviso: Problema com registro de score detectado:",
+            error.message
+          );
+
           // Tenta novamente apenas os dados essenciais, sem os que podem triggerar o erro
           const { data: dataRetry, error: errorRetry } = await supabase
             .from("cobrancas_franqueados")
@@ -575,11 +580,13 @@ export class CobrancaService {
             .eq("id", id)
             .select()
             .single();
-            
+
           if (errorRetry && !errorRetry.message?.includes("eventos_score")) {
-            throw new Error(`Erro ao atualizar cobrança: ${errorRetry.message}`);
+            throw new Error(
+              `Erro ao atualizar cobrança: ${errorRetry.message}`
+            );
           }
-          
+
           return dataRetry || null;
         } else {
           throw new Error(`Erro ao atualizar cobrança: ${error.message}`);
@@ -737,7 +744,8 @@ export class CobrancaService {
       // Busca dados da cobrança
       const { data: cobranca, error: errorBusca } = await supabase
         .from("cobrancas_franqueados")
-        .select(`
+        .select(
+          `
           *,
           unidades_franqueadas (
             id,
@@ -746,48 +754,57 @@ export class CobrancaService {
             email_franqueado,
             telefone_franqueado
           )
-        `)
+        `
+        )
         .eq("id", cobrancaId)
         .single();
 
       if (errorBusca || !cobranca) {
         return {
           sucesso: false,
-          mensagem: "Cobrança não encontrada"
+          mensagem: "Cobrança não encontrada",
         };
       }
 
       // Determina se é quitação total ou parcial
-      const valorOriginal = cobranca.valor_atualizado || cobranca.valor_original;
+      const valorOriginal =
+        cobranca.valor_atualizado || cobranca.valor_original;
       const valorJaPago = cobranca.valor_recebido || 0;
       const valorTotalPago = valorJaPago + valorPago;
       const isQuitacaoTotal = valorTotalPago >= valorOriginal;
       const valorRestante = valorOriginal - valorTotalPago;
-      
+
       // Define novo status
       const novoStatus = isQuitacaoTotal ? "quitado" : "pagamento_parcial";
-      
+
       // Atualiza a cobrança
       const { error: errorUpdate } = await supabase
         .from("cobrancas_franqueados")
         .update({
           status: novoStatus,
           valor_recebido: valorTotalPago,
-          data_ultima_atualizacao: dataRecebimento || new Date().toISOString()
+          data_ultima_atualizacao: dataRecebimento || new Date().toISOString(),
         })
         .eq("id", cobrancaId);
 
       if (errorUpdate) {
         // Se o erro for relacionado ao RLS da tabela eventos_score, apenas loga e continua
-        if (errorUpdate.message?.includes("eventos_score") || 
-            errorUpdate.message?.includes("row-level security")) {
-          console.warn("Aviso: Não foi possível registrar evento de score devido a políticas RLS:", errorUpdate.message);
-          console.info("A quitação foi processada com sucesso, apenas o registro de score foi pulado.");
+        if (
+          errorUpdate.message?.includes("eventos_score") ||
+          errorUpdate.message?.includes("row-level security")
+        ) {
+          console.warn(
+            "Aviso: Não foi possível registrar evento de score devido a políticas RLS:",
+            errorUpdate.message
+          );
+          console.info(
+            "A quitação foi processada com sucesso, apenas o registro de score foi pulado."
+          );
           // Não retorna erro, continua o processo normalmente
         } else {
           return {
             sucesso: false,
-            mensagem: `Erro ao atualizar cobrança: ${errorUpdate.message}`
+            mensagem: `Erro ao atualizar cobrança: ${errorUpdate.message}`,
           };
         }
       }
@@ -795,11 +812,17 @@ export class CobrancaService {
       // Registra tratativa
       await supabase.from("tratativas_cobranca").insert({
         titulo_id: cobrancaId,
-        tipo_interacao: isQuitacaoTotal ? 'marcado_como_quitado' : 'pagamento_parcial',
-        canal: 'interno',
+        tipo_interacao: isQuitacaoTotal
+          ? "marcado_como_quitado"
+          : "pagamento_parcial",
+        canal: "interno",
         usuario_sistema: usuario,
-        descricao: `${isQuitacaoTotal ? 'Quitação total' : 'Pagamento parcial'}: R$ ${valorPago.toFixed(2)} via ${formaPagamento}. ${observacoes || ''}`,
-        status_cobranca_resultante: novoStatus
+        descricao: `${
+          isQuitacaoTotal ? "Quitação total" : "Pagamento parcial"
+        }: R$ ${valorPago.toFixed(2)} via ${formaPagamento}. ${
+          observacoes || ""
+        }`,
+        status_cobranca_resultante: novoStatus,
       });
 
       if (isQuitacaoTotal) {
@@ -848,7 +871,7 @@ export class CobrancaService {
             await evolutionApiService.sendTextMessage({
               instanceName: "automacoes_backup",
               number: unidade.telefone_franqueado,
-              text: mensagemQuitacao
+              text: mensagemQuitacao,
             });
 
             // Registra envio da mensagem
@@ -859,11 +882,13 @@ export class CobrancaService {
               telefone: unidade.telefone_franqueado,
               mensagem_enviada: mensagemQuitacao,
               status_envio: "sucesso",
-              referencia_importacao: "QUITACAO_AUTOMATICA"
+              referencia_importacao: "QUITACAO_AUTOMATICA",
             });
-
           } catch (errorWhatsApp) {
-            console.error("Erro ao enviar WhatsApp de quitação:", errorWhatsApp);
+            console.error(
+              "Erro ao enviar WhatsApp de quitação:",
+              errorWhatsApp
+            );
             // Não falha o processo por erro no WhatsApp
           }
         }
@@ -871,18 +896,21 @@ export class CobrancaService {
 
       return {
         sucesso: true,
-        mensagem: isQuitacaoTotal 
+        mensagem: isQuitacaoTotal
           ? "Cobrança quitada com sucesso! Processo encerrado e confirmação enviada."
-          : `Pagamento parcial registrado: R$ ${valorPago.toFixed(2)}. Restante: R$ ${valorRestante.toFixed(2)}`,
+          : `Pagamento parcial registrado: R$ ${valorPago.toFixed(
+              2
+            )}. Restante: R$ ${valorRestante.toFixed(2)}`,
         isQuitacaoTotal,
-        valorRestante: isQuitacaoTotal ? 0 : valorRestante
+        valorRestante: isQuitacaoTotal ? 0 : valorRestante,
       };
-
     } catch (error) {
       console.error("Erro ao quitar cobrança:", error);
       return {
         sucesso: false,
-        mensagem: `Erro interno: ${error instanceof Error ? error.message : String(error)}`
+        mensagem: `Erro interno: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       };
     }
   }
@@ -897,11 +925,11 @@ export class CobrancaService {
     formaPagamento: string
   ): string {
     const dataAtual = new Date().toLocaleDateString("pt-BR");
-    const horaAtual = new Date().toLocaleTimeString("pt-BR", { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    const horaAtual = new Date().toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
     });
-    
+
     return `🎉 *QUITAÇÃO CONFIRMADA* 🎉
 
 Prezado(a) ${unidade.nome_franqueado || cobranca.cliente},
@@ -909,7 +937,7 @@ Prezado(a) ${unidade.nome_franqueado || cobranca.cliente},
 Confirmamos o recebimento do pagamento da sua unidade ${unidade.codigo_unidade}.
 
 📋 *DETALHES:*
-• Valor Pago: R$ ${valorPago.toFixed(2).replace('.', ',')}
+• Valor Pago: R$ ${valorPago.toFixed(2).replace(".", ",")}
 • Forma: ${formaPagamento}
 • Data: ${dataAtual} às ${horaAtual}
 • Status: ✅ QUITADO
@@ -1058,6 +1086,367 @@ _Cresci e Perdi - Franquias_`;
     } catch (error) {
       console.error("Erro ao acionar jurídico individual:", error);
       return { sucesso: false, mensagem: "Erro ao acionar jurídico." };
+    }
+  }
+
+  /**
+   * Registra log de envio de WhatsApp na tabela unificada
+   */
+  async registrarLogEnvioWhatsapp(dados: {
+    cobrancaId: string;
+    tipo: "amigavel" | "juridico" | "parcelamento";
+    numero: string;
+    mensagem: string;
+    usuario?: string;
+  }): Promise<{ sucesso: boolean; mensagem: string }> {
+    try {
+      const { error } = await supabase
+        .from("historico_envios_completo")
+        .insert({
+          cobranca_id: dados.cobrancaId,
+          tipo_envio: `whatsapp_${dados.tipo}`,
+          canal: "whatsapp",
+          destinatario: dados.numero,
+          mensagem: dados.mensagem,
+          usuario: dados.usuario || "Sistema",
+          status_envio: "sucesso",
+          metadados: {
+            canal_original: "whatsapp",
+            instance: "automacoes_backup",
+          },
+        });
+
+      if (error) {
+        console.warn(
+          "Aviso: Não foi possível registrar log devido a políticas RLS:",
+          error
+        );
+        // Fallback para tabela antiga se a nova falhar
+        await supabase.from("envios_mensagem").insert({
+          titulo_id: dados.cobrancaId,
+          tipo_envio: `whatsapp_${dados.tipo}`,
+          mensagem_enviada: dados.mensagem,
+          status_envio: "sucesso",
+          erro_detalhes: `Enviado via WhatsApp para ${dados.numero} por ${
+            dados.usuario || "Sistema"
+          }`,
+        });
+
+        return {
+          sucesso: true,
+          mensagem: "Envio realizado com sucesso (log fallback).",
+        };
+      }
+
+      return {
+        sucesso: true,
+        mensagem: "Log de envio registrado com sucesso.",
+      };
+    } catch (error) {
+      console.error("Erro ao registrar log de envio WhatsApp:", error);
+      // Não falha o processo principal
+      return {
+        sucesso: true,
+        mensagem: "Envio realizado com sucesso (erro no log).",
+      };
+    }
+  }
+
+  /**
+   * Registra log de envio de email na tabela unificada
+   */
+  async registrarLogEnvioEmail(dados: {
+    cobrancaId: string;
+    tipo:
+      | "proposta_parcelamento"
+      | "cobranca_padrao"
+      | "cobranca_formal"
+      | "cobranca_urgente"
+      | "notificacao_extrajudicial";
+    destinatario: string;
+    assunto: string;
+    mensagem: string;
+    usuario?: string;
+    metadados?: any;
+  }): Promise<{ sucesso: boolean; mensagem: string }> {
+    try {
+      const { error } = await supabase
+        .from("historico_envios_completo")
+        .insert({
+          cobranca_id: dados.cobrancaId,
+          tipo_envio: `email_${dados.tipo}`,
+          canal: "email",
+          destinatario: dados.destinatario,
+          assunto: dados.assunto,
+          mensagem: dados.mensagem,
+          usuario: dados.usuario || "Sistema",
+          status_envio: "sucesso",
+          metadados: dados.metadados || {},
+        });
+
+      if (error) {
+        console.warn("Aviso: Não foi possível registrar log de email:", error);
+        return {
+          sucesso: true,
+          mensagem: "Email enviado com sucesso (log não registrado).",
+        };
+      }
+
+      return {
+        sucesso: true,
+        mensagem: "Log de email registrado com sucesso.",
+      };
+    } catch (error) {
+      console.error("Erro ao registrar log de email:", error);
+      return {
+        sucesso: true,
+        mensagem: "Email enviado com sucesso (erro no log).",
+      };
+    }
+  }
+
+  /**
+   * Registra log de escalonamento jurídico na tabela unificada
+   */
+  async registrarLogEscalonamentoJuridico(dados: {
+    cobrancaId: string;
+    destinatarioEmail: string;
+    destinatarioWhatsapp?: string;
+    mensagemEmail: string;
+    mensagemWhatsapp?: string;
+    usuario?: string;
+    metadados?: any;
+  }): Promise<{ sucesso: boolean; mensagem: string }> {
+    try {
+      const registros = [];
+
+      // Registro do email extrajudicial
+      registros.push({
+        cobranca_id: dados.cobrancaId,
+        tipo_envio: "email_notificacao_extrajudicial",
+        canal: "email",
+        destinatario: dados.destinatarioEmail,
+        assunto: "🚨 NOTIFICAÇÃO EXTRAJUDICIAL - Acionamento Jurídico",
+        mensagem: dados.mensagemEmail,
+        usuario: dados.usuario || "Sistema",
+        status_envio: "sucesso",
+        metadados: {
+          ...(dados.metadados || {}),
+          escalonamento_juridico: true,
+          notificacao_extrajudicial: true,
+        },
+      });
+
+      // Registro do WhatsApp se houver
+      if (dados.destinatarioWhatsapp && dados.mensagemWhatsapp) {
+        registros.push({
+          cobranca_id: dados.cobrancaId,
+          tipo_envio: "whatsapp_juridico",
+          canal: "whatsapp",
+          destinatario: dados.destinatarioWhatsapp,
+          mensagem: dados.mensagemWhatsapp,
+          usuario: dados.usuario || "Sistema",
+          status_envio: "sucesso",
+          metadados: {
+            ...(dados.metadados || {}),
+            escalonamento_juridico: true,
+            notificacao_extrajudicial: true,
+          },
+        });
+      }
+
+      // Registro geral do escalonamento
+      registros.push({
+        cobranca_id: dados.cobrancaId,
+        tipo_envio: "sistema_escalonamento_juridico",
+        canal: "sistema",
+        destinatario: "Sistema Jurídico",
+        mensagem: `Cobrança escalonada para o jurídico. Notificação extrajudicial enviada para ${dados.destinatarioEmail}`,
+        usuario: dados.usuario || "Sistema",
+        status_envio: "sucesso",
+        metadados: {
+          ...(dados.metadados || {}),
+          escalonamento_juridico: true,
+          email_enviado: dados.destinatarioEmail,
+          whatsapp_enviado: dados.destinatarioWhatsapp || null,
+        },
+      });
+
+      const { error } = await supabase
+        .from("historico_envios_completo")
+        .insert(registros);
+
+      if (error) {
+        console.warn(
+          "Aviso: Não foi possível registrar log de escalonamento:",
+          error
+        );
+        return {
+          sucesso: true,
+          mensagem: "Escalonamento realizado com sucesso (log não registrado).",
+        };
+      }
+
+      return {
+        sucesso: true,
+        mensagem: "Log de escalonamento jurídico registrado com sucesso.",
+      };
+    } catch (error) {
+      console.error("Erro ao registrar log de escalonamento:", error);
+      return {
+        sucesso: true,
+        mensagem: "Escalonamento realizado com sucesso (erro no log).",
+      };
+    }
+  }
+
+  /**
+   * Busca histórico completo de envios (WhatsApp, Email, Sistema) para uma cobrança
+   */
+  async buscarHistoricoEnvios(cobrancaId: string): Promise<any[]> {
+    try {
+      // Primeiro tenta buscar da nova tabela unificada
+      const { data: historicoCompleto, error: errorCompleto } = await supabase
+        .from("historico_envios_completo")
+        .select("*")
+        .eq("cobranca_id", cobrancaId)
+        .order("data_envio", { ascending: false });
+
+      if (!errorCompleto && historicoCompleto && historicoCompleto.length > 0) {
+        // Formatar dados da nova tabela para exibição
+        return historicoCompleto.map((item) => ({
+          id: item.id,
+          tipo: item.tipo_envio,
+          canal:
+            item.canal === "whatsapp"
+              ? "WhatsApp"
+              : item.canal === "email"
+              ? "Email"
+              : "Sistema",
+          destinatario: item.destinatario,
+          assunto: item.assunto,
+          mensagem: item.mensagem,
+          usuario: item.usuario,
+          status: item.status_envio,
+          data: item.data_envio,
+          numero_telefone: item.canal === "whatsapp" ? item.destinatario : null,
+          erro_detalhes: item.erro_detalhes,
+          metadados: item.metadados || {},
+          // Campos para compatibilidade com interface existente
+          tipo_envio: item.tipo_envio,
+          mensagem_enviada: item.mensagem,
+          status_envio: item.status_envio,
+          data_envio: item.data_envio,
+        }));
+      }
+
+      // Fallback para tabelas antigas se a nova não existir ou estiver vazia
+      console.warn("Usando fallback para tabelas antigas de envios");
+      
+      // Busca dados da cobrança para identificar unidade e emails relacionados
+      const { data: cobranca } = await supabase
+        .from("cobrancas_franqueados")
+        .select(`
+          *,
+          unidades_franqueadas!unidade_id_fk (
+            codigo_unidade,
+            email_franqueado
+          )
+        `)
+        .eq("id", cobrancaId)
+        .single();
+
+      // Busca logs de WhatsApp/Sistema da tabela envios_mensagem
+      const { data: logsEnvios, error: errorEnvios } = await supabase
+        .from("envios_mensagem")
+        .select("*")
+        .eq("titulo_id", cobrancaId)
+        .order("data_envio", { ascending: false });
+
+      if (errorEnvios) {
+        console.warn(
+          "Aviso: Não foi possível buscar logs de envios devido a políticas RLS:",
+          errorEnvios
+        );
+      }
+
+      // Busca logs de email da tabela logs_envio_email
+      let logsEmail: any[] = [];
+      if (cobranca?.unidades_franqueadas?.email_franqueado) {
+        const { data: emailLogs, error: errorEmail } = await supabase
+          .from("logs_envio_email")
+          .select("*")
+          .eq("destinatario", cobranca.unidades_franqueadas.email_franqueado)
+          .order("data_envio", { ascending: false });
+
+        if (!errorEmail && emailLogs) {
+          logsEmail = emailLogs;
+        } else if (errorEmail) {
+          console.warn("Aviso: Não foi possível buscar logs de email:", errorEmail);
+        }
+      }
+
+      // Combina e organiza todos os logs
+      const historico = [
+        // Logs de WhatsApp/Sistema da tabela envios_mensagem
+        ...(logsEnvios || []).map((log) => ({
+          ...log,
+          canal: log.tipo_envio?.startsWith("whatsapp_")
+            ? "WhatsApp"
+            : "Sistema",
+          data: log.data_envio,
+          tipo: log.tipo_envio?.replace("whatsapp_", "") || log.tipo_envio,
+          mensagem: log.mensagem_enviada,
+          numero_telefone: log.erro_detalhes?.includes("WhatsApp para")
+            ? log.erro_detalhes.split("WhatsApp para ")[1]?.split(" ")[0]
+            : null,
+          destinatario: log.erro_detalhes,
+          usuario: log.erro_detalhes?.includes(" por ")
+            ? log.erro_detalhes.split(" por ")[1]
+            : "Sistema",
+          status: log.status_envio,
+        })),
+        
+        // Logs de Email da tabela logs_envio_email
+        ...logsEmail.map((log) => {
+          // Determina o tipo baseado no assunto
+          let tipoEmail = "email_generico";
+          if (log.assunto?.includes("Proposta de Parcelamento")) {
+            tipoEmail = "email_proposta_parcelamento";
+          } else if (log.assunto?.includes("NOTIFICAÇÃO EXTRAJUDICIAL") || log.assunto?.includes("Acionamento Jurídico")) {
+            tipoEmail = "email_escalonamento_juridico";
+          } else if (log.assunto?.includes("URGENTE") || log.assunto?.includes("Débito Vencido")) {
+            tipoEmail = "email_cobranca_urgente";
+          }
+
+          return {
+            id: log.id,
+            canal: "Email",
+            data: log.data_envio,
+            tipo: tipoEmail,
+            destinatario: log.destinatario,
+            assunto: log.assunto,
+            mensagem: log.assunto, // Usa assunto como mensagem para compatibilidade
+            usuario: "Sistema",
+            status: log.sucesso ? "sucesso" : "erro",
+            erro_detalhes: log.erro_detalhes,
+            message_id: log.message_id,
+            // Campos para compatibilidade com interface existente
+            tipo_envio: tipoEmail,
+            mensagem_enviada: log.assunto,
+            status_envio: log.sucesso ? "sucesso" : "erro",
+            data_envio: log.data_envio,
+          };
+        }),
+      ];
+
+      // Ordena por data decrescente
+      return historico.sort(
+        (a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()
+      );
+    } catch (error) {
+      console.error("Erro ao buscar histórico de envios:", error);
+      return []; // Retorna array vazio ao invés de falhar
     }
   }
 }

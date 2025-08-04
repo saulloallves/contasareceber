@@ -197,6 +197,7 @@ Setor Jurídico – Cresci e Perdi`;
   const corpoHtml = corpoTexto.trim().split("\n\n").map((p)=>`<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
   // Mensagem para WhatsApp (mais curta)
   const mensagemWhatsApp = `NOTIFICAÇÃO EXTRAJUDICIAL: A cobrança de ${valorFormatado} para a unidade ${unidade.codigo_unidade} foi escalonada para o jurídico. Motivo: ${motivosDetalhados}. Prazo para regularização: 5 dias úteis.`;
+  
   await enviarEmail(supabase, {
     destinatario: unidade.email_franqueado,
     nome_destinatario: unidade.nome_franqueado,
@@ -204,11 +205,93 @@ Setor Jurídico – Cresci e Perdi`;
     corpo_html: corpoHtml,
     corpo_texto: corpoTexto.trim()
   });
+  
   await enviarWhatsApp({
     instanceName: "automacoes_backup",
     number: unidade.telefone_franqueado,
     text: mensagemWhatsApp
   });
+
+  // 4. Registra no histórico unificado de envios
+  console.log("Registrando no histórico unificado...");
+  try {
+    const registrosHistorico = [];
+
+    // Registro do email extrajudicial
+    registrosHistorico.push({
+      cobranca_id: cobranca.id,
+      tipo_envio: "email_notificacao_extrajudicial",
+      canal: "email",
+      destinatario: unidade.email_franqueado,
+      assunto: `🚨 NOTIFICAÇÃO EXTRAJUDICIAL - Acionamento Jurídico - Unidade ${unidade.codigo_unidade}`,
+      mensagem: corpoTexto.trim(),
+      usuario: "Sistema (Edge Function)",
+      status_envio: "sucesso",
+      metadados: {
+        valor_cobrado: valorAtualizado,
+        dias_atraso: diasAtraso,
+        codigo_unidade: unidade.codigo_unidade,
+        escalonamento_juridico: true,
+        notificacao_extrajudicial: true,
+        motivos: motivosDetalhados
+      }
+    });
+
+    // Registro do WhatsApp
+    if (unidade.telefone_franqueado) {
+      registrosHistorico.push({
+        cobranca_id: cobranca.id,
+        tipo_envio: "whatsapp_juridico",
+        canal: "whatsapp",
+        destinatario: unidade.telefone_franqueado,
+        mensagem: mensagemWhatsApp,
+        usuario: "Sistema (Edge Function)",
+        status_envio: "sucesso",
+        metadados: {
+          valor_cobrado: valorAtualizado,
+          dias_atraso: diasAtraso,
+          codigo_unidade: unidade.codigo_unidade,
+          escalonamento_juridico: true,
+          notificacao_extrajudicial: true,
+          motivos: motivosDetalhados
+        }
+      });
+    }
+
+    // Registro geral do escalonamento
+    registrosHistorico.push({
+      cobranca_id: cobranca.id,
+      tipo_envio: "sistema_escalonamento_juridico",
+      canal: "sistema",
+      destinatario: "Sistema Jurídico",
+      mensagem: `Cobrança ID ${cobranca.id} escalonada para o jurídico. Notificação extrajudicial enviada para ${unidade.email_franqueado}${unidade.telefone_franqueado ? ` e WhatsApp para ${unidade.telefone_franqueado}` : ""}`,
+      usuario: "Sistema (Edge Function)",
+      status_envio: "sucesso",
+      metadados: {
+        valor_cobrado: valorAtualizado,
+        dias_atraso: diasAtraso,
+        codigo_unidade: unidade.codigo_unidade,
+        escalonamento_juridico: true,
+        email_enviado: unidade.email_franqueado,
+        whatsapp_enviado: unidade.telefone_franqueado || null,
+        motivos_acionamento: motivosDetalhados
+      }
+    });
+
+    const { error: errorHistorico } = await supabase
+      .from("historico_envios_completo")
+      .insert(registrosHistorico);
+
+    if (errorHistorico) {
+      console.warn("Aviso: Não foi possível registrar no histórico:", errorHistorico);
+      // Não falha o processo, apenas registra o aviso
+    } else {
+      console.log("Histórico registrado com sucesso!");
+    }
+  } catch (historicoError) {
+    console.warn("Erro ao registrar histórico:", historicoError);
+    // Não falha o processo principal
+  }
   // 4. Registra log de auditoria
   console.log("Registrando log de auditoria...");
   await supabase.from("auditoria_logs").insert({

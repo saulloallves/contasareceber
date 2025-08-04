@@ -120,7 +120,32 @@ export class EmailService {
       corpo_texto: template.corpo_texto,
     };
 
-    return this.enviarEmail(dadosEmail);
+    const resultado = await this.enviarEmail(dadosEmail);
+
+    // Registra o log se o envio foi bem-sucedido
+    if (resultado.sucesso && dadosCobranca.id) {
+      try {
+        const { cobrancaService } = await import('./cobrancaService');
+        await cobrancaService.registrarLogEnvioEmail({
+          cobrancaId: dadosCobranca.id,
+          tipo: "proposta_parcelamento",
+          destinatario: destinatario,
+          assunto: template.assunto,
+          mensagem: template.corpo_texto,
+          usuario: "Sistema",
+          metadados: {
+            valor_original: simulacao.valor_original,
+            valor_parcelamento: simulacao.valor_total_parcelamento,
+            quantidade_parcelas: simulacao.quantidade_parcelas,
+            codigo_unidade: dadosUnidade.codigo_unidade
+          }
+        });
+      } catch (logError) {
+        console.warn("Erro ao registrar log de proposta de parcelamento:", logError);
+      }
+    }
+
+    return resultado;
   }
 
   /**
@@ -168,7 +193,33 @@ export class EmailService {
       corpo_texto: template.corpo_texto,
     };
 
-    return this.enviarEmail(dadosEmail);
+    const resultado = await this.enviarEmail(dadosEmail);
+
+    // Registra o log se o envio foi bem-sucedido
+    if (resultado.sucesso && dadosCobranca.id) {
+      try {
+        const { cobrancaService } = await import('./cobrancaService');
+        const tipoEnvio = tipoTemplate === "personalizada" ? "cobranca_padrao" : `cobranca_${tipoTemplate}`;
+        await cobrancaService.registrarLogEnvioEmail({
+          cobrancaId: dadosCobranca.id,
+          tipo: tipoEnvio as any,
+          destinatario: destinatario,
+          assunto: template.assunto,
+          mensagem: template.corpo_texto,
+          usuario: "Sistema",
+          metadados: {
+            valor_original: dadosCobranca.valor_original,
+            valor_atualizado: dadosCobranca.valor_atualizado,
+            dias_atraso: dadosCobranca.dias_em_atraso,
+            codigo_unidade: dadosUnidade.codigo_unidade
+          }
+        });
+      } catch (logError) {
+        console.warn("Erro ao registrar log de cobrança por email:", logError);
+      }
+    }
+
+    return resultado;
   }
 
   /**

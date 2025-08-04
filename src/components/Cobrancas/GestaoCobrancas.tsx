@@ -1,12 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Plus,
   Edit,
   Eye,
   Upload,
-  MessageSquare,
   Receipt,
   CheckCircle,
   XCircle,
@@ -18,9 +17,11 @@ import {
   ArrowDown,
   AlertTriangle,
   Info,
+  MessageCircle,
 } from "lucide-react";
 import { CobrancaFranqueado } from "../../types/cobranca";
 import { cobrancaService } from "../../services/cobrancaService";
+import { evolutionApiService } from "../../services/evolutionApiService";
 import {
   processarPlanilhaExcel,
   processarPlanilhaXML,
@@ -56,7 +57,7 @@ export function GestaoCobrancas() {
     valorPago: 0,
     formaPagamento: "",
     observacoes: "",
-    dataRecebimento: new Date().toISOString().split('T')[0]
+    dataRecebimento: new Date().toISOString().split("T")[0],
   });
   const [filtros, setFiltros] = useState({
     status: "",
@@ -76,6 +77,10 @@ export function GestaoCobrancas() {
     tipo: "sucesso" | "erro" | "info";
     texto: string;
   } | null>(null);
+  const [enviandoWhatsapp, setEnviandoWhatsapp] = useState<string | null>(null); // ID da cobrança sendo enviada
+  const [modalHistoricoAberto, setModalHistoricoAberto] = useState(false);
+  const [historicoEnvios, setHistoricoEnvios] = useState<any[]>([]);
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
 
   const mostrarMensagem = (
     tipo: "sucesso" | "erro" | "info",
@@ -85,16 +90,11 @@ export function GestaoCobrancas() {
     setTimeout(() => setMensagemFeedback(null), 5000);
   };
 
-  // Carrega as cobranças ao montar o componente e quando os filtros ou ordenação mudam
-  useEffect(() => {
-    carregarCobrancas();
-  }, [filtros, colunaOrdenacao, direcaoOrdenacao, mostrarApenasInadimplentes]);
-
   /**
    * Função para carregar as cobranças do serviço
    * Ela aplica os filtros e ordenação definidos pelo usuário
    */
-  const carregarCobrancas = async () => {
+  const carregarCobrancas = useCallback(async () => {
     setCarregando(true);
     try {
       const dadosReaisDoBanco = await cobrancaService.buscarCobrancas({
@@ -112,7 +112,28 @@ export function GestaoCobrancas() {
     } finally {
       setCarregando(false);
     }
-  };
+  }, [filtros, colunaOrdenacao, direcaoOrdenacao, mostrarApenasInadimplentes]);
+
+  // Função para abrir histórico de envios
+  const abrirHistoricoEnvios = useCallback(async (cobrancaId: string) => {
+    setCarregandoHistorico(true);
+    setModalHistoricoAberto(true);
+
+    try {
+      const historico = await cobrancaService.buscarHistoricoEnvios(cobrancaId);
+      setHistoricoEnvios(historico);
+    } catch (error) {
+      console.error("Erro ao carregar histórico:", error);
+      setHistoricoEnvios([]);
+    } finally {
+      setCarregandoHistorico(false);
+    }
+  }, []);
+
+  // Carrega as cobranças ao montar o componente e quando os filtros ou ordenação mudam
+  useEffect(() => {
+    carregarCobrancas();
+  }, [carregarCobrancas]);
 
   /**
    * Função para abrir o modal de criação
@@ -372,14 +393,109 @@ export function GestaoCobrancas() {
 
   /**
    * Função para enviar a cobrança via WhatsApp
-   * (Falta a integração com o serviço de envio de mensagens, apenas um exemplo de como poderia ser implementado)
+   * Envia um lembrete amigável sobre a cobrança pendente
    */
   const enviarCobranca = async (cobranca: CobrancaFranqueado) => {
     try {
-      console.log("Enviando cobrança via WhatsApp:", cobranca);
-      alert("Cobrança enviada com sucesso!");
+      // Verifica se há telefone cadastrado
+      if (!cobranca.telefone) {
+        mostrarMensagem("erro", "Telefone não cadastrado para este cliente.");
+        return;
+      }
+
+      // Evita envio duplo
+      if (enviandoWhatsapp === cobranca.id) {
+        return;
+      }
+
+      // Define o estado de carregamento
+      setEnviandoWhatsapp(cobranca.id!);
+      mostrarMensagem(
+        "info",
+        `Enviando cobrança amigável para ${cobranca.cliente}...`
+      );
+      // Calcula dias de atraso
+      const dataVencimento = new Date(cobranca.data_vencimento);
+      const hoje = new Date();
+      const diffTime = hoje.getTime() - dataVencimento.getTime();
+      const diasAtraso = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      // Formata o valor para exibição
+      const valorFormatado = new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      }).format(cobranca.valor_atualizado || cobranca.valor_original);
+
+      // Formata a data de vencimento
+      const dataVencimentoFormatada = new Intl.DateTimeFormat("pt-BR").format(
+        dataVencimento
+      );
+
+      // Monta a mensagem personalizada
+      let mensagem = `Olá, ${cobranca.cliente}! 👋\n\n`;
+      mensagem += `Este é um lembrete amigável sobre uma cobrança pendente:\n\n`;
+      mensagem += `📋 *Detalhes da Cobrança:*\n`;
+      mensagem += `• Valor: ${valorFormatado}\n`;
+      mensagem += `• Vencimento: ${dataVencimentoFormatada}\n`;
+
+      if (diasAtraso > 0) {
+        mensagem += `• Status: Vencida há ${diasAtraso} dia(s)\n\n`;
+        mensagem += `⚠️ Para evitar complicações, recomendamos a regularização o quanto antes.\n\n`;
+      } else {
+        mensagem += `• Status: Pendente\n\n`;
+        mensagem += `📅 Lembramos que o vencimento se aproxima.\n\n`;
+      }
+
+      if (cobranca.descricao) {
+        mensagem += `📝 *Descrição:* ${cobranca.descricao}\n\n`;
+      }
+
+      mensagem += `Para dúvidas ou negociação, entre em contato conosco.\n\n`;
+      mensagem += `Atenciosamente,\n`;
+      mensagem += `Equipe de Cobrança`;
+
+      console.log("Enviando cobrança via WhatsApp:", {
+        cliente: cobranca.cliente,
+        telefone: cobranca.telefone,
+        valor: valorFormatado,
+      });
+
+      // Envia a mensagem via Evolution API
+      await evolutionApiService.sendTextMessage({
+        instanceName: "automacoes_backup",
+        number: cobranca.telefone,
+        text: mensagem,
+      });
+
+      // Registra o log do envio no banco de dados
+      try {
+        await cobrancaService.registrarLogEnvioWhatsapp({
+          cobrancaId: cobranca.id!,
+          tipo: "amigavel",
+          numero: cobranca.telefone,
+          mensagem: mensagem,
+          usuario: usuario,
+        });
+      } catch (logError) {
+        console.error("Erro ao registrar log de envio:", logError);
+        // Não interrompe o fluxo principal mesmo se o log falhar
+      }
+
+      mostrarMensagem(
+        "sucesso",
+        `Cobrança amigável enviada com sucesso para ${cobranca.cliente}!`
+      );
     } catch (error) {
       console.error("Erro ao enviar cobrança:", error);
+      mostrarMensagem(
+        "erro",
+        `Erro ao enviar cobrança amigável: ${
+          error instanceof Error ? error.message : "Erro desconhecido"
+        }`
+      );
+    } finally {
+      // Limpa o estado de carregamento
+      setEnviandoWhatsapp(null);
     }
   };
 
@@ -441,7 +557,7 @@ export function GestaoCobrancas() {
       valorPago: cobranca.valor_atualizado || cobranca.valor_original,
       formaPagamento: "",
       observacoes: "",
-      dataRecebimento: new Date().toISOString().split('T')[0]
+      dataRecebimento: new Date().toISOString().split("T")[0],
     });
     setModalAberto("quitacao");
   };
@@ -850,13 +966,41 @@ export function GestaoCobrancas() {
                           <Edit className="w-4 h-4" />
                         </button>
                         {cobranca.telefone &&
-                          cobranca.status === "em_aberto" && (
+                          cobranca.status === "em_aberto" &&
+                          (() => {
+                            // Calcula dias de atraso para verificar se pode enviar cobrança amigável
+                            const dataVencimento = new Date(
+                              cobranca.data_vencimento
+                            );
+                            const hoje = new Date();
+                            const diffTime =
+                              hoje.getTime() - dataVencimento.getTime();
+                            const diasAtraso = Math.ceil(
+                              diffTime / (1000 * 60 * 60 * 24)
+                            );
+
+                            // Mostra botão apenas se há menos de 15 dias de atraso
+                            return diasAtraso < 15;
+                          })() && (
                             <button
                               onClick={() => enviarCobranca(cobranca)}
-                              className="text-green-600 hover:text-green-900"
-                              title="Enviar cobrança"
+                              disabled={enviandoWhatsapp === cobranca.id}
+                              className={`${
+                                enviandoWhatsapp === cobranca.id
+                                  ? "text-gray-400 cursor-not-allowed"
+                                  : "text-green-600 hover:text-green-900"
+                              }`}
+                              title={
+                                enviandoWhatsapp === cobranca.id
+                                  ? "Enviando..."
+                                  : "Cobrança Amigável"
+                              }
                             >
-                              <MessageSquare className="w-4 h-4" />
+                              {enviandoWhatsapp === cobranca.id ? (
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <MessageCircle className="w-4 h-4" />
+                              )}
                             </button>
                           )}
                         {cobranca.status === "em_aberto" && (
@@ -885,6 +1029,7 @@ export function GestaoCobrancas() {
                           </>
                         )}
                         <button
+                          onClick={() => abrirHistoricoEnvios(cobranca.id!)}
                           className="text-gray-600 hover:text-gray-900"
                           title="Ver histórico"
                         >
@@ -1518,24 +1663,37 @@ export function GestaoCobrancas() {
                 Quitação de Cobrança
               </h2>
             </div>
-            
+
             <div className="px-6 py-4 space-y-4">
               {/* Informações da Cobrança */}
               <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-medium text-gray-800 mb-2">Detalhes da Cobrança:</h3>
+                <h3 className="font-medium text-gray-800 mb-2">
+                  Detalhes da Cobrança:
+                </h3>
                 <p className="text-sm text-gray-600">
                   <strong>Cliente:</strong> {cobrancaSelecionada.cliente}
                 </p>
                 <p className="text-sm text-gray-600">
-                  <strong>Valor Total:</strong> {formatarMoeda(cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original)}
+                  <strong>Valor Total:</strong>{" "}
+                  {formatarMoeda(
+                    cobrancaSelecionada.valor_atualizado ||
+                      cobrancaSelecionada.valor_original
+                  )}
                 </p>
-                {cobrancaSelecionada.valor_recebido && cobrancaSelecionada.valor_recebido > 0 && (
-                  <p className="text-sm text-gray-600">
-                    <strong>Já Pago:</strong> {formatarMoeda(cobrancaSelecionada.valor_recebido)}
-                  </p>
-                )}
+                {cobrancaSelecionada.valor_recebido &&
+                  cobrancaSelecionada.valor_recebido > 0 && (
+                    <p className="text-sm text-gray-600">
+                      <strong>Já Pago:</strong>{" "}
+                      {formatarMoeda(cobrancaSelecionada.valor_recebido)}
+                    </p>
+                  )}
                 <p className="text-sm text-gray-600">
-                  <strong>Saldo Devedor:</strong> {formatarMoeda((cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original) - (cobrancaSelecionada.valor_recebido || 0))}
+                  <strong>Saldo Devedor:</strong>{" "}
+                  {formatarMoeda(
+                    (cobrancaSelecionada.valor_atualizado ||
+                      cobrancaSelecionada.valor_original) -
+                      (cobrancaSelecionada.valor_recebido || 0)
+                  )}
                 </p>
               </div>
 
@@ -1549,7 +1707,12 @@ export function GestaoCobrancas() {
                   step="0.01"
                   min="0"
                   value={formQuitacao.valorPago}
-                  onChange={(e) => setFormQuitacao({...formQuitacao, valorPago: parseFloat(e.target.value) || 0})}
+                  onChange={(e) =>
+                    setFormQuitacao({
+                      ...formQuitacao,
+                      valorPago: parseFloat(e.target.value) || 0,
+                    })
+                  }
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="0,00"
                 />
@@ -1561,12 +1724,19 @@ export function GestaoCobrancas() {
                 </label>
                 <select
                   value={formQuitacao.formaPagamento}
-                  onChange={(e) => setFormQuitacao({...formQuitacao, formaPagamento: e.target.value})}
+                  onChange={(e) =>
+                    setFormQuitacao({
+                      ...formQuitacao,
+                      formaPagamento: e.target.value,
+                    })
+                  }
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Selecione...</option>
                   <option value="PIX">PIX</option>
-                  <option value="Transferência Bancária">Transferência Bancária</option>
+                  <option value="Transferência Bancária">
+                    Transferência Bancária
+                  </option>
                   <option value="Boleto">Boleto</option>
                   <option value="Cartão de Crédito">Cartão de Crédito</option>
                   <option value="Cartão de Débito">Cartão de Débito</option>
@@ -1583,7 +1753,12 @@ export function GestaoCobrancas() {
                 <input
                   type="date"
                   value={formQuitacao.dataRecebimento}
-                  onChange={(e) => setFormQuitacao({...formQuitacao, dataRecebimento: e.target.value})}
+                  onChange={(e) =>
+                    setFormQuitacao({
+                      ...formQuitacao,
+                      dataRecebimento: e.target.value,
+                    })
+                  }
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -1594,7 +1769,12 @@ export function GestaoCobrancas() {
                 </label>
                 <textarea
                   value={formQuitacao.observacoes}
-                  onChange={(e) => setFormQuitacao({...formQuitacao, observacoes: e.target.value})}
+                  onChange={(e) =>
+                    setFormQuitacao({
+                      ...formQuitacao,
+                      observacoes: e.target.value,
+                    })
+                  }
                   rows={3}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Informações adicionais sobre o pagamento..."
@@ -1607,21 +1787,29 @@ export function GestaoCobrancas() {
                   <h4 className="text-sm font-medium text-blue-800 mb-1">
                     Resultado da Operação:
                   </h4>
-                  {formQuitacao.valorPago >= ((cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original) - (cobrancaSelecionada.valor_recebido || 0)) ? (
+                  {formQuitacao.valorPago >=
+                  (cobrancaSelecionada.valor_atualizado ||
+                    cobrancaSelecionada.valor_original) -
+                    (cobrancaSelecionada.valor_recebido || 0) ? (
                     <p className="text-sm text-green-700">
-                      ✅ <strong>Quitação Total</strong> - Processo será encerrado e confirmação enviada por WhatsApp
+                      ✅ <strong>Quitação Total</strong> - Processo será
+                      encerrado e confirmação enviada por WhatsApp
                     </p>
                   ) : (
                     <p className="text-sm text-yellow-700">
-                      ⚠️ <strong>Pagamento Parcial</strong> - Restará: {formatarMoeda(
-                        ((cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original) - (cobrancaSelecionada.valor_recebido || 0)) - formQuitacao.valorPago
+                      ⚠️ <strong>Pagamento Parcial</strong> - Restará:{" "}
+                      {formatarMoeda(
+                        (cobrancaSelecionada.valor_atualizado ||
+                          cobrancaSelecionada.valor_original) -
+                          (cobrancaSelecionada.valor_recebido || 0) -
+                          formQuitacao.valorPago
                       )}
                     </p>
                   )}
                 </div>
               )}
             </div>
-            
+
             <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
               <button
                 onClick={() => setModalAberto(null)}
@@ -1635,6 +1823,277 @@ export function GestaoCobrancas() {
               >
                 <Receipt className="w-4 h-4" />
                 <span>Registrar Quitação</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Histórico de Envios */}
+      {modalHistoricoAberto && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-auto overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold">Histórico de Envios</h3>
+              <button
+                onClick={() => setModalHistoricoAberto(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              {carregandoHistorico ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <span className="ml-2 text-gray-600">
+                    Carregando histórico...
+                  </span>
+                </div>
+              ) : historicoEnvios.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  Nenhum envio encontrado para esta cobrança.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {historicoEnvios.map((envio, index) => {
+                    // Função para determinar o tipo de envio e sua cor
+                    const getTipoEnvio = (tipo: string, canal: string) => {
+                      if (
+                        tipo?.includes("whatsapp_amigavel") ||
+                        tipo === "amigavel"
+                      ) {
+                        return {
+                          texto: "💬 Cobrança Amigável (WhatsApp)",
+                          cor: "bg-green-100 text-green-800",
+                        };
+                      } else if (
+                        tipo?.includes("whatsapp_juridico") ||
+                        tipo === "juridico"
+                      ) {
+                        return {
+                          texto: "⚖️ Acionamento Jurídico (WhatsApp)",
+                          cor: "bg-red-100 text-red-800",
+                        };
+                      } else if (
+                        tipo?.includes("whatsapp_parcelamento") ||
+                        tipo === "parcelamento"
+                      ) {
+                        return {
+                          texto: "💰 Proposta de Parcelamento (WhatsApp)",
+                          cor: "bg-blue-100 text-blue-800",
+                        };
+                      } else if (
+                        tipo?.includes("email_proposta_parcelamento")
+                      ) {
+                        return {
+                          texto: "📧💰 Proposta de Parcelamento (Email)",
+                          cor: "bg-blue-100 text-blue-800",
+                        };
+                      } else if (tipo?.includes("email_cobranca_padrao")) {
+                        return {
+                          texto: "📧 Cobrança Padrão (Email)",
+                          cor: "bg-yellow-100 text-yellow-800",
+                        };
+                      } else if (tipo?.includes("email_cobranca_formal")) {
+                        return {
+                          texto: "📧 Cobrança Formal (Email)",
+                          cor: "bg-orange-100 text-orange-800",
+                        };
+                      } else if (tipo?.includes("email_cobranca_urgente")) {
+                        return {
+                          texto: "📧🚨 Cobrança Urgente (Email)",
+                          cor: "bg-red-100 text-red-800",
+                        };
+                      } else if (
+                        tipo?.includes("email_escalonamento_juridico") ||
+                        tipo?.includes("email_notificacao_extrajudicial")
+                      ) {
+                        return {
+                          texto: "📧⚖️ Notificação Extrajudicial (Email)",
+                          cor: "bg-red-100 text-red-800",
+                        };
+                      } else if (
+                        tipo?.includes("sistema_escalonamento_juridico")
+                      ) {
+                        return {
+                          texto: "🎯 Escalonamento para Jurídico",
+                          cor: "bg-purple-100 text-purple-800",
+                        };
+                      } else if (canal === "Email" || canal === "email") {
+                        return {
+                          texto: "📧 Email",
+                          cor: "bg-blue-100 text-blue-800",
+                        };
+                      } else if (canal === "WhatsApp" || canal === "whatsapp") {
+                        return {
+                          texto: "💬 WhatsApp",
+                          cor: "bg-green-100 text-green-800",
+                        };
+                      } else {
+                        return {
+                          texto: "📋 Sistema",
+                          cor: "bg-gray-100 text-gray-800",
+                        };
+                      }
+                    };
+
+                    const tipoInfo = getTipoEnvio(
+                      envio.tipo_envio || envio.tipo,
+                      envio.canal
+                    );
+
+                    return (
+                      <div
+                        key={index}
+                        className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-3">
+                            <span
+                              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${tipoInfo.cor}`}
+                            >
+                              {tipoInfo.texto}
+                            </span>
+                            {envio.status_envio && (
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  envio.status_envio === "sucesso" ||
+                                  envio.status === "sucesso"
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                              >
+                                {envio.status_envio === "sucesso" ||
+                                envio.status === "sucesso"
+                                  ? "✅ Enviado"
+                                  : "❌ Falha"}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-sm text-gray-500 font-medium">
+                            {new Date(
+                              envio.data_envio || envio.data
+                            ).toLocaleString("pt-BR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+
+                        {/* Informações do destinatário */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                          <div className="text-sm">
+                            <span className="font-medium text-gray-600">
+                              Destinatário:
+                            </span>
+                            <div className="text-gray-900 mt-1">
+                              {envio.destinatario ||
+                                envio.numero_telefone ||
+                                "Não informado"}
+                            </div>
+                          </div>
+                          <div className="text-sm">
+                            <span className="font-medium text-gray-600">
+                              Enviado por:
+                            </span>
+                            <div className="text-gray-900 mt-1">
+                              {envio.usuario || "Sistema"}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Assunto do email, se houver */}
+                        {envio.assunto && (
+                          <div className="text-sm mb-3">
+                            <span className="font-medium text-gray-600">
+                              Assunto:
+                            </span>
+                            <div className="text-gray-900 mt-1 font-medium">
+                              {envio.assunto}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Metadados importantes */}
+                        {envio.metadados &&
+                          Object.keys(envio.metadados).length > 0 && (
+                            <div className="text-sm mb-3">
+                              <span className="font-medium text-gray-600">
+                                Informações:
+                              </span>
+                              <div className="mt-1 text-gray-700 space-y-1">
+                                {envio.metadados.valor_cobrado && (
+                                  <div>
+                                    💰 Valor:{" "}
+                                    {new Intl.NumberFormat("pt-BR", {
+                                      style: "currency",
+                                      currency: "BRL",
+                                    }).format(envio.metadados.valor_cobrado)}
+                                  </div>
+                                )}
+                                {envio.metadados.dias_atraso && (
+                                  <div>
+                                    📅 Dias em atraso:{" "}
+                                    {envio.metadados.dias_atraso}
+                                  </div>
+                                )}
+                                {envio.metadados.codigo_unidade && (
+                                  <div>
+                                    🏢 Unidade: {envio.metadados.codigo_unidade}
+                                  </div>
+                                )}
+                                {envio.metadados.escalonamento_juridico && (
+                                  <div className="text-red-600 font-medium">
+                                    ⚖️ Escalonamento Jurídico
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                        {/* Mensagem */}
+                        <div className="text-sm">
+                          <span className="font-medium text-gray-600">
+                            Mensagem:
+                          </span>
+                          <div className="mt-2 p-3 bg-white border border-gray-200 rounded-md">
+                            <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
+                              {envio.mensagem ||
+                                envio.mensagem_enviada ||
+                                "Conteúdo não disponível"}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Erro, se houver */}
+                        {envio.erro_detalhes && (
+                          <div className="text-sm mt-3">
+                            <span className="font-medium text-red-600">
+                              Detalhes do erro:
+                            </span>
+                            <div className="mt-1 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+                              {envio.erro_detalhes}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end p-6 border-t border-gray-200">
+              <button
+                onClick={() => setModalHistoricoAberto(false)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Fechar
               </button>
             </div>
           </div>
