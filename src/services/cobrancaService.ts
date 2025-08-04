@@ -1342,17 +1342,20 @@ _Cresci e Perdi - Franquias_`;
 
       // Fallback para tabelas antigas se a nova não existir ou estiver vazia
       console.warn("Usando fallback para tabelas antigas de envios");
-      
+
       // Busca dados da cobrança para identificar unidade e emails relacionados
       const { data: cobranca } = await supabase
         .from("cobrancas_franqueados")
-        .select(`
+        .select(
+          `
           *,
           unidades_franqueadas!unidade_id_fk (
             codigo_unidade,
-            email_franqueado
+            email_franqueado,
+            telefone_franqueado
           )
-        `)
+        `
+        )
         .eq("id", cobrancaId)
         .single();
 
@@ -1382,7 +1385,34 @@ _Cresci e Perdi - Franquias_`;
         if (!errorEmail && emailLogs) {
           logsEmail = emailLogs;
         } else if (errorEmail) {
-          console.warn("Aviso: Não foi possível buscar logs de email:", errorEmail);
+          console.warn(
+            "Aviso: Não foi possível buscar logs de email:",
+            errorEmail
+          );
+        }
+      }
+
+      // Busca logs de WhatsApp da tabela logs_envio_whatsapp
+      let logsWhatsapp: any[] = [];
+      if (cobranca?.unidades_franqueadas?.telefone_franqueado) {
+        const telefone = cobranca.unidades_franqueadas.telefone_franqueado;
+
+        // Busca por telefone exato ou com variações de formato
+        const { data: whatsappLogs, error: errorWhatsapp } = await supabase
+          .from("logs_envio_whatsapp")
+          .select("*")
+          .or(
+            `destinatario.eq.${telefone},destinatario.eq.55${telefone},destinatario.eq.5511${telefone}`
+          )
+          .order("data_envio", { ascending: false });
+
+        if (!errorWhatsapp && whatsappLogs) {
+          logsWhatsapp = whatsappLogs;
+        } else if (errorWhatsapp) {
+          console.warn(
+            "Aviso: Não foi possível buscar logs de WhatsApp:",
+            errorWhatsapp
+          );
         }
       }
 
@@ -1406,16 +1436,22 @@ _Cresci e Perdi - Franquias_`;
             : "Sistema",
           status: log.status_envio,
         })),
-        
+
         // Logs de Email da tabela logs_envio_email
         ...logsEmail.map((log) => {
           // Determina o tipo baseado no assunto
           let tipoEmail = "email_generico";
           if (log.assunto?.includes("Proposta de Parcelamento")) {
             tipoEmail = "email_proposta_parcelamento";
-          } else if (log.assunto?.includes("NOTIFICAÇÃO EXTRAJUDICIAL") || log.assunto?.includes("Acionamento Jurídico")) {
+          } else if (
+            log.assunto?.includes("NOTIFICAÇÃO EXTRAJUDICIAL") ||
+            log.assunto?.includes("Acionamento Jurídico")
+          ) {
             tipoEmail = "email_escalonamento_juridico";
-          } else if (log.assunto?.includes("URGENTE") || log.assunto?.includes("Débito Vencido")) {
+          } else if (
+            log.assunto?.includes("URGENTE") ||
+            log.assunto?.includes("Débito Vencido")
+          ) {
             tipoEmail = "email_cobranca_urgente";
           }
 
@@ -1436,6 +1472,45 @@ _Cresci e Perdi - Franquias_`;
             mensagem_enviada: log.assunto,
             status_envio: log.sucesso ? "sucesso" : "erro",
             data_envio: log.data_envio,
+          };
+        }),
+
+        // Logs de WhatsApp da tabela logs_envio_whatsapp
+        ...logsWhatsapp.map((log) => {
+          // Determina o tipo baseado na mensagem
+          let tipoWhatsapp = "whatsapp_generico";
+          if (log.mensagem_enviada?.includes("PROPOSTA DE PARCELAMENTO")) {
+            tipoWhatsapp = "whatsapp_parcelamento";
+          } else if (
+            log.mensagem_enviada?.includes("NOTIFICAÇÃO EXTRAJUDICIAL") ||
+            log.mensagem_enviada?.includes("URGENTE")
+          ) {
+            tipoWhatsapp = "whatsapp_juridico";
+          } else if (
+            log.mensagem_enviada?.includes("Lembrete") ||
+            log.mensagem_enviada?.includes("cobrança")
+          ) {
+            tipoWhatsapp = "whatsapp_amigavel";
+          }
+
+          return {
+            id: log.id,
+            canal: "WhatsApp",
+            data: log.data_envio,
+            tipo: tipoWhatsapp,
+            destinatario: log.destinatario,
+            mensagem: log.mensagem_enviada,
+            usuario: "Sistema",
+            status: log.sucesso ? "sucesso" : "erro",
+            erro_detalhes: log.erro_detalhes,
+            evolution_message_id: log.evolution_message_id,
+            instancia_evolution: log.instancia_evolution,
+            // Campos para compatibilidade com interface existente
+            tipo_envio: tipoWhatsapp,
+            mensagem_enviada: log.mensagem_enviada,
+            status_envio: log.sucesso ? "sucesso" : "erro",
+            data_envio: log.data_envio,
+            numero_telefone: log.destinatario,
           };
         }),
       ];
