@@ -32,14 +32,6 @@ import { GestaoUsuarios } from "./components/Usuarios/GestaoUsuarios";
 import { AuditoriaLogs } from "./components/AuditoriaLogs";
 import { TemplatesJuridicos } from "./components/TemplatesJuridicos";
 import { KanbanCobranca } from "./components/KanbanCobranca";
-        // Se é um evento de logout, limpa tudo imediatamente
-        if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setProfile(null);
-          setLoading(false);
-          return;
-        }
-        
 import { Layout } from "./components/Layout/Layout";
 import { SimulacaoParcelamento } from "./components/SimulacaoParcelamento";
 
@@ -59,11 +51,6 @@ function AppContent() {
         role: profile.nivel_permissao || "Admin",
         id: user.id,
         avatar_url: profile.avatar_url || user.user_metadata?.avatar_url
-        
-        // Só define loading como false após processar tudo
-        if (mounted) {
-          setLoading(false);
-        }
       }
     : undefined;
 
