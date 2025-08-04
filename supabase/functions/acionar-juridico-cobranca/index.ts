@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Supabase Edge Function: acionar-juridico-cobranca
 // Este arquivo é autossuficiente e contém toda a lógica necessária.
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
@@ -215,7 +216,7 @@ Setor Jurídico – Cresci e Perdi`;
   // 4. Registra no histórico unificado de envios
   console.log("Registrando no histórico unificado...");
   try {
-    const registrosHistorico = [];
+    const registrosHistorico: any[] = [];
 
     // Registro do email extrajudicial
     registrosHistorico.push({
