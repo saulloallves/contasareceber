@@ -11,14 +11,9 @@ interface EmailPayload {
 
 export interface ConfiguracaoEmail {
   id: string;
-  servidor_smtp: string;
-  porta: number;
-  usuario: string;
-  senha: string;
   nome_remetente: string;
   email_padrao: string;
   email_retorno: string;
-  ssl_ativo: boolean;
   ativo: boolean;
   created_at?: string;
   updated_at?: string;
@@ -41,6 +36,8 @@ export interface DadosEmail {
   assunto: string;
   corpo_html: string;
   corpo_texto: string;
+  remetente_nome?: string;
+  remetente_email?: string;
   anexos?: { nome: string; conteudo: string; tipo: string }[];
 }
 
@@ -54,40 +51,45 @@ export interface ResultadoEnvio {
 export class EmailService {
   /**
    * Envia email chamando uma Supabase Edge Function.
+   * A função agora espera receber o corpo completo do e-mail.
    */
   async enviarEmail(dados: DadosEmail): Promise<ResultadoEnvio> {
     try {
-      // A configuração da tabela não é mais usada para credenciais, mas pode ser usada para o 'from'
       const config = await this.buscarConfiguracao();
       if (!config.ativo) {
-        throw new Error('Serviço de email está desativado');
+        console.warn("Serviço de email desativado. Abortando envio.");
+        return { sucesso: false, erro: "Serviço de email está desativado" };
       }
 
-      const { data, error } = await supabase.functions.invoke("send-email", {
-        body: {
-          // Usando seu e-mail validado como remetente
-          from: "marcus.vinicius@crescieperdi.com.br", 
-          fromName: config.nome_remetente,
-          to: dados.destinatario,
-          subject: dados.assunto,
-          html: dados.corpo_html,
-          text: dados.corpo_texto,
-        },
-      });
+      // Adiciona dados do remetente da configuração
+      const dadosCompletos: DadosEmail = {
+        ...dados,
+        remetente_nome: config.nome_remetente,
+        remetente_email: config.email_retorno,
+      };
+
+      // O corpo da requisição agora é o próprio objeto 'dados'
+      const { data: responseData, error } = await supabase.functions.invoke(
+        "send-email",
+        {
+          body: dadosCompletos,
+        }
+      );
 
       if (error) {
         throw new Error(`Erro ao invocar a função de e-mail: ${error.message}`);
       }
 
-      // CORREÇÃO: Captura o messageId retornado pela função
-      const resultado = { sucesso: true, message_id: data.messageId };
-      await this.registrarLogEnvio(dados, resultado);
-      return resultado;
-    } catch (error) {
+      if (!responseData.success) {
+        throw new Error(`Falha no envio do e-mail: ${responseData.error}`);
+      }
+
+      // O log é feito na edge function, então apenas retornamos o sucesso.
+      return { sucesso: true, message_id: responseData.messageId };
+    } catch (error: any) {
       console.error("Erro ao enviar email:", error);
-      const resultado = { sucesso: false, erro: String(error) };
-      await this.registrarLogEnvio(dados, resultado);
-      return resultado;
+      // O log de falha também é feito na edge function.
+      return { sucesso: false, erro: error.message };
     }
   }
 
@@ -95,120 +97,78 @@ export class EmailService {
    * Envia proposta de parcelamento por email
    */
   async enviarPropostaParcelamento(
-    propostaId: string,
     simulacao: any,
     dadosUnidade: any,
     dadosCobranca: any
   ): Promise<ResultadoEnvio> {
-    try {
-      if (!dadosUnidade.email_franqueado) {
-        throw new Error("Email da unidade não cadastrado");
-      }
+    const template = this.gerarTemplatePropostaParcelamento(
+      simulacao,
+      dadosUnidade,
+      dadosCobranca
+    );
 
-      const template = this.gerarTemplatePropostaParcelamento(
-        simulacao,
-        dadosUnidade,
-        dadosCobranca
-      );
+    const destinatario =
+      dadosUnidade.email_franqueado ||
+      dadosCobranca.email_cliente ||
+      (await this.buscarConfiguracao()).email_padrao;
 
-      const dados: DadosEmail = {
-        destinatario: dadosUnidade.email_franqueado,
-        nome_destinatario:
-          dadosUnidade.nome_franqueado || dadosCobranca.cliente,
-        assunto: template.assunto,
-        corpo_html: template.corpo_html,
-        corpo_texto: template.corpo_texto,
-      };
+    const dadosEmail: DadosEmail = {
+      destinatario: destinatario,
+      nome_destinatario: dadosUnidade.nome_franqueado || dadosCobranca.cliente,
+      assunto: template.assunto,
+      corpo_html: template.corpo_html,
+      corpo_texto: template.corpo_texto,
+    };
 
-      const resultado = await this.enviarEmail(dados);
-
-      // Atualiza status da proposta se enviado com sucesso
-      if (resultado.sucesso) {
-        await supabase
-          .from("propostas_parcelamento")
-          .update({
-            data_envio: new Date().toISOString(),
-            status_proposta: "enviada",
-          })
-          .eq("id", propostaId);
-      }
-
-      return resultado;
-    } catch (error) {
-      console.error("Erro ao enviar proposta por email:", error);
-      return {
-        sucesso: false,
-        erro: String(error),
-      };
-    }
+    return this.enviarEmail(dadosEmail);
   }
 
   /**
    * Envia mensagem de cobrança por email
    */
   async enviarMensagemCobranca(
-    cobrancaId: string,
     tipoTemplate: "padrao" | "formal" | "urgente" | "personalizada",
     mensagemPersonalizada: string,
     dadosUnidade: any,
     dadosCobranca: any
   ): Promise<ResultadoEnvio> {
-    try {
-      if (!dadosUnidade.email_franqueado) {
-        throw new Error("Email da unidade não cadastrado");
-      }
+    const destinatario =
+      dadosUnidade.email_franqueado ||
+      dadosCobranca.email_cliente ||
+      (await this.buscarConfiguracao()).email_padrao;
 
-      let template: EmailTemplate;
+    let template: EmailTemplate;
+    let corpo_html: string;
+    let corpo_texto: string;
 
-      if (tipoTemplate === "personalizada") {
-        template = {
-          tipo: "cobranca_padrao",
-          assunto: `Cobrança Pendente - ${
-            dadosUnidade.codigo_unidade || dadosCobranca.cnpj
-          }`,
-          corpo_html: this.converterTextoParaHTML(mensagemPersonalizada),
-          corpo_texto: mensagemPersonalizada,
-        };
-      } else {
-        template = this.gerarTemplateCobranca(
-          tipoTemplate,
-          dadosUnidade,
-          dadosCobranca
-        );
-      }
-
-      const dados: DadosEmail = {
-        destinatario: dadosUnidade.email_franqueado,
-        nome_destinatario:
-          dadosUnidade.nome_franqueado || dadosCobranca.cliente,
-        assunto: template.assunto,
-        corpo_html: template.corpo_html,
-        corpo_texto: template.corpo_texto,
+    if (tipoTemplate === "personalizada") {
+      corpo_texto = mensagemPersonalizada;
+      corpo_html = this.converterTextoParaHTML(mensagemPersonalizada);
+      template = {
+        assunto: `Mensagem sobre pendência - ${
+          dadosUnidade.codigo_unidade || dadosCobranca.cnpj
+        }`,
+        corpo_html: corpo_html,
+        corpo_texto: corpo_texto,
+        tipo: "cobranca_padrao", // Tipo genérico
       };
-
-      const resultado = await this.enviarEmail(dados);
-
-      // Registra envio na tabela de mensagens
-      if (resultado.sucesso) {
-        await supabase.from("envios_mensagem").insert({
-          titulo_id: cobrancaId,
-          cliente: dadosCobranca.cliente,
-          cnpj: dadosCobranca.cnpj,
-          telefone: "", // Email não usa telefone
-          mensagem_enviada: template.corpo_texto,
-          status_envio: "sucesso",
-          referencia_importacao: "EMAIL_MANUAL",
-        });
-      }
-
-      return resultado;
-    } catch (error) {
-      console.error("Erro ao enviar mensagem por email:", error);
-      return {
-        sucesso: false,
-        erro: String(error),
-      };
+    } else {
+      template = this.gerarTemplateCobranca(
+        tipoTemplate,
+        dadosUnidade,
+        dadosCobranca
+      );
     }
+
+    const dadosEmail: DadosEmail = {
+      destinatario: destinatario,
+      nome_destinatario: dadosUnidade.nome_franqueado || dadosCobranca.cliente,
+      assunto: template.assunto,
+      corpo_html: template.corpo_html,
+      corpo_texto: template.corpo_texto,
+    };
+
+    return this.enviarEmail(dadosEmail);
   }
 
   /**
@@ -225,14 +185,9 @@ export class EmailService {
       // Retorna configuração padrão (deve ser configurada pelo admin)
       return {
         id: "default",
-        servidor_smtp: "smtp.gmail.com",
-        porta: 587,
-        usuario: "seu-email@gmail.com",
-        senha: "sua-senha-app",
         nome_remetente: "Cresci e Perdi - Financeiro",
         email_padrao: "financeiro@crescieperdi.com",
         email_retorno: "financeiro@crescieperdi.com",
-        ssl_ativo: true,
         ativo: false, // Inativo até ser configurado
       };
     }
@@ -265,42 +220,16 @@ export class EmailService {
    * Testa configuração de email
    */
   async testarConfiguracao(emailTeste: string): Promise<ResultadoEnvio> {
-    try {
-      const dados: DadosEmail = {
-        destinatario: emailTeste,
-        nome_destinatario: "Teste",
-        assunto: "Teste de Configuração - Sistema Cresci e Perdi",
-        corpo_html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #3B82F6;">Teste de Configuração de Email</h2>
-            <p>Este é um email de teste para verificar se a configuração está funcionando corretamente.</p>
-            <p>Se você recebeu este email, a configuração está funcionando! ✅</p>
-            <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
-            <p style="font-size: 12px; color: #666;">
-              Sistema de Cobrança - Cresci e Perdi<br>
-              Enviado em: ${new Date().toLocaleString("pt-BR")}
-            </p>
-          </div>
-        `,
-        corpo_texto: `
-Teste de Configuração - Sistema Cresci e Perdi
-
-Este é um email de teste para verificar se a configuração está funcionando corretamente.
-
-Se você recebeu este email, a configuração está funcionando! ✅
-
-Sistema de Cobrança - Cresci e Perdi
-Enviado em: ${new Date().toLocaleString("pt-BR")}
-        `,
-      };
-
-      return await this.enviarEmail(dados);
-    } catch (error) {
-      return {
-        sucesso: false,
-        erro: String(error),
-      };
-    }
+    const dadosEmail: DadosEmail = {
+      destinatario: emailTeste,
+      nome_destinatario: "Usuário Teste",
+      assunto: "Teste de Configuração de Email",
+      corpo_html:
+        "<h1>Teste de Email</h1><p>Se você recebeu este email, a configuração está funcionando corretamente.</p>",
+      corpo_texto:
+        "Teste de Email: Se você recebeu este email, a configuração está funcionando corretamente.",
+    };
+    return this.enviarEmail(dadosEmail);
   }
 
   /**
@@ -359,18 +288,26 @@ Enviado em: ${new Date().toLocaleString("pt-BR")}
                 <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Parcelamento:</strong></td>
                 <td style="padding: 8px 0; border-bottom: 1px solid #ddd; text-align: right;">${
                   simulacao.quantidade_parcelas
-                }x de ${this.formatarMoeda(simulacao.parcelas[0].valor)}</td>
+                }x de ${this.formatarMoeda(
+      simulacao.parcelas && simulacao.parcelas.length > 0
+        ? simulacao.parcelas[0].valor
+        : 0
+    )}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Multa:</strong></td>
                 <td style="padding: 8px 0; border-bottom: 1px solid #ddd; text-align: right;">10% (${this.formatarMoeda(
-                  simulacao.parcelas[0].multa
+                  simulacao.parcelas && simulacao.parcelas.length > 0
+                    ? simulacao.parcelas[0].multa
+                    : 0
                 )})</td>
               </tr>
               <tr>
                 <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Juros Mora:</strong></td>
                 <td style="padding: 8px 0; border-bottom: 1px solid #ddd; text-align: right;">1.5% (${this.formatarMoeda(
-                  simulacao.parcelas[0].juros_mora
+                  simulacao.parcelas && simulacao.parcelas.length > 0
+                    ? simulacao.parcelas[0].juros_mora
+                    : 0
                 )})</td>
               </tr>
               <tr style="background-color: #F3F4F6;">
@@ -395,9 +332,9 @@ Enviado em: ${new Date().toLocaleString("pt-BR")}
             `
                 : ""
             }
-            ${simulacao.parcelas
+            ${(simulacao.parcelas || [])
               .map(
-                (parcela: any, index: number) => `
+                (parcela: any) => `
               <p><strong>Parcela ${
                 parcela.numero
               }:</strong> ${this.formatarMoeda(
@@ -450,10 +387,20 @@ ${
     : ""
 }
 - Parcelamento: ${simulacao.quantidade_parcelas}x de ${this.formatarMoeda(
-      simulacao.parcelas[0].valor
+      simulacao.parcelas && simulacao.parcelas.length > 0
+        ? simulacao.parcelas[0].valor
+        : 0
     )}
-- Multa: 10% (${this.formatarMoeda(simulacao.parcelas[0].multa)})
-- Juros Mora: 1.5% (${this.formatarMoeda(simulacao.parcelas[0].juros_mora)})
+- Multa: 10% (${this.formatarMoeda(
+      simulacao.parcelas && simulacao.parcelas.length > 0
+        ? simulacao.parcelas[0].multa
+        : 0
+    )})
+- Juros Mora: 1.5% (${this.formatarMoeda(
+      simulacao.parcelas && simulacao.parcelas.length > 0
+        ? simulacao.parcelas[0].juros_mora
+        : 0
+    )})
 - Valor Total: ${this.formatarMoeda(simulacao.valor_total_parcelamento)}
 
 CRONOGRAMA:
@@ -464,7 +411,7 @@ ${
       )} - ${this.formatarData(simulacao.data_primeira_parcela)}`
     : ""
 }
-${simulacao.parcelas
+${(simulacao.parcelas || [])
   .map(
     (parcela: any) =>
       `Parcela ${parcela.numero}: ${this.formatarMoeda(
@@ -622,6 +569,7 @@ Equipe Financeira - Cresci e Perdi
   /**
    * Registra log do envio
    */
+  /*
   private async registrarLogEnvio(
     dados: DadosEmail,
     resultado: ResultadoEnvio
@@ -639,6 +587,7 @@ Equipe Financeira - Cresci e Perdi
       console.error("Erro ao registrar log de envio:", error);
     }
   }
+  */
 
   /**
    * Métodos auxiliares de formatação

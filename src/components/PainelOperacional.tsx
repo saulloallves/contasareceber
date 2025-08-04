@@ -240,9 +240,7 @@ Entre em contato: (11) 99999-9999`,
       }
 
       if (formProposta.canais_envio.includes("email")) {
-        // Envia email real da proposta
         const resultadoEmail = await emailService.enviarPropostaParcelamento(
-          proposta.id!,
           simulacaoAtual,
           unidadeSelecionada,
           cobrancaSelecionada
@@ -284,7 +282,6 @@ Entre em contato: (11) 99999-9999`,
     setProcessando(true);
     try {
       if (formMensagem.canal === "whatsapp") {
-        // WhatsApp será implementado posteriormente
         const mensagemFinal =
           formMensagem.template === "personalizada"
             ? formMensagem.mensagem_personalizada
@@ -302,7 +299,6 @@ Entre em contato: (11) 99999-9999`,
       } else {
         // Envia email real
         const resultado = await emailService.enviarMensagemCobranca(
-          cobrancaSelecionada.id,
           formMensagem.template as
             | "padrao"
             | "formal"
