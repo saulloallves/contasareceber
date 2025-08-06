@@ -3,31 +3,56 @@
 import { useState, useEffect } from "react";
 import {
   Users,
-  Plus,
-  Edit,
-  Filter,
-  Download,
+  Settings,
   Mail,
   Phone,
-  Building2,
   MapPin,
-  CheckCircle,
-  XCircle,
-  Clock,
-  AlertTriangle,
+  Info,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
 } from "lucide-react";
 import { supabase } from "../services/databaseService";
+
+function truncateText(text: string, max: number) {
+  if (!text) return "";
+  return text.length > max ? text.slice(0, max - 3) + "..." : text;
+}
+
+function getTipoBadge(tipo: string | undefined) {
+  if (!tipo) {
+    return {
+      label: "sem status",
+      className: "bg-gray-100 text-gray-500 border border-gray-300",
+    };
+  }
+  if (tipo === "principal") {
+    return {
+      label: "PRINCIPAL",
+      className: "bg-green-100 text-green-700 border border-green-300",
+    };
+  }
+  if (tipo === "socio") {
+    return {
+      label: "SÓCIO",
+      className: "bg-yellow-100 text-yellow-700 border border-yellow-300",
+    };
+  }
+  return {
+    label: tipo.toUpperCase(),
+    className: "bg-gray-100 text-gray-500 border border-gray-300",
+  };
+}
 
 export function Franqueados() {
   const [franqueados, setFranqueados] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [modalAberto, setModalAberto] = useState<"criar" | "editar" | null>(
-    null
-  );
+  const [modalAberto, setModalAberto] = useState(false);
   const [franqueadoSelecionado, setFranqueadoSelecionado] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
   const [salvando, setSalvando] = useState(false);
-  const [unidades, setUnidades] = useState<any[]>([]);
+  const [busca, setBusca] = useState("");
+  const [showFiltros, setShowFiltros] = useState(false);
 
   useEffect(() => {
     carregarFranqueados();
@@ -36,15 +61,9 @@ export function Franqueados() {
   const carregarFranqueados = async () => {
     setCarregando(true);
     try {
-      // Busca franqueados e suas unidades vinculadas
       const { data, error } = await supabase
         .from("franqueados")
-        .select(
-          `
-          *,
-          franqueado_unidades:franqueado_unidades!inner(ativo, unidade_id, unidades_franqueadas:unidade_id (id, codigo_unidade, nome_unidade, cidade, estado, status_unidade))
-        `
-        )
+        .select("*")
         .order("nome_completo");
       setFranqueados(data || []);
     } catch (error) {
@@ -54,37 +73,34 @@ export function Franqueados() {
     }
   };
 
-  const carregarUnidades = async () => {
-    const { data, error } = await supabase
-      .from("unidades_franqueadas")
-      .select(
-        "id, codigo_unidade, nome_unidade, cidade, estado, status_unidade"
-      );
-    setUnidades(data || []);
+  const abrirModalEdicao = (franqueado: any) => {
+    setFranqueadoSelecionado(franqueado);
+    setFormData({ ...franqueado });
+    setModalAberto(true);
   };
 
-  const abrirModalCriar = () => {
+  const abrirModalNovo = () => {
+    setFranqueadoSelecionado(null);
     setFormData({
       nome_completo: "",
       cpf_rnm: "",
       email: "",
       telefone: "",
-      tipo_franqueado: "principal",
+      tipo_franqueado: "",
+      cidade: "",
+      estado: "",
+      endereco: "",
+      status: "",
+      observacoes: "",
     });
-    setModalAberto("criar");
-  };
-
-  const abrirModalEditar = (franqueado: any) => {
-    setFranqueadoSelecionado(franqueado);
-    setFormData(franqueado);
-    setModalAberto("editar");
-    carregarUnidades();
+    setModalAberto(true);
   };
 
   const fecharModal = () => {
-    setModalAberto(null);
+    setModalAberto(false);
     setFranqueadoSelecionado(null);
     setFormData({});
+    setSalvando(false);
   };
 
   const salvarFranqueado = async () => {
@@ -95,35 +111,24 @@ export function Franqueados() {
     setSalvando(true);
     try {
       let franqueadoId = formData.id;
-      if (modalAberto === "criar") {
-        // Cria franqueado
+      if (!franqueadoSelecionado) {
         const { data, error } = await supabase
           .from("franqueados")
-          .insert({
-            nome_completo: formData.nome_completo,
-            cpf_rnm: formData.cpf_rnm,
-            email: formData.email,
-            telefone: formData.telefone,
-            tipo_franqueado: formData.tipo_franqueado,
-          })
+          .insert(formData)
           .select()
           .single();
         if (error) throw error;
         franqueadoId = data.id;
-      } else if (modalAberto === "editar" && franqueadoSelecionado) {
-        // Atualiza franqueado
+      } else {
+        const { id, ...dadosParaAtualizar } = formData;
         const { error } = await supabase
           .from("franqueados")
-          .update({
-            nome_completo: formData.nome_completo,
-            cpf_rnm: formData.cpf_rnm,
-            email: formData.email,
-            telefone: formData.telefone,
-            tipo_franqueado: formData.tipo_franqueado,
-          })
+          .update(dadosParaAtualizar)
           .eq("id", franqueadoSelecionado.id);
         if (error) throw error;
+        franqueadoId = franqueadoSelecionado.id;
       }
+      alert("Franqueado salvo com sucesso!");
       fecharModal();
       carregarFranqueados();
     } catch (error) {
@@ -133,299 +138,418 @@ export function Franqueados() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "ativa":
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case "inaugurando":
-        return <Clock className="w-5 h-5 text-yellow-600" />;
-      case "fechada":
-        return <XCircle className="w-5 h-5 text-red-600" />;
-      case "em_tratativa":
-        return <AlertTriangle className="w-5 h-5 text-orange-600" />;
-      default:
-        return <Clock className="w-5 h-5 text-gray-600" />;
-    }
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev: any) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "ativa":
-        return "bg-green-100 text-green-800";
-      case "inaugurando":
-        return "bg-yellow-100 text-yellow-800";
-      case "fechada":
-        return "bg-red-100 text-red-800";
-      case "em_tratativa":
-        return "bg-orange-100 text-orange-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+  const franqueadosFiltrados = franqueados.filter((f) => {
+    const termo = busca.toLowerCase();
+    return (
+      f.nome_completo?.toLowerCase().includes(termo) ||
+      f.cpf_rnm?.toLowerCase().includes(termo) ||
+      f.cidade?.toLowerCase().includes(termo) ||
+      f.estado?.toLowerCase().includes(termo)
+    );
+  });
+
+  const CardFranqueado = ({ franqueado }: { franqueado: any }) => {
+    const NOME_MAX = 32;
+    const CPF_MAX = 16;
+    const badge = getTipoBadge(franqueado.tipo_franqueado);
+    return (
+      <div
+        className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 flex flex-col min-h-[120px] max-w-full w-full cursor-pointer hover:shadow-lg transition-all duration-150"
+        style={{ minWidth: 0 }}
+        title="Clique para editar"
+        onClick={() => abrirModalEdicao(franqueado)}
+      >
+        <div className="flex items-center mb-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mr-3">
+            <Users className="w-6 h-6 text-blue-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div
+              className="font-bold text-gray-800 uppercase text-base leading-tight truncate"
+              style={{ maxWidth: "100%" }}
+              title={franqueado.nome_completo}
+            >
+              {truncateText(franqueado.nome_completo, NOME_MAX)}
+            </div>
+            <div className="text-xs text-gray-500">
+              CPF/RNM:{" "}
+              <span className="font-semibold">
+                #{truncateText(franqueado.cpf_rnm, CPF_MAX)}
+              </span>
+            </div>
+          </div>
+          <Settings className="w-5 h-5 text-gray-300" />
+        </div>
+        <div className="flex flex-wrap gap-2 mt-2">
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-semibold ${badge.className}`}
+          >
+            {badge.label}
+          </span>
+        </div>
+      </div>
+    );
   };
 
   return (
     <div className="max-w-full mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-lg p-8">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
-              <Users className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">Franqueados</h1>
-              <p className="text-gray-600">
-                Gestão dos franqueados e vínculos com unidades
-              </p>
-            </div>
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8 mb-8">
+        <div className="flex items-center mb-2">
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
+            <Users className="w-7 h-7 text-white" />
           </div>
-
-          <div className="flex space-x-3">
-            <button
-              onClick={abrirModalCriar}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Franqueado
-            </button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800 mb-1">
+              Franqueados
+            </h1>
+            <p className="text-gray-600">
+              Gerencie todos os franqueados do sistema
+            </p>
           </div>
         </div>
-
-        {/* Tabela de Franqueados */}
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Nome
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  CPF/RNM
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tipo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Email
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Telefone
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Unidades Vinculadas
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {carregando ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
-                      Carregando franqueados...
-                    </div>
-                  </td>
-                </tr>
-              ) : franqueados.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-6 py-4 text-center text-gray-500"
-                  >
-                    Nenhum franqueado encontrado
-                  </td>
-                </tr>
-              ) : (
-                franqueados.map((franqueado) => (
-                  <tr key={franqueado.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <Users className="w-5 h-5 text-blue-600 mr-2" />
-                        <span className="font-medium text-gray-800">
-                          {franqueado.nome_completo}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {franqueado.cpf_rnm}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {franqueado.tipo_franqueado}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {franqueado.email || "-"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {franqueado.telefone || "-"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {franqueado.franqueado_unidades?.length > 0 ? (
-                        <ul className="space-y-1">
-                          {franqueado.franqueado_unidades.map((v: any) => (
-                            <li
-                              key={v.unidade_id}
-                              className="flex items-center"
-                            >
-                              <Building2 className="w-4 h-4 text-purple-600 mr-1" />
-                              <span className="font-medium text-gray-800">
-                                {v.unidades_franqueadas?.codigo_unidade}
-                              </span>
-                              <span className="ml-2 text-xs text-gray-500">
-                                {v.unidades_franqueadas?.nome_unidade}
-                              </span>
-                              <span className="ml-2 text-xs text-gray-400">
-                                {v.unidades_franqueadas?.cidade}/
-                                {v.unidades_franqueadas?.estado}
-                              </span>
-                              <span
-                                className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
-                                  v.unidades_franqueadas?.status_unidade
-                                )}`}
-                              >
-                                {getStatusIcon(
-                                  v.unidades_franqueadas?.status_unidade
-                                )}
-                                {v.unidades_franqueadas?.status_unidade?.toUpperCase()}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <span className="text-xs text-gray-400">
-                          Sem unidades
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => abrirModalEditar(franqueado)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Editar franqueado"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-4">
+          <div className="flex-1 flex items-center bg-white rounded-lg shadow-sm px-4 py-2 border border-gray-200">
+            <svg
+              className="w-5 h-5 text-gray-400 mr-2"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z"
+              ></path>
+            </svg>
+            <input
+              type="text"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por nome, CPF ou cidade..."
+              className="flex-1 bg-transparent outline-none text-gray-800"
+            />
+            <button
+              className="ml-2 text-gray-500 hover:text-blue-600"
+              onClick={() => setShowFiltros((v) => !v)}
+              title="Filtros"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707l-7 7V21a1 1 0 01-2 0v-7.293l-7-7A1 1 0 013 6V4z"
+                ></path>
+              </svg>
+            </button>
+          </div>
+          <button
+            onClick={abrirModalNovo}
+            className="px-4 py-2 bg-yellow-400 text-white rounded-lg font-semibold hover:bg-yellow-500 transition-all"
+          >
+            + Novo Franqueado
+          </button>
+        </div>
+        {showFiltros && (
+          <div className="mt-3 bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-wrap gap-3">
+            <span className="text-xs text-gray-500">
+              Filtros avançados em breve...
+            </span>
+          </div>
+        )}
+        <div className="mt-2 text-xs text-gray-500">
+          Mostrando {franqueadosFiltrados.length} de {franqueados.length}{" "}
+          franqueados
         </div>
       </div>
 
-      {/* Modal de Cadastro/Edição */}
+      {/* Grid de Cards - 4 colunas */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-7">
+        {carregando ? (
+          <div className="col-span-full flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-2"></div>
+            Carregando franqueados...
+          </div>
+        ) : franqueadosFiltrados.length === 0 ? (
+          <div className="col-span-full text-center text-gray-500 py-12">
+            Nenhum franqueado encontrado
+          </div>
+        ) : (
+          franqueadosFiltrados.map((franqueado) => (
+            <CardFranqueado key={franqueado.id} franqueado={franqueado} />
+          ))
+        )}
+      </div>
+
+      {/* Modal de Edição/Cadastro */}
       {modalAberto && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold">
-                {modalAberto === "criar"
-                  ? "Novo Franqueado"
-                  : "Editar Franqueado"}
-              </h3>
+          <div className="bg-white rounded-xl p-0 max-w-3xl w-full max-h-[95vh] overflow-y-auto shadow-2xl border border-gray-200">
+            {/* Header Modal */}
+            <div className="flex items-center justify-between px-8 pt-6 pb-2 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Users className="w-7 h-7 text-blue-600" />
+                </div>
+                <div>
+                  <div className="text-xl font-bold text-gray-800 leading-tight">
+                    {formData.nome_completo || "Novo Franqueado"}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    CPF/RNM:{" "}
+                    <span className="font-semibold">
+                      #{formData.cpf_rnm || "Novo"}
+                    </span>
+                  </div>
+                </div>
+              </div>
               <button
                 onClick={fecharModal}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-400 hover:text-gray-700 text-2xl px-2"
+                title="Fechar"
               >
-                ✕
+                ×
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome Completo *
-                </label>
-                <input
-                  type="text"
-                  value={formData.nome_completo || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nome_completo: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Nome do franqueado"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  CPF/RNM *
-                </label>
-                <input
-                  type="text"
-                  value={formData.cpf_rnm || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cpf_rnm: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="CPF ou RNM"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tipo de Franqueado
-                </label>
-                <select
-                  value={formData.tipo_franqueado || "principal"}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      tipo_franqueado: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            <form
+              className="px-8 py-4 space-y-8"
+              onSubmit={(e) => {
+                e.preventDefault();
+                salvarFranqueado();
+              }}
+            >
+              {/* Informações Básicas */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <Info className="w-5 h-5 text-blue-500" />
+                  <h4 className="font-semibold text-lg text-gray-800">
+                    Informações Básicas
+                  </h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">
+                      Nome Completo
+                    </label>
+                    <input
+                      type="text"
+                      name="nome_completo"
+                      value={formData.nome_completo || ""}
+                      onChange={handleInputChange}
+                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0"
+                      required
+                    />
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">
+                      CPF/RNM
+                    </label>
+                    <input
+                      type="text"
+                      name="cpf_rnm"
+                      value={formData.cpf_rnm || ""}
+                      onChange={handleInputChange}
+                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0"
+                      required
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* Contato */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <Phone className="w-5 h-5 text-green-600" />
+                  <h4 className="font-semibold text-lg text-gray-800">
+                    Contato
+                  </h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">
+                      Telefone
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        name="telefone"
+                        value={formData.telefone || ""}
+                        onChange={handleInputChange}
+                        className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0 flex-1"
+                        placeholder="não possui"
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">
+                      Email
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-gray-400" />
+                      <input
+                        type="email"
+                        name="email"
+                        value={formData.email || ""}
+                        onChange={handleInputChange}
+                        className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0 flex-1"
+                        placeholder="não informado"
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">
+                      Tipo de Franqueado
+                    </label>
+                    <select
+                      name="tipo_franqueado"
+                      value={formData.tipo_franqueado || ""}
+                      onChange={handleInputChange}
+                      className="bg-white border border-gray-300 rounded-md px-3 py-2 text-base font-medium text-gray-800 focus:border-blue-500 focus:ring-blue-500"
+                    >
+                      <option value="">Sem Status</option>
+                      <option value="principal">Principal</option>
+                      <option value="socio">Sócio</option>
+                      <option value="operador">Operador</option>
+                    </select>
+                  </div>
+                </div>
+              </section>
+
+              {/* Endereço */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className="w-5 h-5 text-red-500" />
+                  <h4 className="font-semibold text-lg text-gray-800">
+                    Endereço
+                  </h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">
+                      Cidade
+                    </label>
+                    <input
+                      type="text"
+                      name="cidade"
+                      value={formData.cidade || ""}
+                      onChange={handleInputChange}
+                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0"
+                      placeholder="Cidade"
+                    />
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">
+                      Estado
+                    </label>
+                    <input
+                      type="text"
+                      name="estado"
+                      value={formData.estado || ""}
+                      onChange={handleInputChange}
+                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0"
+                      placeholder="Estado"
+                    />
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">
+                      Endereço
+                    </label>
+                    <input
+                      type="text"
+                      name="endereco"
+                      value={formData.endereco || ""}
+                      onChange={handleInputChange}
+                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0"
+                      placeholder="Endereço completo"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* Observações */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <Info className="w-5 h-5 text-gray-500" />
+                  <h4 className="font-semibold text-lg text-gray-800">
+                    Observações
+                  </h4>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <textarea
+                    name="observacoes"
+                    value={formData.observacoes || ""}
+                    onChange={handleInputChange}
+                    className="w-full bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0 resize-none"
+                    rows={2}
+                    placeholder="Observações relevantes sobre o franqueado"
+                  />
+                </div>
+              </section>
+
+              {/* Status */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <Settings className="w-5 h-5 text-gray-500" />
+                  <h4 className="font-semibold text-lg text-gray-800">
+                    Status
+                  </h4>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4 flex flex-col max-w-xs">
+                  <label className="text-xs text-gray-500 font-semibold mb-1">
+                    Status do Franqueado
+                  </label>
+                  <select
+                    name="status"
+                    value={formData.status || ""}
+                    onChange={handleInputChange}
+                    className="bg-white border border-gray-300 rounded-md px-3 py-2 text-base font-medium text-gray-800 focus:border-blue-500 focus:ring-blue-500"
+                  >
+                    <option value="">Sem Status</option>
+                    <option value="ativo">Ativo</option>
+                    <option value="inativo">Inativo</option>
+                  </select>
+                </div>
+              </section>
+
+              {/* Botões de ação */}
+              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 mt-8">
+                <button
+                  type="button"
+                  onClick={fecharModal}
+                  className="px-6 py-2 rounded-md bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300"
+                  disabled={salvando}
                 >
-                  <option value="principal">Principal</option>
-                  <option value="socio">Sócio</option>
-                  <option value="operador">Operador</option>
-                </select>
+                  Fechar
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 rounded-md bg-blue-600 text-white font-semibold hover:bg-blue-700"
+                  disabled={salvando}
+                >
+                  {salvando ? "Salvando..." : "Salvar"}
+                </button>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={formData.email || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="email@exemplo.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Telefone
-                </label>
-                <input
-                  type="tel"
-                  value={formData.telefone || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, telefone: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="(11) 99999-9999"
-                />
-              </div>
-            </div>
-
-            <div className="flex space-x-3 mt-6">
-              <button
-                onClick={salvarFranqueado}
-                disabled={salvando}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {salvando ? "Salvando..." : "Salvar"}
-              </button>
-              <button
-                onClick={fecharModal}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-              >
-                Cancelar
-              </button>
-            </div>
+            </form>
           </div>
         </div>
       )}
