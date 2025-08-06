@@ -67,7 +67,26 @@ export function CadastroUnidades() {
 
   const abrirModalEdicao = (unidade: any) => {
     setUnidadeSelecionada(unidade);
-    setFormData(unidade);
+    // Cria uma cópia limpa dos dados da unidade
+    setFormData({
+      id: unidade.id,
+      nome_unidade: unidade.nome_unidade || "",
+      codigo_unidade: unidade.codigo_unidade || "",
+      codigo_interno: unidade.codigo_interno || "",
+      cidade: unidade.cidade || "",
+      estado: unidade.estado || "",
+      endereco_completo: unidade.endereco_completo || "",
+      telefone_unidade: unidade.telefone_unidade || "",
+      email_unidade: unidade.email_unidade || "",
+      instagram_unidade: unidade.instagram_unidade || "",
+      horario_seg_sex: unidade.horario_seg_sex || "08:00 - 18:00",
+      horario_sabado: unidade.horario_sabado || "08:00 - 14:00",
+      horario_domingo: unidade.horario_domingo || "Fechado",
+      cep: unidade.cep || "",
+      observacoes_unidade: unidade.observacoes_unidade || "",
+      juridico_status: unidade.juridico_status || "regular",
+      status_unidade: unidade.status_unidade || "ativa"
+    });
     setFranqueadoVinculo(
       unidade.franqueado_unidades?.find((v: any) => v.ativo)?.franqueado_id ||
         ""
@@ -104,6 +123,7 @@ export function CadastroUnidades() {
     setUnidadeSelecionada(null);
     setFormData({});
     setFranqueadoVinculo("");
+    setSalvando(false); // Reset do estado de salvamento
   };
 
   const salvarUnidade = async () => {
@@ -111,10 +131,17 @@ export function CadastroUnidades() {
       alert("Nome da unidade é obrigatório");
       return;
     }
+    
+    if (!formData.codigo_unidade) {
+      alert("Código da unidade é obrigatório");
+      return;
+    }
+
     setSalvando(true);
     try {
       let unidadeId = formData.id;
       if (!unidadeSelecionada) {
+        // Criando nova unidade
         const { data, error } = await supabase
           .from("unidades_franqueadas")
           .insert(formData)
@@ -123,29 +150,53 @@ export function CadastroUnidades() {
         if (error) throw error;
         unidadeId = data.id;
       } else {
+        // Editando unidade existente
+        const { id, franqueado_unidades, ...dadosParaAtualizar } = formData;
         const { error } = await supabase
           .from("unidades_franqueadas")
-          .update(formData)
+          .update({
+            ...dadosParaAtualizar,
+            updated_at: new Date().toISOString()
+          })
           .eq("id", unidadeSelecionada.id);
         if (error) throw error;
+        unidadeId = unidadeSelecionada.id;
       }
+      
+      // Atualiza vínculos com franqueados apenas se houver mudança
       if (unidadeId) {
-        await supabase
+        // Desativa vínculos anteriores
+        const { error: errorDesativar } = await supabase
           .from("franqueado_unidades")
           .update({ ativo: false })
           .eq("unidade_id", unidadeId)
           .eq("ativo", true);
+        
+        if (errorDesativar) {
+          console.warn("Erro ao desativar vínculos anteriores:", errorDesativar);
+        }
+        
+        // Cria novo vínculo se selecionado
         if (franqueadoVinculo) {
-          await supabase.from("franqueado_unidades").insert({
+          const { error: errorVinculo } = await supabase
+            .from("franqueado_unidades")
+            .insert({
             unidade_id: unidadeId,
             franqueado_id: franqueadoVinculo,
             ativo: true,
           });
+          
+          if (errorVinculo) {
+            console.warn("Erro ao criar vínculo:", errorVinculo);
+          }
         }
       }
+      
+      alert("Unidade salva com sucesso!");
       fecharModal();
       carregarDados();
     } catch (error) {
+      console.error("Erro detalhado ao salvar unidade:", error);
       alert(`Erro ao salvar unidade: ${error}`);
     } finally {
       setSalvando(false);
@@ -338,7 +389,7 @@ export function CadastroUnidades() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Código da Unidade
+                  Código da Unidade *
                 </label>
                 <input
                   type="text"
@@ -348,7 +399,13 @@ export function CadastroUnidades() {
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="CP001"
+                  disabled={!!unidadeSelecionada} // Não permite editar código de unidade existente
                 />
+                {unidadeSelecionada && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Código não pode ser alterado após criação
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -569,8 +626,7 @@ export function CadastroUnidades() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Status Jurídico
                 </label>
-                <input
-                  type="text"
+                <select
                   value={formData.juridico_status || ""}
                   onChange={(e) =>
                     setFormData({
@@ -579,8 +635,15 @@ export function CadastroUnidades() {
                     })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="regular, notificado, acionado, etc."
-                />
+                >
+                  <option value="regular">Regular</option>
+                  <option value="pendente_grave">Pendente Grave</option>
+                  <option value="notificado">Notificado</option>
+                  <option value="em_analise">Em Análise</option>
+                  <option value="pre_processo">Pré-Processo</option>
+                  <option value="acionado">Acionado</option>
+                  <option value="resolvido">Resolvido</option>
+                </select>
               </div>
             </div>
             {/* Vínculo com Franqueado */}
@@ -600,6 +663,9 @@ export function CadastroUnidades() {
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Selecione o franqueado responsável por esta unidade
+              </p>
             </div>
             <div className="flex space-x-3">
               <button
@@ -607,10 +673,18 @@ export function CadastroUnidades() {
                 disabled={salvando}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                {salvando ? "Salvando..." : "Salvar"}
+                {salvando ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Salvando...
+                  </div>
+                ) : (
+                  "Salvar Unidade"
+                )}
               </button>
               <button
                 onClick={fecharModal}
+                disabled={salvando}
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
               >
                 Cancelar
