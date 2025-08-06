@@ -34,6 +34,7 @@ import { TemplatesJuridicos } from "./components/TemplatesJuridicos";
 import { KanbanCobranca } from "./components/KanbanCobranca";
 import { Layout } from "./components/Layout/Layout";
 import { SimulacaoParcelamento } from "./components/SimulacaoParcelamento";
+import { Franqueados } from "./components/Franqueados";
 
 function AppContent() {
   const { user, loading, profile } = useAuth();
@@ -44,24 +45,29 @@ function AppContent() {
   const userPermissions = ["admin"]; // Exemplo de permissões
 
   // Mapeia o usuário do Supabase para o formato esperado pelo Header/Layout
-  const mappedUser = user && profile
-    ? {
-        name: profile.nome_completo || user.user_metadata?.name || user.email || "Usuário",
-        email: profile.email || user.email || '',
-        role: profile.nivel_permissao || "Admin",
-        id: user.id,
-        avatar_url: profile.avatar_url || user.user_metadata?.avatar_url
-      }
-    : undefined;
+  const mappedUser =
+    user && profile
+      ? {
+          name:
+            profile.nome_completo ||
+            user.user_metadata?.name ||
+            user.email ||
+            "Usuário",
+          email: profile.email || user.email || "",
+          role: profile.nivel_permissao || "Admin",
+          id: user.id,
+          avatar_url: profile.avatar_url || user.user_metadata?.avatar_url,
+        }
+      : undefined;
 
   // Debug logs
   useEffect(() => {
-    console.log('🔍 App State:', { 
-      hasUser: !!user, 
-      hasProfile: !!profile, 
-      loading, 
+    console.log("🔍 App State:", {
+      hasUser: !!user,
+      hasProfile: !!profile,
+      loading,
       userEmail: user?.email,
-      profileName: profile?.nome_completo 
+      profileName: profile?.nome_completo,
     });
   }, [user, profile, loading]);
 
@@ -105,6 +111,8 @@ function AppContent() {
         return <ImportacaoPlanilha />;
       case "unidades":
         return <CadastroUnidades />;
+      case "franqueados":
+        return <Franqueados />;
       case "reunioes":
         return <GestaoReunioes />;
       case "acordos":

@@ -16,11 +16,13 @@ import {
   Receipt,
   CircleDollarSign,
   Calculator,
+  Users,
 } from "lucide-react";
 // Substituir import local por link web
 // import logo from "../../assets/favicon.png";
 
-const FAVICON_URL = "https://raw.githubusercontent.com/saulloallves/contasareceber/refs/heads/main/src/assets/favicon.png";
+const FAVICON_URL =
+  "https://raw.githubusercontent.com/saulloallves/contasareceber/refs/heads/main/src/assets/favicon.png";
 
 interface SidebarProps {
   activeTab: string;
@@ -81,6 +83,13 @@ export function Sidebar({
       icon: Building2,
       permissions: ["admin", "financeiro"],
       description: "Cadastro e gestão de unidades",
+    },
+    {
+      id: "franqueados",
+      label: "Franqueados",
+      icon: Users,
+      permissions: ["admin", "financeiro"],
+      description: "Cadastro e vínculos de franqueados",
     },
     {
       id: "reunioes",
