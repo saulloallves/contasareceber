@@ -1,12 +1,9 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { useState, useEffect } from "react";
 import { Bell, Maximize } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Alerta } from "../../types/alertas";
 import { alertasService } from "../../services/alertasService";
 import { NotificationsDropdown } from "./NotificationsDropdown";
 import { UserAccountDropdown } from "./UserAccountDropdown";
-// Substituir import local por link web
-// import logo from "../../assets/logo-header.png";
 
 const LOGO_URL =
   "https://raw.githubusercontent.com/saulloallves/contasareceber/refs/heads/main/src/assets/logo-header.png";
@@ -16,7 +13,11 @@ interface HeaderProps {
     name: string;
     email: string;
     role: string;
-    id: string; // Adicionado para uso no alerta
+    id: string;
+    user_metadata?: {
+      nome_exibicao?: string;
+      nivel_permissao?: string;
+    };
   };
 }
 
@@ -97,7 +98,7 @@ export function Header({ user }: HeaderProps) {
           )}
 
           {/* User Account Dropdown */}
-          <div className="border-l border-gray-200 pl-4">
+          <div className="border-l border-gray-200 pl-4 flex flex-col items-end">
             {user ? (
               <UserAccountDropdown user={user} />
             ) : (

@@ -35,6 +35,7 @@ import { KanbanCobranca } from "./components/KanbanCobranca";
 import { Layout } from "./components/Layout/Layout";
 import { SimulacaoParcelamento } from "./components/SimulacaoParcelamento";
 import { Franqueados } from "./components/Franqueados";
+import { supabase } from "./lib/supabaseClient";
 
 function AppContent() {
   const { user, loading, profile } = useAuth();
@@ -45,20 +46,23 @@ function AppContent() {
   const userPermissions = ["admin"]; // Exemplo de permissões
 
   // Mapeia o usuário do Supabase para o formato esperado pelo Header/Layout
-  const mappedUser =
-    user && profile
-      ? {
-          name:
-            profile.nome_completo ||
-            user.user_metadata?.name ||
-            user.email ||
-            "Usuário",
-          email: profile.email || user.email || "",
-          role: profile.nivel_permissao || "Admin",
-          id: user.id,
-          avatar_url: profile.avatar_url || user.user_metadata?.avatar_url,
-        }
-      : undefined;
+  const mappedUser = user
+    ? {
+        name:
+          profile?.nome_completo ||
+          user.user_metadata?.nome_exibicao ||
+          user.user_metadata?.name ||
+          user.email ||
+          "Usuário",
+        email: profile?.email || user.email || "",
+        role:
+          profile?.nivel_permissao ||
+          user.user_metadata?.nivel_permissao ||
+          "Admin",
+        id: user.id,
+        avatar_url: profile?.avatar_url || user.user_metadata?.avatar_url,
+      }
+    : undefined;
 
   // Debug logs
   useEffect(() => {
