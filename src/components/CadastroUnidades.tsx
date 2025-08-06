@@ -3,23 +3,40 @@
 import { useState, useEffect } from "react";
 import {
   Building2,
-  Plus,
-  Filter,
-  MapPin,
+  Settings,
   Phone,
   Mail,
-  User,
-  Search,
-  Settings,
+  Instagram,
+  MapPin,
+  Calendar,
+  Clock,
+  Info,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { supabase } from "../services/databaseService";
 
 const STATUS_COLORS: Record<string, string> = {
-  ativa: "bg-green-100 text-green-800",
-  inaugurando: "bg-yellow-100 text-yellow-800",
-  fechada: "bg-red-100 text-red-800",
-  em_tratativa: "bg-orange-100 text-orange-800",
+  "OPERAÇÃO": "bg-green-100 text-green-800 border-green-300",
+  "INATIVA": "bg-gray-100 text-gray-700 border-gray-300",
+  "IMPLANTAÇÃO": "bg-yellow-100 text-yellow-800 border-yellow-300",
+  "SEM STATUS": "bg-gray-100 text-gray-500 border-gray-300",
 };
+
+const STATUS_OPTIONS = [
+  { value: "OPERAÇÃO", label: "OPERAÇÃO" },
+  { value: "INATIVA", label: "INATIVA" },
+  { value: "IMPLANTAÇÃO", label: "IMPLANTAÇÃO" },
+];
+
+function getStatusProps(status: string | null | undefined) {
+  if (!status) return { label: "Sem Status", color: STATUS_COLORS["SEM STATUS"] };
+  const normalized = status.trim().toUpperCase();
+  if (STATUS_COLORS[normalized]) {
+    return { label: normalized, color: STATUS_COLORS[normalized] };
+  }
+  return { label: "Sem Status", color: STATUS_COLORS["SEM STATUS"] };
+}
 
 function truncateText(text: string, max: number) {
   if (!text) return "";
@@ -67,7 +84,6 @@ export function CadastroUnidades() {
 
   const abrirModalEdicao = (unidade: any) => {
     setUnidadeSelecionada(unidade);
-    // Cria uma cópia limpa dos dados da unidade
     setFormData({
       id: unidade.id,
       nome_unidade: unidade.nome_unidade || "",
@@ -85,7 +101,7 @@ export function CadastroUnidades() {
       cep: unidade.cep || "",
       observacoes_unidade: unidade.observacoes_unidade || "",
       juridico_status: unidade.juridico_status || "regular",
-      status_unidade: unidade.status_unidade || "ativa"
+      status_unidade: unidade.status_unidade ?? "",
     });
     setFranqueadoVinculo(
       unidade.franqueado_unidades?.find((v: any) => v.ativo)?.franqueado_id ||
@@ -97,7 +113,7 @@ export function CadastroUnidades() {
   const abrirModalNova = () => {
     setUnidadeSelecionada(null);
     setFormData({
-      status_unidade: "ativa",
+      status_unidade: "",
       nome_unidade: "",
       codigo_unidade: "",
       codigo_interno: "",
@@ -123,7 +139,7 @@ export function CadastroUnidades() {
     setUnidadeSelecionada(null);
     setFormData({});
     setFranqueadoVinculo("");
-    setSalvando(false); // Reset do estado de salvamento
+    setSalvando(false);
   };
 
   const salvarUnidade = async () => {
@@ -131,17 +147,14 @@ export function CadastroUnidades() {
       alert("Nome da unidade é obrigatório");
       return;
     }
-    
     if (!formData.codigo_unidade) {
       alert("Código da unidade é obrigatório");
       return;
     }
-
     setSalvando(true);
     try {
       let unidadeId = formData.id;
       if (!unidadeSelecionada) {
-        // Criando nova unidade
         const { data, error } = await supabase
           .from("unidades_franqueadas")
           .insert(formData)
@@ -150,7 +163,6 @@ export function CadastroUnidades() {
         if (error) throw error;
         unidadeId = data.id;
       } else {
-        // Editando unidade existente
         const { id, franqueado_unidades, ...dadosParaAtualizar } = formData;
         const { error } = await supabase
           .from("unidades_franqueadas")
@@ -162,21 +174,15 @@ export function CadastroUnidades() {
         if (error) throw error;
         unidadeId = unidadeSelecionada.id;
       }
-      
-      // Atualiza vínculos com franqueados apenas se houver mudança
       if (unidadeId) {
-        // Desativa vínculos anteriores
         const { error: errorDesativar } = await supabase
           .from("franqueado_unidades")
           .update({ ativo: false })
           .eq("unidade_id", unidadeId)
           .eq("ativo", true);
-        
         if (errorDesativar) {
           console.warn("Erro ao desativar vínculos anteriores:", errorDesativar);
         }
-        
-        // Cria novo vínculo se selecionado
         if (franqueadoVinculo) {
           const { error: errorVinculo } = await supabase
             .from("franqueado_unidades")
@@ -185,13 +191,11 @@ export function CadastroUnidades() {
             franqueado_id: franqueadoVinculo,
             ativo: true,
           });
-          
           if (errorVinculo) {
             console.warn("Erro ao criar vínculo:", errorVinculo);
           }
         }
       }
-      
       alert("Unidade salva com sucesso!");
       fecharModal();
       carregarDados();
@@ -203,7 +207,14 @@ export function CadastroUnidades() {
     }
   };
 
-  // Filtro de busca
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev: any) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
   const unidadesFiltradas = unidades.filter((u) => {
     const termo = busca.toLowerCase();
     return (
@@ -214,79 +225,50 @@ export function CadastroUnidades() {
     );
   });
 
-  // Card visual padronizado
-  const CardUnidade = ({ unidade }: { unidade: any }) => (
-    <div
-      className="bg-white rounded-xl shadow-lg border border-gray-100 p-5 flex flex-col min-h-[210px] cursor-pointer hover:shadow-xl transition-all duration-150"
-      onClick={() => abrirModalEdicao(unidade)}
-      title="Clique para editar"
-    >
-      <div className="flex items-center mb-3">
-        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mr-3">
-          <Building2 className="w-6 h-6 text-blue-600" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div
-            className="font-bold text-gray-800 uppercase text-base leading-tight truncate"
-            style={{ maxWidth: "100%" }}
-            title={unidade.nome_unidade}
-          >
-            {truncateText(unidade.nome_unidade, 20)}
-            {unidade.cidade && unidade.estado && (
-              <span className="ml-1 text-gray-500 font-normal text-sm">
-                / {unidade.cidade} {unidade.estado}
-              </span>
-            )}
-          </div>
-          <div className="text-xs text-gray-500">
-            Código:{" "}
-            <span className="font-semibold">#{unidade.codigo_unidade}</span>
-          </div>
-        </div>
-        <Settings className="w-5 h-5 text-gray-300" />
-      </div>
-      <div className="flex flex-wrap gap-2 mb-2">
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-semibold ${
-            STATUS_COLORS[unidade.status_unidade] || "bg-gray-100 text-gray-800"
-          }`}
-        >
-          {unidade.status_unidade?.toUpperCase() || "N/A"}
-        </span>
-        {unidade.franqueado_unidades?.length > 0 &&
-          unidade.franqueado_unidades[0]?.franqueados && (
-            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold flex items-center">
-              <User className="w-3 h-3 mr-1" />
-              {unidade.franqueado_unidades[0].franqueados.nome_completo}
-            </span>
-          )}
-      </div>
-      <div className="flex-1 flex flex-col justify-end">
-        <div className="text-xs text-gray-500 mb-1 truncate">
-          {unidade.endereco_completo}
-        </div>
-        <div className="flex items-center text-xs text-gray-500">
-          <Phone className="w-3 h-3 mr-1" />
-          {unidade.telefone_unidade || "-"}
-        </div>
-        <div className="flex items-center text-xs text-gray-500">
-          <Mail className="w-3 h-3 mr-1" />
-          {unidade.email_unidade || "-"}
-        </div>
-      </div>
-      <div className="mt-2 flex items-center justify-between">
-        <span className="text-xs text-gray-400 truncate">
-          {unidade.observacoes_unidade || " "}
-        </span>
-        <span className="text-xs text-gray-400">
-          {unidade.juridico_status && unidade.juridico_status !== "regular"
-            ? `Jurídico: ${unidade.juridico_status}`
-            : ""}
-        </span>
-      </div>
-    </div>
-  );
+  const CardUnidade = ({ unidade }: { unidade: any }) => {
+    const NOME_MAX = 32;
+    const CODIGO_MAX = 16;
+    const statusRaw = unidade.status_unidade || "";
+    const { label: statusLabel, color: statusColor } = getStatusProps(statusRaw);
 
+    return (
+      <div
+        className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 flex flex-col min-h-[120px] max-w-full w-full cursor-pointer hover:shadow-lg transition-all duration-150"
+        style={{ minWidth: 0 }}
+        title="Clique para editar"
+        onClick={() => abrirModalEdicao(unidade)}
+      >
+        <div className="flex items-center mb-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mr-3">
+            <Building2 className="w-6 h-6 text-blue-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div
+              className="font-bold text-gray-800 uppercase text-base leading-tight truncate"
+              style={{ maxWidth: "100%" }}
+              title={unidade.nome_unidade}
+            >
+              {truncateText(unidade.nome_unidade, NOME_MAX)}
+            </div>
+            <div className="text-xs text-gray-500">
+              Código: <span className="font-semibold">#{truncateText(unidade.codigo_unidade, CODIGO_MAX)}</span>
+            </div>
+          </div>
+          <Settings className="w-5 h-5 text-gray-300" />
+        </div>
+        <div className="flex flex-wrap gap-2 mt-2">
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-semibold border ${statusColor}`}
+            style={{ letterSpacing: "0.03em" }}
+          >
+            {statusLabel}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  // --- MODAL LAYOUT ---
   return (
     <div className="max-w-full mx-auto p-6">
       <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8 mb-8">
@@ -303,7 +285,7 @@ export function CadastroUnidades() {
         </div>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-4">
           <div className="flex-1 flex items-center bg-white rounded-lg shadow-sm px-4 py-2 border border-gray-200">
-            <Search className="w-5 h-5 text-gray-400 mr-2" />
+            <svg className="w-5 h-5 text-gray-400 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z"></path></svg>
             <input
               type="text"
               value={busca}
@@ -316,7 +298,7 @@ export function CadastroUnidades() {
               onClick={() => setShowFiltros((v) => !v)}
               title="Filtros"
             >
-              <Filter className="w-5 h-5" />
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707l-7 7V21a1 1 0 01-2 0v-7.293l-7-7A1 1 0 013 6V4z"></path></svg>
             </button>
           </div>
           <button
@@ -338,8 +320,8 @@ export function CadastroUnidades() {
         </div>
       </div>
 
-      {/* Grid de Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+      {/* Grid de Cards - 4 colunas */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-7">
         {carregando ? (
           <div className="col-span-full flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-2"></div>
@@ -359,337 +341,295 @@ export function CadastroUnidades() {
       {/* Modal de Edição/Cadastro */}
       {modalAberto && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold">
-                {unidadeSelecionada ? "Editar Unidade" : "Nova Unidade"}
-              </h3>
-              <button
-                onClick={fecharModal}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              {/* Todos os campos do banco */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome da Unidade *
-                </label>
-                <input
-                  type="text"
-                  value={formData.nome_unidade || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nome_unidade: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Nome da unidade"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Código da Unidade *
-                </label>
-                <input
-                  type="text"
-                  value={formData.codigo_unidade || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, codigo_unidade: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="CP001"
-                  disabled={!!unidadeSelecionada} // Não permite editar código de unidade existente
-                />
-                {unidadeSelecionada && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Código não pode ser alterado após criação
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Código Interno
-                </label>
-                <input
-                  type="text"
-                  value={formData.codigo_interno || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, codigo_interno: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="INT001"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status
-                </label>
-                <select
-                  value={formData.status_unidade || "ativa"}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      status_unidade: e.target.value as any,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="ativa">Ativa</option>
-                  <option value="inaugurando">Inaugurando</option>
-                  <option value="fechada">Fechada</option>
-                  <option value="em_tratativa">Em Tratativa</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cidade
-                </label>
-                <input
-                  type="text"
-                  value={formData.cidade || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cidade: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="São Paulo"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Estado
-                </label>
-                <input
-                  type="text"
-                  value={formData.estado || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, estado: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="SP"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Endereço Completo
-                </label>
-                <input
-                  type="text"
-                  value={formData.endereco_completo || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      endereco_completo: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Rua das Flores, 123 - Centro"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Telefone
-                </label>
-                <input
-                  type="tel"
-                  value={formData.telefone_unidade || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      telefone_unidade: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="(11) 99999-9999"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={formData.email_unidade || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      email_unidade: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="unidade@exemplo.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Instagram
-                </label>
-                <input
-                  type="text"
-                  value={formData.instagram_unidade || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      instagram_unidade: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="@instagram"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Horário Seg-Sex
-                </label>
-                <input
-                  type="text"
-                  value={formData.horario_seg_sex || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      horario_seg_sex: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="08:00 - 18:00"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Horário Sábado
-                </label>
-                <input
-                  type="text"
-                  value={formData.horario_sabado || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      horario_sabado: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="08:00 - 14:00"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Horário Domingo
-                </label>
-                <input
-                  type="text"
-                  value={formData.horario_domingo || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      horario_domingo: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Fechado"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  CEP
-                </label>
-                <input
-                  type="text"
-                  value={formData.cep || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      cep: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="00000-000"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Observações
-                </label>
-                <textarea
-                  value={formData.observacoes_unidade || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      observacoes_unidade: e.target.value,
-                    })
-                  }
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Observações sobre a unidade..."
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status Jurídico
-                </label>
-                <select
-                  value={formData.juridico_status || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      juridico_status: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="regular">Regular</option>
-                  <option value="pendente_grave">Pendente Grave</option>
-                  <option value="notificado">Notificado</option>
-                  <option value="em_analise">Em Análise</option>
-                  <option value="pre_processo">Pré-Processo</option>
-                  <option value="acionado">Acionado</option>
-                  <option value="resolvido">Resolvido</option>
-                </select>
-              </div>
-            </div>
-            {/* Vínculo com Franqueado */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Franqueado Vinculado
-              </label>
-              <select
-                value={franqueadoVinculo}
-                onChange={(e) => setFranqueadoVinculo(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Sem vínculo</option>
-                {franqueados.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.nome_completo} ({f.email})
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Selecione o franqueado responsável por esta unidade
-              </p>
-            </div>
-            <div className="flex space-x-3">
-              <button
-                onClick={salvarUnidade}
-                disabled={salvando}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {salvando ? (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Salvando...
+          <div className="bg-white rounded-xl p-0 max-w-3xl w-full max-h-[95vh] overflow-y-auto shadow-2xl border border-gray-200">
+            {/* Header Modal */}
+            <div className="flex items-center justify-between px-8 pt-6 pb-2 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Building2 className="w-7 h-7 text-blue-600" />
+                </div>
+                <div>
+                  <div className="text-xl font-bold text-gray-800 leading-tight">
+                    {formData.nome_unidade || "Nova Unidade"}
                   </div>
-                ) : (
-                  "Salvar Unidade"
-                )}
-              </button>
+                  <div className="text-sm text-gray-500">
+                    Código: <span className="font-semibold">#{formData.codigo_unidade || "Novo"}</span>
+                  </div>
+                </div>
+              </div>
               <button
                 onClick={fecharModal}
-                disabled={salvando}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                className="text-gray-400 hover:text-gray-700 text-2xl px-2"
+                title="Fechar"
               >
-                Cancelar
+                ×
               </button>
             </div>
+
+            {/* Status e Ações */}
+            <div className="flex flex-wrap items-center gap-3 px-8 pt-4 pb-2">
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusProps(formData.status_unidade).color}`}>
+                {getStatusProps(formData.status_unidade).label}
+              </span>
+            </div>
+
+            <form
+              className="px-8 py-4 space-y-8"
+              onSubmit={e => {
+                e.preventDefault();
+                salvarUnidade();
+              }}
+            >
+              {/* Informações Básicas */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <Info className="w-5 h-5 text-blue-500" />
+                  <h4 className="font-semibold text-lg text-gray-800">Informações Básicas</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Nome do Grupo</label>
+                    <input
+                      type="text"
+                      name="nome_unidade"
+                      value={formData.nome_unidade || ""}
+                      onChange={handleInputChange}
+                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0"
+                      required
+                    />
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Código da Unidade</label>
+                    <input
+                      type="text"
+                      name="codigo_unidade"
+                      value={formData.codigo_unidade || ""}
+                      onChange={handleInputChange}
+                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0"
+                      required
+                    />
+                    <span className="text-xs text-gray-400 mt-1">Código não pode ser editado</span>
+                  </div>
+                </div>
+              </section>
+
+              {/* Informações de Contato */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <Phone className="w-5 h-5 text-green-600" />
+                  <h4 className="font-semibold text-lg text-gray-800">Informações de Contato</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Telefone</label>
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        name="telefone_unidade"
+                        value={formData.telefone_unidade || ""}
+                        onChange={handleInputChange}
+                        className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0 flex-1"
+                        placeholder="não possui"
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Email</label>
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-gray-400" />
+                      <input
+                        type="email"
+                        name="email_unidade"
+                        value={formData.email_unidade || ""}
+                        onChange={handleInputChange}
+                        className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0 flex-1"
+                        placeholder="não informado"
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Instagram</label>
+                    <div className="flex items-center gap-2">
+                      <Instagram className="w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        name="instagram_unidade"
+                        value={formData.instagram_unidade || ""}
+                        onChange={handleInputChange}
+                        className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0 flex-1"
+                        placeholder="não informado"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Horário de Funcionamento */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="w-5 h-5 text-purple-600" />
+                  <h4 className="font-semibold text-lg text-gray-800">Horário de Funcionamento</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Segunda a Sexta</label>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        name="horario_seg_sex"
+                        value={formData.horario_seg_sex || ""}
+                        onChange={handleInputChange}
+                        className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0 flex-1"
+                        placeholder="08:00 às 18:00"
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Sábado</label>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        name="horario_sabado"
+                        value={formData.horario_sabado || ""}
+                        onChange={handleInputChange}
+                        className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0 flex-1"
+                        placeholder="08:00 às 14:00"
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Domingo</label>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        name="horario_domingo"
+                        value={formData.horario_domingo || ""}
+                        onChange={handleInputChange}
+                        className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0 flex-1"
+                        placeholder="Fechado"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Endereço */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className="w-5 h-5 text-red-500" />
+                  <h4 className="font-semibold text-lg text-gray-800">Endereço</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Endereço Completo</label>
+                    <input
+                      type="text"
+                      name="endereco_completo"
+                      value={formData.endereco_completo || ""}
+                      onChange={handleInputChange}
+                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0"
+                      placeholder="Rua, número, bairro"
+                    />
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Cidade</label>
+                    <input
+                      type="text"
+                      name="cidade"
+                      value={formData.cidade || ""}
+                      onChange={handleInputChange}
+                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0"
+                      placeholder="Cidade"
+                    />
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Estado</label>
+                    <input
+                      type="text"
+                      name="estado"
+                      value={formData.estado || ""}
+                      onChange={handleInputChange}
+                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0"
+                      placeholder="Estado"
+                    />
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">CEP</label>
+                    <input
+                      type="text"
+                      name="cep"
+                      value={formData.cep || ""}
+                      onChange={handleInputChange}
+                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0"
+                      placeholder="CEP"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* Observações */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <Info className="w-5 h-5 text-gray-500" />
+                  <h4 className="font-semibold text-lg text-gray-800">Observações</h4>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <textarea
+                    name="observacoes_unidade"
+                    value={formData.observacoes_unidade || ""}
+                    onChange={handleInputChange}
+                    className="w-full bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0 resize-none"
+                    rows={2}
+                    placeholder="Observações relevantes sobre a unidade"
+                  />
+                </div>
+              </section>
+
+              {/* Status */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <Settings className="w-5 h-5 text-gray-500" />
+                  <h4 className="font-semibold text-lg text-gray-800">Status</h4>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4 flex flex-col max-w-xs">
+                  <label className="text-xs text-gray-500 font-semibold mb-1">Status da Unidade</label>
+                  <select
+                    name="status_unidade"
+                    value={formData.status_unidade || ""}
+                    onChange={handleInputChange}
+                    className="bg-white border border-gray-300 rounded-md px-3 py-2 text-base font-medium text-gray-800 focus:border-blue-500 focus:ring-blue-500"
+                  >
+                    <option value="">Sem Status</option>
+                    {STATUS_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </section>
+
+              {/* Botões de ação */}
+              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 mt-8">
+                <button
+                  type="button"
+                  onClick={fecharModal}
+                  className="px-6 py-2 rounded-md bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300"
+                  disabled={salvando}
+                >
+                  Fechar
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 rounded-md bg-blue-600 text-white font-semibold hover:bg-blue-700"
+                  disabled={salvando}
+                >
+                  {salvando ? "Salvando..." : "Salvar"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
