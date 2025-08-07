@@ -4,6 +4,7 @@ import { Alerta } from "../../types/alertas";
 import { alertasService } from "../../services/alertasService";
 import { NotificationsDropdown } from "./NotificationsDropdown";
 import { UserAccountDropdown } from "./UserAccountDropdown";
+import { supabase } from "../../lib/supabaseClient";
 
 const LOGO_URL =
   "https://raw.githubusercontent.com/saulloallves/contasareceber/refs/heads/main/src/assets/logo-header.png";
@@ -25,6 +26,10 @@ export function Header({ user }: HeaderProps) {
   const [fullscreen, setFullscreen] = useState(false);
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  // Estado para controlar o modal de conclusão da importação
+  const [resultadoImportacao, setResultadoImportacao] = useState<Alerta | null>(
+    null
+  );
 
   const fetchAlertas = async () => {
     try {
@@ -36,10 +41,41 @@ export function Header({ user }: HeaderProps) {
   };
 
   useEffect(() => {
+    // Busca os alertas iniciais ao carregar
     fetchAlertas();
-    const interval = setInterval(fetchAlertas, 60000);
-    return () => clearInterval(interval);
-  }, []);
+
+    // Cria a "escuta" em tempo real na tabela de alertas
+    const channel = supabase
+      .channel("alertas_sistema_realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "alertas_sistema" },
+        (payload) => {
+          console.log("Novo alerta recebido do Supabase!", payload.new);
+
+          // Quando um novo alerta chega, buscamos a lista inteira novamente
+          // para manter o sino de notificações atualizado.
+          fetchAlertas();
+
+          // Verifica se é a notificação que estamos esperando
+          const novoAlerta = payload.new as Alerta;
+          if (novoAlerta.tipo_alerta === "importacao_concluida") {
+            // Guarda os dados do alerta para mostrar o modal de sucesso!
+            setResultadoImportacao(novoAlerta);
+
+            // Dispara um evento global para que outras partes da aplicação saibam que precisam se atualizar.
+            console.log("Disparando evento: cobrancasAtualizadas");
+            window.dispatchEvent(new CustomEvent("cobrancasAtualizadas"));
+          }
+        }
+      )
+      .subscribe();
+
+    // Função de limpeza para remover a "escuta" quando o usuário sai da página
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []); // O array vazio garante que isso rode apenas uma vez
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -48,6 +84,24 @@ export function Header({ user }: HeaderProps) {
     } else {
       document.exitFullscreen();
       setFullscreen(false);
+    }
+  };
+
+  // Função para fechar o modal de resultado da importação
+  // e marcar o alerta como resolvido
+  const handleFecharModalResultado = async () => {
+    if (!resultadoImportacao || !user) return;
+    try {
+      // Marcar o alerta como resolvido para não aparecer de novo
+      await alertasService.marcarComoResolvido(resultadoImportacao.id, user.id);
+      // Limpa o estado para fechar o modal
+      setResultadoImportacao(null);
+      // Atualiza a lista de alertas (remove o que acabamos de resolver)
+      fetchAlertas();
+    } catch (error) {
+      console.error("Erro ao resolver alerta do modal:", error);
+      // Mesmo com erro, fecha o modal para o usuário não ficar preso
+      setResultadoImportacao(null);
     }
   };
 
@@ -108,6 +162,27 @@ export function Header({ user }: HeaderProps) {
               </div>
             )}
           </div>
+          {/* Modal que será exibido quando a importação terminar */}
+          {resultadoImportacao && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
+                <h3 className="text-lg font-semibold text-green-600">
+                  Importação Concluída!
+                </h3>
+                <p className="mt-2 text-gray-700">
+                  {resultadoImportacao.descricao}
+                </p>
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={handleFecharModalResultado}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>

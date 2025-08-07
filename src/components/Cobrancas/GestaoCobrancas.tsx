@@ -135,6 +135,25 @@ export function GestaoCobrancas() {
     carregarCobrancas();
   }, [carregarCobrancas]);
 
+  useEffect(() => {
+    // Função que será chamada quando o evento for disparado
+    const handleAtualizacao = () => {
+      console.log(
+        "Evento 'cobrancasAtualizadas' recebido! Recarregando cobranças..."
+      );
+      carregarCobrancas();
+    };
+
+    // Adiciona o "ouvinte" de eventos
+    window.addEventListener("cobrancasAtualizadas", handleAtualizacao);
+
+    // Função de limpeza: remove o "ouvinte" quando o componente for desmontado
+    // Isso é MUITO importante para evitar vazamentos de memória.
+    return () => {
+      window.removeEventListener("cobrancasAtualizadas", handleAtualizacao);
+    };
+  }, [carregarCobrancas]); // Adiciona carregarCobrancas como dependência
+
   /**
    * Função para abrir o modal de criação
    */
@@ -240,87 +259,65 @@ export function GestaoCobrancas() {
   };
 
   /**
-   * Função para processar a planilha selecionada
-   * Ela verifica o tipo de arquivo e chama a função apropriada para processar os dados
+   * Função para processar a planilha selecionada pelo n8n
    */
   const handleProcessarPlanilha = async () => {
     if (!arquivoSelecionado) {
-      alert("Por favor, selecione um arquivo primeiro.");
+      mostrarMensagem("erro", "Por favor, selecione um arquivo primeiro.");
       return;
     }
 
     setProcessando(true);
-    setResultado(null);
-    setErrosImportacao([]); // Limpa os erros antigos antes de processar uma nova planilha
+
+    // Um timeout de 10 segundos para o caso de o n8n estar offline ou demorando para responder
+    const timeoutId = setTimeout(() => {
+      setProcessando(false);
+      // Limpa o input de arquivo para permitir nova tentativa
+      LimparArquivo();
+      mostrarMensagem(
+        "erro",
+        "O servidor de importação demorou para responder. Verifique se o serviço está no ar e tente novamente."
+      );
+    }, 10000);
+
+    // A URL do webhook n8n (idealmente vinda de uma variável de ambiente)
+    const n8nWebhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
 
     try {
-      console.log("Iniciando processamento da planilha...");
-      let dadosDaPlanilha;
+      // 1. Criar um objeto FormData para enviar o arquivo
+      const formData = new FormData();
+      // A chave 'file' deve corresponder ao que o n8n espera.
+      // O n8n por padrão espera o primeiro arquivo binário.
+      formData.append("file", arquivoSelecionado);
 
-      // Lógica para identificar e processar o tipo de arquivo
-      if (arquivoSelecionado.name.toLowerCase().endsWith(".xlsx")) {
-        dadosDaPlanilha = await processarPlanilhaExcel(arquivoSelecionado);
-      } else if (arquivoSelecionado.name.toLowerCase().endsWith(".csv")) {
-        dadosDaPlanilha = await processarPlanilhaXML(arquivoSelecionado);
-      } else {
-        // Lançar um erro se o formato não for suportado é a melhor prática.
-        throw new Error("Formato de arquivo não suportado. Use .xlsx ou .csv");
+      // 2. Enviar o arquivo para o n8n usando fetch
+      const response = await fetch(n8nWebhookUrl, {
+        method: "POST",
+        body: formData,
+        // Não defina o 'Content-Type' header manualmente,
+        // o navegador fará isso corretamente para multipart/form-data.
+      });
+
+      // Se chegamos aqui, o n8n respondeu. Cancelamos o timeout.
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        // Este erro é para o caso de o n8n retornar um erro imediato (ex: 401, 500)
+        throw new Error("O servidor de importação retornou um erro inicial.");
       }
 
-      // Verificação de segurança: garante que a planilha foi lida com sucesso
-      if (!dadosDaPlanilha) {
-        throw new Error("Não foi possível extrair dados da planilha.");
-      }
-
-      console.log(
-        `${dadosDaPlanilha.length} registros extraídos. Enviando para o serviço...`
-      );
-
-      // Chama o serviço de importação
-      const resultadoImportacao =
-        await cobrancaService.processarImportacaoPlanilha(
-          dadosDaPlanilha,
-          arquivoSelecionado.name,
-          usuario
-        );
-
-      setResultado(resultadoImportacao);
-
-      // Lógica para lidar com a resposta
-      if (resultadoImportacao.sucesso) {
-        // Verificação de segurança para o ID da importação
-        if (resultadoImportacao.importacao_id) {
-          await cobrancaService.verificarAcionamentoJuridico();
-        }
-        // Uso de optional chaining para segurança!
-        const sucessoMsg = `Planilha processada com sucesso! ${
-          resultadoImportacao.estatisticas?.novos_registros ?? 0
-        } novos registros foram criados.`;
-        alert(sucessoMsg);
-      } else {
-        if (resultadoImportacao.erros && resultadoImportacao.erros.length > 0) {
-          setErrosImportacao(resultadoImportacao.erros);
-          alert(
-            `A importação não foi realizada devido a ${resultadoImportacao.erros.length} erros encontrados. Clique em "Verificar Erros" para ver os detalhes e corrigir a planilha.`
-          );
-        } else {
-          alert("A importação falhou por um motivo desconhecido!");
-        }
-      }
-    } catch (error: any) {
-      // Tratamento de erros críticos
-      console.error("ERRO CRÍTICO ao processar a planilha:", error);
-      const erroMsg = error.message || "Ocorreu um erro inesperado.";
-      setErrosImportacao([`Erro crítico: ${erroMsg}`]);
-      setResultado({ sucesso: false, erros: [erroMsg] });
-      alert(
-        `Ocorreu um erro crítico. Clique em "Verificar Erros" para ver os detalhes.`
-      );
-    } finally {
-      carregarCobrancas();
-      fecharModal();
-      LimparArquivo(); // Limpa o arquivo selecionado após o processamento
+      // Sucesso! A tarefa foi aceita e está rodando em segundo plano.
       setProcessando(false);
+      fecharModal(); // Fecha o modal de upload
+      mostrarMensagem(
+        "sucesso",
+        "Planilha recebida! O processamento foi iniciado em segundo plano. Você será notificado aqui mesmo no sistema quando terminar."
+      );
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      setProcessando(false);
+      LimparArquivo();
+      mostrarMensagem("erro", `Erro ao iniciar importação: ${error.message}`);
     }
   };
 
