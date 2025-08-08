@@ -15,6 +15,10 @@ export interface CardCobranca {
   observacoes?: string;
   criticidade: 'normal' | 'atencao' | 'critica';
   data_entrada_etapa: string;
+  // Campos opcionais para cobranças individuais
+  descricao_cobranca?: string;
+  valor_recebido?: number;
+  quantidade_titulos?: number;
   created_at?: string;
   updated_at?: string;
 }
