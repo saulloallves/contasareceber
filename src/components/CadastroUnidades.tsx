@@ -62,17 +62,39 @@ export function CadastroUnidades() {
 
   const carregarDados = async () => {
     setCarregando(true);
-    const { data } = await supabase
+    try {
+      const { data, error } = await supabase
       .from("unidades_franqueadas")
       .select(
         `
         *,
-        franqueado_unidades:franqueado_unidades!inner(ativo, franqueado_id, franqueados:franqueado_id (id, nome_completo, email, telefone, tipo_franqueado))
+        franqueado_unidades!unidade_id(
+          ativo, 
+          franqueado_id, 
+          franqueados!franqueado_id (
+            id, 
+            nome_completo, 
+            email, 
+            telefone, 
+            tipo_franqueado
+          )
+        )
       `
       )
-      .order("nome_unidade");
-    setUnidades(data || []);
-    setCarregando(false);
+        .order("nome_unidade");
+
+      if (error) {
+        console.error('Erro ao carregar unidades:', error);
+        setUnidades([]);
+      } else {
+        setUnidades(data || []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar unidades:', error);
+      setUnidades([]);
+    } finally {
+      setCarregando(false);
+    }
   };
 
   const carregarFranqueados = async () => {

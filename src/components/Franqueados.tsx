@@ -65,9 +65,16 @@ export function Franqueados() {
         .from("franqueados")
         .select("*")
         .order("nome_completo");
-      setFranqueados(data || []);
+      
+      if (error) {
+        console.error('Erro ao carregar franqueados:', error);
+        setFranqueados([]);
+      } else {
+        setFranqueados(data || []);
+      }
     } catch (error) {
-      alert(`Erro ao carregar franqueados: ${error}`);
+      console.error('Erro ao carregar franqueados:', error);
+      setFranqueados([]);
     } finally {
       setCarregando(false);
     }
