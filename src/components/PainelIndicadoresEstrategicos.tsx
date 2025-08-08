@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { IndicadoresEstrategicosService } from '../services/indicadoresEstrategicosService';
 import { IndicadoresEstrategicos, FiltrosIndicadores } from '../types/indicadoresEstrategicos';
+import { formatMonetaryResponsive } from '../utils/monetaryUtils';
 
 const CORES = {
   primary: '#3B82F6',
@@ -109,6 +110,21 @@ export function PainelIndicadoresEstrategicos() {
     if (valor > 0) return 'text-green-600';
     if (valor < 0) return 'text-red-600';
     return 'text-gray-600';
+  };
+
+  const renderMonetaryValue = (value: number, colorClass: string = '') => {
+    const { formatted, className, shouldTruncate } = formatMonetaryResponsive(value, {
+      compact: value >= 1000000
+    });
+
+    return (
+      <p 
+        className={`${className} ${colorClass} ${shouldTruncate ? 'monetary-truncate' : ''}`}
+        title={shouldTruncate ? formatarMoeda(value) : undefined}
+      >
+        {formatted}
+      </p>
+    );
   };
 
   const getSituacaoColor = (situacao: string) => {
@@ -239,84 +255,80 @@ export function PainelIndicadoresEstrategicos() {
       {/* Cards de Resumo Executivo */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl shadow-lg p-6 border border-red-200">
-          <div className="flex items-center justify-between mb-4">
-            <div>
+          <div className="flex items-start space-x-4 min-h-[80px]">
+            <div className="p-2 bg-red-500 rounded-full flex-shrink-0">
+              <DollarSign className="w-6 h-6 text-white" />
+            </div>
+            <div className="monetary-container">
               <p className="text-sm font-medium text-red-700">Total Devido</p>
-              <p className="text-3xl font-bold text-red-600">
-                {formatarMoeda(indicadores.visao_geral_mensal.total_devido)}
-              </p>
+              {renderMonetaryValue(indicadores.visao_geral_mensal.total_devido, 'text-red-600')}
+              <div className="mt-2 flex items-center text-sm">
+                <span className={`flex items-center font-semibold ${getVariacaoColor(indicadores.visao_geral_mensal.variacao_mes_anterior.devido)}`}>
+                  {getVariacaoIcon(indicadores.visao_geral_mensal.variacao_mes_anterior.devido)}
+                  <span className="ml-1">{Math.abs(indicadores.visao_geral_mensal.variacao_mes_anterior.devido).toFixed(1)}%</span>
+                </span>
+                <span className="text-gray-500 ml-2">vs. mês anterior</span>
+              </div>
             </div>
-            <div className="p-3 bg-red-500 rounded-full">
-              <DollarSign className="w-8 h-8 text-white" />
-            </div>
-          </div>
-          <div className="flex items-center text-sm">
-            <span className={`flex items-center font-semibold ${getVariacaoColor(indicadores.visao_geral_mensal.variacao_mes_anterior.devido)}`}>
-              {getVariacaoIcon(indicadores.visao_geral_mensal.variacao_mes_anterior.devido)}
-              <span className="ml-1">{Math.abs(indicadores.visao_geral_mensal.variacao_mes_anterior.devido).toFixed(1)}%</span>
-            </span>
-            <span className="text-gray-500 ml-2">vs. mês anterior</span>
           </div>
         </div>
 
         <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-lg p-6 border border-green-200">
-          <div className="flex items-center justify-between mb-4">
-            <div>
+          <div className="flex items-start space-x-4 min-h-[80px]">
+            <div className="p-2 bg-green-500 rounded-full flex-shrink-0">
+              <CheckCircle className="w-6 h-6 text-white" />
+            </div>
+            <div className="monetary-container">
               <p className="text-sm font-medium text-green-700">Total Recuperado</p>
-              <p className="text-3xl font-bold text-green-600">
-                {formatarMoeda(indicadores.visao_geral_mensal.total_recuperado)}
-              </p>
+              {renderMonetaryValue(indicadores.visao_geral_mensal.total_recuperado, 'text-green-600')}
+              <div className="mt-2 flex items-center text-sm">
+                <span className={`flex items-center font-semibold ${getVariacaoColor(indicadores.visao_geral_mensal.variacao_mes_anterior.recuperado)}`}>
+                  {getVariacaoIcon(indicadores.visao_geral_mensal.variacao_mes_anterior.recuperado)}
+                  <span className="ml-1">{Math.abs(indicadores.visao_geral_mensal.variacao_mes_anterior.recuperado).toFixed(1)}%</span>
+                </span>
+                <span className="text-gray-500 ml-2">vs. mês anterior</span>
+              </div>
             </div>
-            <div className="p-3 bg-green-500 rounded-full">
-              <CheckCircle className="w-8 h-8 text-white" />
-            </div>
-          </div>
-          <div className="flex items-center text-sm">
-            <span className={`flex items-center font-semibold ${getVariacaoColor(indicadores.visao_geral_mensal.variacao_mes_anterior.recuperado)}`}>
-              {getVariacaoIcon(indicadores.visao_geral_mensal.variacao_mes_anterior.recuperado)}
-              <span className="ml-1">{Math.abs(indicadores.visao_geral_mensal.variacao_mes_anterior.recuperado).toFixed(1)}%</span>
-            </span>
-            <span className="text-gray-500 ml-2">vs. mês anterior</span>
           </div>
         </div>
 
         <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl shadow-lg p-6 border border-yellow-200">
-          <div className="flex items-center justify-between mb-4">
-            <div>
+          <div className="flex items-start space-x-4 min-h-[80px]">
+            <div className="p-2 bg-yellow-500 rounded-full flex-shrink-0">
+              <AlertTriangle className="w-6 h-6 text-white" />
+            </div>
+            <div className="monetary-container">
               <p className="text-sm font-medium text-yellow-700">% Inadimplência</p>
-              <p className="text-3xl font-bold text-yellow-600">
+              <p className="monetary-value text-yellow-600">
                 {formatarPercentual(indicadores.visao_geral_mensal.percentual_inadimplencia)}
               </p>
+              <div className="mt-2 flex items-center text-sm">
+                <span className={`flex items-center font-semibold ${getVariacaoColor(-indicadores.visao_geral_mensal.variacao_mes_anterior.inadimplencia)}`}>
+                  {getVariacaoIcon(-indicadores.visao_geral_mensal.variacao_mes_anterior.inadimplencia)}
+                  <span className="ml-1">{Math.abs(indicadores.visao_geral_mensal.variacao_mes_anterior.inadimplencia).toFixed(1)}pp</span>
+                </span>
+                <span className="text-gray-500 ml-2">vs. mês anterior</span>
+              </div>
             </div>
-            <div className="p-3 bg-yellow-500 rounded-full">
-              <AlertTriangle className="w-8 h-8 text-white" />
-            </div>
-          </div>
-          <div className="flex items-center text-sm">
-            <span className={`flex items-center font-semibold ${getVariacaoColor(-indicadores.visao_geral_mensal.variacao_mes_anterior.inadimplencia)}`}>
-              {getVariacaoIcon(-indicadores.visao_geral_mensal.variacao_mes_anterior.inadimplencia)}
-              <span className="ml-1">{Math.abs(indicadores.visao_geral_mensal.variacao_mes_anterior.inadimplencia).toFixed(1)}pp</span>
-            </span>
-            <span className="text-gray-500 ml-2">vs. mês anterior</span>
           </div>
         </div>
 
         <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl shadow-lg p-6 border border-purple-200">
-          <div className="flex items-center justify-between mb-4">
-            <div>
+          <div className="flex items-start space-x-4 min-h-[80px]">
+            <div className="p-2 bg-purple-500 rounded-full flex-shrink-0">
+              <Users className="w-6 h-6 text-white" />
+            </div>
+            <div className="monetary-container">
               <p className="text-sm font-medium text-purple-700">Unidades Críticas</p>
-              <p className="text-3xl font-bold text-purple-600">
+              <p className="monetary-value text-purple-600">
                 {indicadores.reincidencia_criticos.unidades_criticas}
               </p>
+              <div className="mt-2 flex items-center text-sm">
+                <span className="text-purple-600 font-semibold">
+                  {formatarPercentual(indicadores.reincidencia_criticos.indicador_reincidencia_global)} reincidentes
+                </span>
+              </div>
             </div>
-            <div className="p-3 bg-purple-500 rounded-full">
-              <Users className="w-8 h-8 text-white" />
-            </div>
-          </div>
-          <div className="flex items-center text-sm">
-            <span className="text-purple-600 font-semibold">
-              {formatarPercentual(indicadores.reincidencia_criticos.indicador_reincidencia_global)} reincidentes
-            </span>
           </div>
         </div>
       </div>
