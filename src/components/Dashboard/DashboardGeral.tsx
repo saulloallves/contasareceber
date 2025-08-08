@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { DashboardService } from '../../services/dashboardService';
 import { IndicadoresMensais } from '../../types/dashboard';
+import { formatMonetaryResponsive } from '../../utils/monetaryUtils';
 
 export function DashboardGeral() {
   const [indicadores, setIndicadores] = useState<IndicadoresMensais | null>(null);
@@ -57,6 +58,22 @@ export function DashboardGeral() {
     if (valor < 0) return 'text-red-600';
     return 'text-gray-600';
   };
+
+  const renderMonetaryValue = (value: number, colorClass: string = '') => {
+    const { formatted, className, shouldTruncate } = formatMonetaryResponsive(value, {
+      compact: value >= 1000000 // Use compact notation for values >= 1M
+    });
+
+    return (
+      <p 
+        className={`${className} ${colorClass} ${shouldTruncate ? 'monetary-truncate' : ''}`}
+        title={shouldTruncate ? formatarMoeda(value) : undefined}
+      >
+        {formatted}
+      </p>
+    );
+  };
+
   if (carregando) {
     return (
       <div className="flex items-center justify-center min-h-96">
@@ -144,15 +161,13 @@ export function DashboardGeral() {
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl shadow-lg p-6 border border-red-200">
-          <div className="flex items-start space-x-4">
+          <div className="flex items-start space-x-4 min-h-[80px]">
             <div className="p-2 bg-red-500 rounded-full flex-shrink-0">
               <TrendingUp className="w-4 h-4 text-white" />
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="monetary-container">
               <p className="text-sm font-medium text-red-700">Total Inadimplentes</p>
-              <p className="text-3xl font-bold text-red-600">
-                {formatarMoeda(indicadores.totalEmAberto)}
-              </p>
+              {renderMonetaryValue(indicadores.totalEmAberto, 'text-red-600')}
               <div className="mt-2 flex items-center text-sm">
                 <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoEmAberto)}`}>
                   {getVariacaoIcon(indicadores.variacaoEmAberto)}
@@ -165,15 +180,13 @@ export function DashboardGeral() {
         </div>
 
         <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-lg p-6 border border-green-200">
-          <div className="flex items-start space-x-4">
+          <div className="flex items-start space-x-4 min-h-[80px]">
             <div className="p-2 bg-green-500 rounded-full flex-shrink-0">
               <CheckCircle className="w-4 h-4 text-white" />
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="monetary-container">
               <p className="text-sm font-medium text-green-700">Valor Recuperado</p>
-              <p className="text-3xl font-bold text-green-600">
-                {formatarMoeda(indicadores.totalQuitado)}
-              </p>
+              {renderMonetaryValue(indicadores.totalQuitado, 'text-green-600')}
               <div className="mt-2 flex items-center text-sm">
                 <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoQuitado)}`}>
                   {getVariacaoIcon(indicadores.variacaoQuitado)}
@@ -186,15 +199,13 @@ export function DashboardGeral() {
         </div>
 
         <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl shadow-lg p-6 border border-yellow-200">
-          <div className="flex items-start space-x-4">
+          <div className="flex items-start space-x-4 min-h-[80px]">
             <div className="p-2 bg-yellow-500 rounded-full flex-shrink-0">
               <Clock className="w-4 h-4 text-white" />
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="monetary-container">
               <p className="text-sm font-medium text-yellow-700">Em Negociação</p>
-              <p className="text-3xl font-bold text-yellow-600">
-                {formatarMoeda(indicadores.totalNegociando)}
-              </p>
+              {renderMonetaryValue(indicadores.totalNegociando, 'text-yellow-600')}
               <div className="mt-2 flex items-center text-sm">
                 <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoNegociando)}`}>
                   {getVariacaoIcon(indicadores.variacaoNegociando)}
@@ -207,14 +218,19 @@ export function DashboardGeral() {
         </div>
 
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg p-6 border border-blue-200">
-          <div className="flex items-start space-x-4">
+          <div className="flex items-start space-x-4 min-h-[80px]">
             <div className="p-2 bg-blue-500 rounded-full flex-shrink-0">
               <Users className="w-4 h-4 text-white" />
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="monetary-container">
               <p className="text-sm font-medium text-blue-700">Unidades Inadimplentes</p>
-              <p className="text-3xl font-bold text-blue-600">{indicadores.unidadesInadimplentes}</p>
-              <p className="text-xs text-blue-500 mt-1">Ticket médio: {formatarMoeda(indicadores.ticketMedio)}</p>
+              <p className="monetary-value text-blue-600">{indicadores.unidadesInadimplentes}</p>
+              <p className="text-xs text-blue-500 mt-1">
+                Ticket médio: 
+                <span className="font-semibold ml-1">
+                  {formatMonetaryResponsive(indicadores.ticketMedio, { compact: true }).formatted}
+                </span>
+              </p>
               <div className="mt-2 flex items-center text-sm">
                 <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoUnidades)}`}>
                   {getVariacaoIcon(indicadores.variacaoUnidades)}

@@ -142,3 +142,115 @@
     width: auto !important;
   }
 }
+/* Responsive monetary text sizing */
+.monetary-value {
+  /* Base font size using clamp for fluid scaling */
+  font-size: clamp(1.25rem, 4vw, 1.875rem);
+  font-weight: 700;
+  line-height: 1.1;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Large monetary values - automatically scale down */
+.monetary-value-large {
+  font-size: clamp(1rem, 3.5vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.1;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Extra large monetary values - scale down further */
+.monetary-value-xl {
+  font-size: clamp(0.875rem, 3vw, 1.25rem);
+  font-weight: 700;
+  line-height: 1.1;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Responsive breakpoints for monetary values */
+@media (max-width: 320px) {
+  .monetary-value {
+    font-size: 1rem;
+  }
+  .monetary-value-large {
+    font-size: 0.875rem;
+  }
+  .monetary-value-xl {
+    font-size: 0.75rem;
+  }
+}
+
+@media (min-width: 321px) and (max-width: 480px) {
+  .monetary-value {
+    font-size: clamp(1rem, 5vw, 1.25rem);
+  }
+  .monetary-value-large {
+    font-size: clamp(0.875rem, 4vw, 1.125rem);
+  }
+  .monetary-value-xl {
+    font-size: clamp(0.75rem, 3.5vw, 1rem);
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .monetary-value {
+    font-size: clamp(1.125rem, 4vw, 1.5rem);
+  }
+  .monetary-value-large {
+    font-size: clamp(1rem, 3.5vw, 1.25rem);
+  }
+  .monetary-value-xl {
+    font-size: clamp(0.875rem, 3vw, 1.125rem);
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .monetary-value {
+    font-size: clamp(1.25rem, 3vw, 1.75rem);
+  }
+  .monetary-value-large {
+    font-size: clamp(1.125rem, 2.5vw, 1.5rem);
+  }
+  .monetary-value-xl {
+    font-size: clamp(1rem, 2vw, 1.25rem);
+  }
+}
+
+@media (min-width: 1025px) {
+  .monetary-value {
+    font-size: 1.875rem; /* 30px */
+  }
+  .monetary-value-large {
+    font-size: 1.5rem; /* 24px */
+  }
+  .monetary-value-xl {
+    font-size: 1.25rem; /* 20px */
+  }
+}
+
+/* Container for monetary values with overflow protection */
+.monetary-container {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Utility class for truncating very long monetary values */
+.monetary-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Animation for monetary value changes */
+.monetary-value-animated {
+  transition: font-size 0.3s ease-in-out, color 0.2s ease-in-out;
+}
