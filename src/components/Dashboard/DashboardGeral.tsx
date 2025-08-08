@@ -144,85 +144,85 @@ export function DashboardGeral() {
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl shadow-lg p-6 border border-red-200">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-start space-x-4">
+            <div className="p-2 bg-red-500 rounded-full flex-shrink-0">
+              <TrendingUp className="w-7 h-7 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-red-700">Total Inadimplentes</p>
               <p className="text-3xl font-bold text-red-600">
                 {formatarMoeda(indicadores.totalEmAberto)}
               </p>
+              <div className="mt-2 flex items-center text-sm">
+                <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoEmAberto)}`}>
+                  {getVariacaoIcon(indicadores.variacaoEmAberto)}
+                  {formatarPercentual(Math.abs(indicadores.variacaoEmAberto))}
+                </span>
+                <span className="text-gray-500 ml-2">vs. mês anterior</span>
+              </div>
             </div>
-            <div className="p-2 bg-red-500 rounded-full">
-              <TrendingUp className="w-7 h-7 text-white" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm">
-            <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoEmAberto)}`}>
-              {getVariacaoIcon(indicadores.variacaoEmAberto)}
-              {formatarPercentual(Math.abs(indicadores.variacaoEmAberto))}
-            </span>
-            <span className="text-gray-500 ml-2">vs. mês anterior</span>
           </div>
         </div>
 
         <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-lg p-6 border border-green-200">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-start space-x-4">
+            <div className="p-2 bg-green-500 rounded-full flex-shrink-0">
+              <CheckCircle className="w-7 h-7 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-green-700">Valor Recuperado</p>
               <p className="text-3xl font-bold text-green-600">
                 {formatarMoeda(indicadores.totalQuitado)}
               </p>
+              <div className="mt-2 flex items-center text-sm">
+                <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoQuitado)}`}>
+                  {getVariacaoIcon(indicadores.variacaoQuitado)}
+                  {formatarPercentual(Math.abs(indicadores.variacaoQuitado))}
+                </span>
+                <span className="text-gray-500 ml-2">vs. mês anterior</span>
+              </div>
             </div>
-            <div className="p-2 bg-green-500 rounded-full">
-              <CheckCircle className="w-7 h-7 text-white" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm">
-            <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoQuitado)}`}>
-              {getVariacaoIcon(indicadores.variacaoQuitado)}
-              {formatarPercentual(Math.abs(indicadores.variacaoQuitado))}
-            </span>
-            <span className="text-gray-500 ml-2">vs. mês anterior</span>
           </div>
         </div>
 
         <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl shadow-lg p-6 border border-yellow-200">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-start space-x-4">
+            <div className="p-2 bg-yellow-500 rounded-full flex-shrink-0">
+              <Clock className="w-7 h-7 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-yellow-700">Em Negociação</p>
               <p className="text-3xl font-bold text-yellow-600">
                 {formatarMoeda(indicadores.totalNegociando)}
               </p>
+              <div className="mt-2 flex items-center text-sm">
+                <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoNegociando)}`}>
+                  {getVariacaoIcon(indicadores.variacaoNegociando)}
+                  {formatarPercentual(Math.abs(indicadores.variacaoNegociando))}
+                </span>
+                <span className="text-gray-500 ml-2">vs. mês anterior</span>
+              </div>
             </div>
-            <div className="p-2 bg-yellow-500 rounded-full">
-              <Clock className="w-7 h-7 text-white" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm">
-            <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoNegociando)}`}>
-              {getVariacaoIcon(indicadores.variacaoNegociando)}
-              {formatarPercentual(Math.abs(indicadores.variacaoNegociando))}
-            </span>
-            <span className="text-gray-500 ml-2">vs. mês anterior</span>
           </div>
         </div>
 
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg p-6 border border-blue-200">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-start space-x-4">
+            <div className="p-2 bg-blue-500 rounded-full flex-shrink-0">
+              <Users className="w-7 h-7 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-blue-700">Unidades Inadimplentes</p>
               <p className="text-3xl font-bold text-blue-600">{indicadores.unidadesInadimplentes}</p>
               <p className="text-xs text-blue-500 mt-1">Ticket médio: {formatarMoeda(indicadores.ticketMedio)}</p>
+              <div className="mt-2 flex items-center text-sm">
+                <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoUnidades)}`}>
+                  {getVariacaoIcon(indicadores.variacaoUnidades)}
+                  {formatarPercentual(Math.abs(indicadores.variacaoUnidades))}
+                </span>
+                <span className="text-gray-500 ml-2">vs. mês anterior</span>
+              </div>
             </div>
-            <div className="p-2 bg-blue-500 rounded-full">
-              <Users className="w-7 h-7 text-white" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm">
-            <span className={`font-semibold ${getVariacaoColor(indicadores.variacaoUnidades)}`}>
-              {getVariacaoIcon(indicadores.variacaoUnidades)}
-              {formatarPercentual(Math.abs(indicadores.variacaoUnidades))}
-            </span>
-            <span className="text-gray-500 ml-2">vs. mês anterior</span>
           </div>
         </div>
       </div>
