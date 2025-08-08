@@ -146,7 +146,7 @@ export function DashboardGeral() {
         <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl shadow-lg p-6 border border-red-200">
           <div className="flex items-start space-x-4">
             <div className="p-2 bg-red-500 rounded-full flex-shrink-0">
-              <TrendingUp className="w-7 h-7 text-white" />
+              <TrendingUp className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-red-700">Total Inadimplentes</p>
@@ -167,7 +167,7 @@ export function DashboardGeral() {
         <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-lg p-6 border border-green-200">
           <div className="flex items-start space-x-4">
             <div className="p-2 bg-green-500 rounded-full flex-shrink-0">
-              <CheckCircle className="w-7 h-7 text-white" />
+              <CheckCircle className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-green-700">Valor Recuperado</p>
@@ -188,7 +188,7 @@ export function DashboardGeral() {
         <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl shadow-lg p-6 border border-yellow-200">
           <div className="flex items-start space-x-4">
             <div className="p-2 bg-yellow-500 rounded-full flex-shrink-0">
-              <Clock className="w-7 h-7 text-white" />
+              <Clock className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-yellow-700">Em Negociação</p>
@@ -209,7 +209,7 @@ export function DashboardGeral() {
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg p-6 border border-blue-200">
           <div className="flex items-start space-x-4">
             <div className="p-2 bg-blue-500 rounded-full flex-shrink-0">
-              <Users className="w-7 h-7 text-white" />
+              <Users className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-blue-700">Unidades Inadimplentes</p>
