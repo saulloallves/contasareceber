@@ -43,7 +43,7 @@ export function ImportacaoPlanilha() {
       }
 
       // Compara com a última planilha
-      const resultadoComp = await cobrancaService.compararComUltimaPlanilha(dadosPlanilha);
+  const resultadoComp = await comparacaoPlanilhaService.compararComUltimaPlanilha(dadosPlanilha);
       setResultadoComparacao(resultadoComp);
       setModalComparacaoAberto(true);
 
@@ -217,25 +217,25 @@ export function ImportacaoPlanilha() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                   <div className="text-center p-3 bg-white rounded-lg">
                     <div className="text-2xl font-bold text-blue-600">
-                      {resultado.estatisticas.total_registros}
+                      {resultado.estatisticas?.total_registros ?? 0}
                     </div>
                     <div className="text-sm text-gray-600">Total de Registros</div>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg">
                     <div className="text-2xl font-bold text-green-600">
-                      {resultado.estatisticas.novos_registros}
+                      {resultado.estatisticas?.novos_registros ?? 0}
                     </div>
                     <div className="text-sm text-gray-600">Novos Registros</div>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg">
                     <div className="text-2xl font-bold text-yellow-600">
-                      {resultado.estatisticas.registros_atualizados}
+                      {resultado.estatisticas?.registros_atualizados ?? 0}
                     </div>
                     <div className="text-sm text-gray-600">Atualizados</div>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg">
                     <div className="text-2xl font-bold text-gray-600">
-                      {resultado.estatisticas.registros_quitados}
+                      {resultado.estatisticas?.registros_quitados ?? 0}
                     </div>
                     <div className="text-sm text-gray-600">Quitados</div>
                   </div>

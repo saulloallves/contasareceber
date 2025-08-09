@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Plus,
@@ -17,7 +16,11 @@ import {
   ArrowDown,
   AlertTriangle,
   Info,
-  MessageCircle,
+  // MessageCircle,
+  Calculator,
+  MessageSquare,
+  // Mail,
+  Scale,
 } from "lucide-react";
 import { CobrancaFranqueado } from "../../types/cobranca";
 import { cobrancaService } from "../../services/cobrancaService";
@@ -26,7 +29,6 @@ import {
   processarPlanilhaExcel,
   processarPlanilhaXML,
 } from "../../utils/planilhaProcessor";
-import type { ResultadoImportacao } from "../../types/cobranca";
 import type { ResultadoComparacao } from "../../services/comparacaoPlanilhaService";
 import { comparacaoPlanilhaService } from "../../services/comparacaoPlanilhaService";
 import {
@@ -34,12 +36,16 @@ import {
   formatarMoeda,
   formatarData,
 } from "../../utils/formatters"; // Importando a função de formatação de CNPJ/CPF
+import { SimulacaoParcelamentoService } from "../../services/simulacaoParcelamentoService";
+import { UnidadesService } from "../../services/unidadesService";
+import type { UnidadeFranqueada } from "../../types/unidades";
+import { emailService } from "../../services/emailService";
 
 export function GestaoCobrancas() {
   const [cobrancas, setCobrancas] = useState<CobrancaFranqueado[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [modalAberto, setModalAberto] = useState<
-    "criar" | "editar" | "upload" | "status" | "quitacao" | null
+    "criar" | "editar" | "upload" | "status" | "quitacao" | "acoes" | null
   >(null);
   const [cobrancaSelecionada, setCobrancaSelecionada] =
     useState<CobrancaFranqueado | null>(null);
@@ -47,7 +53,7 @@ export function GestaoCobrancas() {
     null
   ); //Linha adicionada para 'guardar' o arquivo selecionado
   const [processando, setProcessando] = useState(false); // Linha adicionada para controlar o estado de processamento do upload
-  const [resultado, setResultado] = useState<ResultadoImportacao | null>(null); // Linha adicionada para armazenar o resultado do processamento da planilha
+  // const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
   const [resultadoComparacao, setResultadoComparacao] =
     useState<ResultadoComparacao | null>(null);
   const [modalComparacaoAberto, setModalComparacaoAberto] = useState(false);
@@ -81,6 +87,73 @@ export function GestaoCobrancas() {
   const [modalHistoricoAberto, setModalHistoricoAberto] = useState(false);
   const [historicoEnvios, setHistoricoEnvios] = useState<any[]>([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+  const [viewMode, setViewMode] = useState<"cards" | "lista">("cards");
+
+  // Serviços auxiliares (instâncias)
+  const simulacaoService = new SimulacaoParcelamentoService();
+  const unidadesService = React.useMemo(() => new UnidadesService(), []);
+  const [unidadesPorCnpj, setUnidadesPorCnpj] = useState<Record<string, UnidadeFranqueada>>({});
+  const cnpjKey = useCallback((cnpj: string) => (cnpj || "").replace(/\D/g, ""), []);
+
+  // Estados do modal unificado
+  const [abaAcoes, setAbaAcoes] = useState<
+    "acoes_rapidas" | "simulacao" | "mensagem" | "detalhes"
+  >("acoes_rapidas");
+  const [unidadeSelecionada, setUnidadeSelecionada] = useState<any | null>(
+    null
+  );
+  const [simulacaoAtual, setSimulacaoAtual] = useState<any>(null);
+  const [formSimulacao, setFormSimulacao] = useState({
+    quantidade_parcelas: 3,
+    data_primeira_parcela: "",
+    valor_entrada: 0,
+  });
+  const [formProposta, setFormProposta] = useState({
+    canais_envio: ["whatsapp"] as ("whatsapp" | "email")[],
+    observacoes: "",
+  });
+  const [formMensagem, setFormMensagem] = useState({
+    template: "padrao",
+    mensagem_personalizada: "",
+    canal: "whatsapp" as "whatsapp" | "email",
+  });
+
+  const templatesPadrao = {
+    padrao: `Olá, {{cliente}}!
+
+Consta um débito da sua unidade, vencido em {{data_vencimento}}.
+Valor atualizado até hoje: *{{valor_atualizado}}*
+
+Deseja regularizar? Entre em contato conosco.
+
+_Esta é uma mensagem do sistema de cobrança._`,
+
+    formal: `Prezado(a) {{cliente}},
+
+Identificamos pendência financeira em aberto referente à sua unidade {{codigo_unidade}}.
+
+Dados da pendência:
+- Valor original: {{valor_original}}
+- Valor atualizado: {{valor_atualizado}}
+- Data de vencimento: {{data_vencimento}}
+- Dias em atraso: {{dias_atraso}}
+
+Solicitamos regularização no prazo de 5 dias úteis.
+
+Atenciosamente,
+Equipe Financeira`,
+
+    urgente: `🚨 ATENÇÃO {{cliente}}
+
+Sua unidade {{codigo_unidade}} possui débito VENCIDO há {{dias_atraso}} dias.
+
+💰 Valor: {{valor_atualizado}}
+📅 Vencimento: {{data_vencimento}}
+
+⚠️ Regularize HOJE para evitar bloqueios!
+
+Entre em contato: (11) 99999-9999`,
+  } as const;
 
   const mostrarMensagem = (
     tipo: "sucesso" | "erro" | "info",
@@ -104,6 +177,15 @@ export function GestaoCobrancas() {
         apenasInadimplentes: mostrarApenasInadimplentes, // Linha adicionada para filtrar apenas inadimplentes
       });
       setCobrancas(dadosReaisDoBanco);
+      // Precarrega nomes/códigos das unidades em lote
+      try {
+  const cnpjs = dadosReaisDoBanco.map((c) => cnpjKey(c.cnpj)).filter(Boolean);
+        const mapa = await unidadesService.buscarUnidadesPorCnpjs(cnpjs);
+        setUnidadesPorCnpj(mapa);
+      } catch (e) {
+        console.warn("Falha ao mapear unidades por CNPJ", e);
+        setUnidadesPorCnpj({});
+      }
     } catch (error) {
       console.error("Erro ao carregar cobranças:", error);
       // Em caso de erro, a lista vai ser limpa e mostrar uma mensagem
@@ -112,7 +194,7 @@ export function GestaoCobrancas() {
     } finally {
       setCarregando(false);
     }
-  }, [filtros, colunaOrdenacao, direcaoOrdenacao, mostrarApenasInadimplentes]);
+  }, [filtros, colunaOrdenacao, direcaoOrdenacao, mostrarApenasInadimplentes, unidadesService, cnpjKey]);
 
   // Função para abrir histórico de envios
   const abrirHistoricoEnvios = useCallback(async (cobrancaId: string) => {
@@ -179,12 +261,50 @@ export function GestaoCobrancas() {
   };
 
   /**
+   * Abre o modal unificado de ações
+   */
+  const abrirModalAcoes = async (cobranca: CobrancaFranqueado) => {
+    setCobrancaSelecionada(cobranca);
+    setAbaAcoes("acoes_rapidas");
+    setSimulacaoAtual(null);
+    setFormSimulacao({
+      quantidade_parcelas: 3,
+      data_primeira_parcela: "",
+      valor_entrada: 0,
+    });
+    setFormProposta({ canais_envio: ["whatsapp"], observacoes: "" });
+    setFormMensagem({
+      template: "padrao",
+      mensagem_personalizada: "",
+      canal: "whatsapp",
+    });
+
+    // Primeiro tenta via cache
+    const cached = unidadesPorCnpj[cnpjKey(cobranca.cnpj)];
+    if (cached) {
+      setUnidadeSelecionada(cached);
+    } else {
+      try {
+        const unidade = await unidadesService.buscarUnidadePorCnpj(cobranca.cnpj);
+        setUnidadeSelecionada(unidade);
+      } catch (e) {
+        console.warn("Não foi possível carregar dados da unidade", e);
+        setUnidadeSelecionada(null);
+      }
+    }
+
+    setModalAberto("acoes");
+  };
+
+  /**
    * Função para fechar o modal e limpar os dados do formulário
    */
   const fecharModal = () => {
     setModalAberto(null);
     setCobrancaSelecionada(null);
     setFormData({});
+    setUnidadeSelecionada(null);
+    setSimulacaoAtual(null);
   };
 
   /**
@@ -245,9 +365,10 @@ export function GestaoCobrancas() {
       );
 
       // Chama o serviço de comparação
-      const resultadoComp = await cobrancaService.compararComUltimaPlanilha(
-        dadosDaPlanilha
-      );
+      const resultadoComp =
+        await comparacaoPlanilhaService.compararComUltimaPlanilha(
+          dadosDaPlanilha
+        );
       setResultadoComparacao(resultadoComp);
       setModalComparacaoAberto(true);
     } catch (error: any) {
@@ -333,6 +454,227 @@ export function GestaoCobrancas() {
         : "desc";
     setColunaOrdenacao(coluna);
     setDirecaoOrdenacao(novaDirecao);
+  };
+
+  // ====== Funcionalidades do Painel Operacional integradas ======
+  const calcularJuros = (cobranca: any) => {
+    const valorOriginal = cobranca.valor_original;
+    const valorAtualizado = cobranca.valor_atualizado || valorOriginal;
+    return valorAtualizado - valorOriginal;
+  };
+
+  const podeSimularParcelamento = (c: CobrancaFranqueado) => {
+    const valorAtualizado = c.valor_atualizado || c.valor_original;
+    return c.status !== "quitado" && valorAtualizado >= 500;
+  };
+
+  const podeAcionarJuridico = (c: CobrancaFranqueado) => {
+    const valorAtualizado = c.valor_atualizado || c.valor_original;
+    const diasAtraso = c.dias_em_atraso || 0;
+    return (
+      c.status === "em_aberto" && valorAtualizado > 5000 && diasAtraso >= 91
+    );
+  };
+
+  const acionarJuridico = async (cobranca: CobrancaFranqueado) => {
+    const valorAtualizado =
+      cobranca.valor_atualizado || cobranca.valor_original;
+
+    if (
+      !confirm(
+        `🚨 ACIONAMENTO JURÍDICO - ${
+          cobranca.cliente
+        }\n\nCRITÉRIOS VALIDADOS:\n✓ Valor: ${formatarMoeda(
+          valorAtualizado
+        )} (superior a R$ 5.000,00)\n✓ Status: Em aberto há ${
+          cobranca.dias_em_atraso || 0
+        } dias (≥91 dias)  \n✓ Aviso de débito enviado: Sim\n✓ Sem resposta do cliente\n\nCRITÉRIOS QUE SERÃO VALIDADOS NO SISTEMA:\n• Score de risco deve ser igual a zero\n• 3+ cobranças ignoradas nos últimos 15 dias  \n• Acordo descumprido OU reincidência nos últimos 6 meses\n\n⚠️ Esta ação enviará notificação extrajudicial via e-mail e WhatsApp.\n\nConfirma o acionamento jurídico?`
+      )
+    ) {
+      return;
+    }
+
+    setProcessando(true);
+    try {
+      const response = await fetch(
+        "https://uveugjjntywsfbcjrpgu.supabase.co/functions/v1/acionar-juridico-cobranca",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ cobrancaId: cobranca.id }),
+        }
+      );
+
+      const resultado = await response.json();
+
+      if (resultado.sucesso) {
+        mostrarMensagem(
+          "sucesso",
+          "Cobrança acionada no jurídico com sucesso! Notificações enviadas."
+        );
+        await carregarCobrancas();
+      } else {
+        mostrarMensagem(
+          "erro",
+          `Erro ao acionar jurídico: ${resultado.mensagem}`
+        );
+      }
+    } catch (error) {
+      console.error("Erro ao acionar jurídico:", error);
+      mostrarMensagem(
+        "erro",
+        "Erro ao comunicar com o servidor. Tente novamente."
+      );
+    } finally {
+      setProcessando(false);
+    }
+  };
+
+  const aplicarVariaveis = (template: string) => {
+    if (!cobrancaSelecionada) return template;
+
+    const variaveis: Record<string, string> = {
+      "{{cliente}}": cobrancaSelecionada.cliente,
+      "{{codigo_unidade}}":
+        (unidadeSelecionada as any)?.codigo_unidade || cobrancaSelecionada.cnpj,
+      "{{valor_original}}": formatarMoeda(cobrancaSelecionada.valor_original),
+      "{{valor_atualizado}}": formatarMoeda(
+        cobrancaSelecionada.valor_atualizado ||
+          cobrancaSelecionada.valor_original
+      ),
+      "{{data_vencimento}}": formatarData(cobrancaSelecionada.data_vencimento),
+      "{{dias_atraso}}": (cobrancaSelecionada.dias_em_atraso || 0).toString(),
+    };
+
+    let mensagem = template;
+    Object.entries(variaveis).forEach(([chave, valor]) => {
+      mensagem = mensagem.replace(
+        new RegExp(chave.replace(/[{}]/g, "\\$&"), "g"),
+        valor
+      );
+    });
+    return mensagem;
+  };
+
+  const getPreviewMensagem = () => {
+    if (formMensagem.template === "personalizada") {
+      return formMensagem.mensagem_personalizada;
+    }
+    return aplicarVariaveis(
+      templatesPadrao[formMensagem.template as keyof typeof templatesPadrao]
+    );
+  };
+
+  const enviarMensagemPersonalizada = async () => {
+    if (!cobrancaSelecionada) return;
+
+    const mensagemFinal =
+      formMensagem.template === "personalizada"
+        ? formMensagem.mensagem_personalizada
+        : aplicarVariaveis(
+            templatesPadrao[
+              formMensagem.template as keyof typeof templatesPadrao
+            ]
+          );
+
+    setProcessando(true);
+    try {
+      if (formMensagem.canal === "whatsapp") {
+        const telefone =
+          (unidadeSelecionada as any)?.telefone_franqueado ||
+          cobrancaSelecionada.telefone ||
+          "";
+        if (!telefone) {
+          mostrarMensagem("erro", "Telefone não cadastrado para esta unidade.");
+        } else {
+          await evolutionApiService.sendTextMessage({
+            instanceName: "automacoes_backup",
+            number: telefone,
+            text: mensagemFinal,
+          });
+          mostrarMensagem("sucesso", "Mensagem enviada via WhatsApp!");
+        }
+      } else {
+        const resultado = await emailService.enviarMensagemCobranca(
+          formMensagem.template as
+            | "padrao"
+            | "formal"
+            | "urgente"
+            | "personalizada",
+          formMensagem.mensagem_personalizada,
+          unidadeSelecionada,
+          cobrancaSelecionada
+        );
+        if (resultado.sucesso) {
+          mostrarMensagem("sucesso", "Email enviado com sucesso!");
+        } else {
+          mostrarMensagem("erro", resultado.erro || "Falha ao enviar email");
+        }
+      }
+      setModalAberto(null);
+    } catch (error) {
+      mostrarMensagem("erro", `Erro ao enviar mensagem: ${error}`);
+    } finally {
+      setProcessando(false);
+    }
+  };
+
+  const simularParcelamento = async () => {
+    if (!cobrancaSelecionada || !formSimulacao.data_primeira_parcela) {
+      alert("Data da primeira parcela é obrigatória");
+      return;
+    }
+    setProcessando(true);
+    try {
+      const simulacao = await simulacaoService.simularParcelamento(
+        cobrancaSelecionada.id!,
+        formSimulacao.quantidade_parcelas,
+        formSimulacao.data_primeira_parcela,
+        formSimulacao.valor_entrada || undefined
+      );
+      setSimulacaoAtual(simulacao);
+      mostrarMensagem("sucesso", "Simulação realizada com sucesso.");
+    } catch (error) {
+      alert(`Erro na simulação: ${error}`);
+    } finally {
+      setProcessando(false);
+    }
+  };
+
+  const gerarProposta = async () => {
+    if (!simulacaoAtual) return;
+    setProcessando(true);
+    try {
+      const simulacaoId = await simulacaoService.salvarSimulacao(
+        simulacaoAtual
+      );
+      const proposta = await simulacaoService.gerarProposta(
+        simulacaoId,
+        formProposta.canais_envio,
+        "usuario_atual"
+      );
+
+      const resultados: string[] = [];
+      if (formProposta.canais_envio.includes("whatsapp")) {
+        const ok = await simulacaoService.enviarPropostaWhatsApp(proposta.id!);
+        resultados.push(`WhatsApp: ${ok ? "Enviado" : "Falha"}`);
+      }
+      if (formProposta.canais_envio.includes("email")) {
+        const ok = await simulacaoService.enviarPropostaEmail(proposta.id!);
+        resultados.push(`Email: ${ok ? "Enviado" : "Falha"}`);
+      }
+
+      alert(`Proposta gerada e enviada!\n${resultados.join("\n")}`);
+      fecharModal();
+      carregarCobrancas();
+    } catch (error) {
+      alert(`Erro ao gerar proposta: ${error}`);
+    } finally {
+      setProcessando(false);
+    }
   };
 
   /**
@@ -576,14 +918,14 @@ export function GestaoCobrancas() {
     }
 
     try {
-      const resultado = await cobrancaService.quitarCobranca(
-        cobrancaSelecionada.id,
-        formQuitacao.valorPago,
-        formQuitacao.formaPagamento,
+      const resultado = await cobrancaService.quitarCobranca({
+        cobrancaId: cobrancaSelecionada.id,
+        valorPago: formQuitacao.valorPago,
+        formaPagamento: formQuitacao.formaPagamento,
+        dataRecebimento: formQuitacao.dataRecebimento,
+        observacoes: formQuitacao.observacoes,
         usuario,
-        formQuitacao.observacoes,
-        formQuitacao.dataRecebimento
-      );
+      });
 
       if (resultado.sucesso) {
         mostrarMensagem("sucesso", resultado.mensagem);
@@ -603,13 +945,14 @@ export function GestaoCobrancas() {
    */
   const marcarQuitadoRapido = async (cobranca: CobrancaFranqueado) => {
     try {
-      const resultado = await cobrancaService.quitarCobranca(
-        cobranca.id!,
-        cobranca.valor_atualizado || cobranca.valor_original,
-        "Não informado",
+      const resultado = await cobrancaService.quitarCobranca({
+        cobrancaId: cobranca.id!,
+        valorPago: cobranca.valor_atualizado || cobranca.valor_original,
+        formaPagamento: "Não informado",
+        dataRecebimento: new Date().toISOString().split("T")[0],
+        observacoes: "Quitação rápida via interface",
         usuario,
-        "Quitação rápida via interface"
-      );
+      });
 
       if (resultado.sucesso) {
         mostrarMensagem("sucesso", resultado.mensagem);
@@ -807,239 +1150,259 @@ export function GestaoCobrancas() {
           </div>
         )}
 
-        {/* Tabela de Cobranças */}
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleOrdenacao("cliente")}
-                >
-                  <div className="flex items-center">
-                    <span>Cliente</span>
-                    {/* Mostra a seta correspondente se esta for a coluna ativa */}
-                    {colunaOrdenacao === "cliente" &&
-                      (direcaoOrdenacao === "desc" ? (
-                        <ArrowDown className="w-4 h-4 ml-2" />
-                      ) : (
-                        <ArrowUp className="w-4 h-4 ml-2" />
-                      ))}
-                  </div>
-                </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleOrdenacao("valor_original")}
-                >
-                  <div className="flex items-center">
-                    <span>Valor Original</span>
-                    {colunaOrdenacao === "valor_original" &&
-                      (direcaoOrdenacao === "desc" ? (
-                        <ArrowDown className="w-4 h-4 ml-2" />
-                      ) : (
-                        <ArrowUp className="w-4 h-4 ml-2" />
-                      ))}
-                  </div>
-                </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleOrdenacao("valor_atualizado")}
-                >
-                  <div className="flex items-center">
-                    <span>Valor Atualizado</span>
-                    {colunaOrdenacao === "valor_atualizado" &&
-                      (direcaoOrdenacao === "desc" ? (
-                        <ArrowDown className="w-4 h-4 ml-2" />
-                      ) : (
-                        <ArrowUp className="w-4 h-4 ml-2" />
-                      ))}
-                  </div>
-                </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleOrdenacao("data_vencimento")}
-                >
-                  <div className="flex items-center">
-                    <span>Vencimento</span>
-                    {colunaOrdenacao === "data_vencimento" &&
-                      (direcaoOrdenacao === "desc" ? (
-                        <ArrowDown className="w-4 h-4 ml-2" />
-                      ) : (
-                        <ArrowUp className="w-4 h-4 ml-2" />
-                      ))}
-                  </div>
-                </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleOrdenacao("status")}
-                >
-                  <div className="flex items-center">
-                    <span>Status</span>
-                    {colunaOrdenacao === "status" &&
-                      (direcaoOrdenacao === "desc" ? (
-                        <ArrowDown className="w-4 h-4 ml-2" />
-                      ) : (
-                        <ArrowUp className="w-4 h-4 ml-2" />
-                      ))}
-                  </div>
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <div className="flex items-center">
-                    <span>Ações</span>
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {carregando ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center">
-                      <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mr-2" />
-                      Carregando cobranças...
-                    </div>
-                  </td>
-                </tr>
-              ) : cobrancas.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-6 py-4 text-center text-gray-500"
-                  >
-                    Nenhuma cobrança encontrada
-                  </td>
-                </tr>
-              ) : (
-                cobrancas.map((cobranca) => (
-                  <tr key={cobranca.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {cobranca.cliente}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {formatarCNPJCPF(cobranca.cnpj)}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatarMoeda(cobranca.valor_original)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-bold text-red-600">
-                        {formatarMoeda(
-                          cobranca.valor_atualizado || cobranca.valor_original
-                        )}
-                      </div>
-                      {cobranca.dias_em_atraso &&
-                        cobranca.dias_em_atraso > 0 && (
-                          <div className="text-xs text-red-500 font-medium">
-                            {cobranca.dias_em_atraso} dias de atraso
-                          </div>
-                        )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatarData(cobranca.data_vencimento)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {getStatusIcon(cobranca.status)}
-                        <span
-                          className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
-                            cobranca.status
-                          )}`}
-                        >
-                          {cobranca.status.replace("_", " ").toUpperCase()}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => abrirModalEditar(cobranca)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Editar"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        {cobranca.telefone &&
-                          cobranca.status === "em_aberto" &&
-                          (() => {
-                            // Calcula dias de atraso para verificar se pode enviar cobrança amigável
-                            const dataVencimento = new Date(
-                              cobranca.data_vencimento
-                            );
-                            const hoje = new Date();
-                            const diffTime =
-                              hoje.getTime() - dataVencimento.getTime();
-                            const diasAtraso = Math.ceil(
-                              diffTime / (1000 * 60 * 60 * 24)
-                            );
+        {/* Alternância de visualização */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm text-gray-600">
+            Mostrando {cobrancas.length} cobranças
+          </div>
+          <div className="inline-flex bg-gray-100 rounded-lg p-1">
+            <button
+              className={`px-3 py-1 text-sm rounded-md ${
+                viewMode === "cards"
+                  ? "bg-white shadow border text-gray-800"
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
+              onClick={() => setViewMode("cards")}
+            >
+              Cards
+            </button>
+            <button
+              className={`ml-1 px-3 py-1 text-sm rounded-md ${
+                viewMode === "lista"
+                  ? "bg-white shadow border text-gray-800"
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
+              onClick={() => setViewMode("lista")}
+            >
+              Lista
+            </button>
+          </div>
+        </div>
 
-                            // Mostra botão apenas se há menos de 15 dias de atraso
-                            return diasAtraso < 15;
-                          })() && (
-                            <button
-                              onClick={() => enviarCobranca(cobranca)}
-                              disabled={enviandoWhatsapp === cobranca.id}
-                              className={`${
-                                enviandoWhatsapp === cobranca.id
-                                  ? "text-gray-400 cursor-not-allowed"
-                                  : "text-green-600 hover:text-green-900"
-                              }`}
-                              title={
-                                enviandoWhatsapp === cobranca.id
-                                  ? "Enviando..."
-                                  : "Cobrança Amigável"
-                              }
-                            >
-                              {enviandoWhatsapp === cobranca.id ? (
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <MessageCircle className="w-4 h-4" />
-                              )}
-                            </button>
-                          )}
-                        {cobranca.status === "em_aberto" && (
-                          <>
-                            <button
-                              onClick={() => marcarQuitadoRapido(cobranca)}
-                              className="text-green-600 hover:text-green-900"
-                              title="Marcar como quitado (rápido)"
-                            >
-                              <CheckCircle className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => abrirModalQuitacao(cobranca)}
-                              className="text-blue-600 hover:text-blue-900"
-                              title="Quitação detalhada"
-                            >
-                              <Receipt className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => abrirModalStatus(cobranca)}
-                              className="text-purple-600 hover:text-purple-900"
-                              title="Alterar status"
-                            >
-                              <Clock className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-                        <button
-                          onClick={() => abrirHistoricoEnvios(cobranca.id!)}
-                          className="text-gray-600 hover:text-gray-900"
-                          title="Ver histórico"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
+        {/* Grid de Cards */}
+        {viewMode === "cards" && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {carregando ? (
+              <div className="col-span-full flex items-center justify-center py-12 text-gray-600">
+                <RefreshCw className="w-6 h-6 animate-spin mr-2" /> Carregando
+                cobranças...
+              </div>
+            ) : cobrancas.length === 0 ? (
+              <div className="col-span-full text-center text-gray-500 py-12">
+                Nenhuma cobrança encontrada
+              </div>
+            ) : (
+              cobrancas.map((c) => (
+                <div
+                  key={c.id}
+                  className="bg-white rounded-2xl shadow-md border border-gray-100 p-5 cursor-pointer hover:shadow-lg transition-all"
+                  onClick={() => abrirModalAcoes(c)}
+                  title="Clique para abrir ações"
+                >
+                  <div className="flex items-center mb-3">
+                    <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mr-3">
+                      <Receipt className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className="font-bold text-gray-800 text-sm truncate"
+                        title={c.cliente}
+                      >
+                        {unidadesPorCnpj[cnpjKey(c.cnpj)]?.nome_franqueado || c.cliente}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {unidadesPorCnpj[cnpjKey(c.cnpj)]?.codigo_unidade || formatarCNPJCPF(c.cnpj)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs text-gray-500">Valor</div>
+                      <div className="text-sm font-semibold text-red-600">
+                        {formatarMoeda(c.valor_atualizado || c.valor_original)}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-gray-500">Venc.</div>
+                      <div className="text-sm text-gray-800">
+                        {formatarData(c.data_vencimento)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <span
+                      className={`px-2 py-1 text-[10px] font-medium rounded-full ${getStatusColor(
+                        c.status
+                      )}`}
+                    >
+                      {c.status.replace("_", " ").toUpperCase()}
+                    </span>
+                    {c.dias_em_atraso && c.dias_em_atraso > 0 && (
+                      <span className="text-[10px] text-red-600 font-medium">
+                        {c.dias_em_atraso}d atraso
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Tabela de Cobranças */}
+        {viewMode === "lista" && (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleOrdenacao("cliente")}
+                  >
+                    <div className="flex items-center">
+                      <span>Cliente</span>
+                      {/* Mostra a seta correspondente se esta for a coluna ativa */}
+                      {colunaOrdenacao === "cliente" &&
+                        (direcaoOrdenacao === "desc" ? (
+                          <ArrowDown className="w-4 h-4 ml-2" />
+                        ) : (
+                          <ArrowUp className="w-4 h-4 ml-2" />
+                        ))}
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleOrdenacao("valor_original")}
+                  >
+                    <div className="flex items-center">
+                      <span>Valor Original</span>
+                      {colunaOrdenacao === "valor_original" &&
+                        (direcaoOrdenacao === "desc" ? (
+                          <ArrowDown className="w-4 h-4 ml-2" />
+                        ) : (
+                          <ArrowUp className="w-4 h-4 ml-2" />
+                        ))}
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleOrdenacao("valor_atualizado")}
+                  >
+                    <div className="flex items-center">
+                      <span>Valor Atualizado</span>
+                      {colunaOrdenacao === "valor_atualizado" &&
+                        (direcaoOrdenacao === "desc" ? (
+                          <ArrowDown className="w-4 h-4 ml-2" />
+                        ) : (
+                          <ArrowUp className="w-4 h-4 ml-2" />
+                        ))}
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleOrdenacao("data_vencimento")}
+                  >
+                    <div className="flex items-center">
+                      <span>Vencimento</span>
+                      {colunaOrdenacao === "data_vencimento" &&
+                        (direcaoOrdenacao === "desc" ? (
+                          <ArrowDown className="w-4 h-4 ml-2" />
+                        ) : (
+                          <ArrowUp className="w-4 h-4 ml-2" />
+                        ))}
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleOrdenacao("status")}
+                  >
+                    <div className="flex items-center">
+                      <span>Status</span>
+                      {colunaOrdenacao === "status" &&
+                        (direcaoOrdenacao === "desc" ? (
+                          <ArrowDown className="w-4 h-4 ml-2" />
+                        ) : (
+                          <ArrowUp className="w-4 h-4 ml-2" />
+                        ))}
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {carregando ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center">
+                        <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mr-2" />
+                        Carregando cobranças...
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : cobrancas.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-6 py-4 text-center text-gray-500"
+                    >
+                      Nenhuma cobrança encontrada
+                    </td>
+                  </tr>
+                ) : (
+                  cobrancas.map((cobranca) => (
+                    <tr
+                      key={cobranca.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => abrirModalAcoes(cobranca)}
+                      title="Clique para abrir ações"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {unidadesPorCnpj[cnpjKey(cobranca.cnpj)]?.nome_franqueado || cobranca.cliente}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {unidadesPorCnpj[cnpjKey(cobranca.cnpj)]?.codigo_unidade || formatarCNPJCPF(cobranca.cnpj)}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatarMoeda(cobranca.valor_original)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-bold text-red-600">
+                          {formatarMoeda(
+                            cobranca.valor_atualizado || cobranca.valor_original
+                          )}
+                        </div>
+                        {cobranca.dias_em_atraso &&
+                          cobranca.dias_em_atraso > 0 && (
+                            <div className="text-xs text-red-500 font-medium">
+                              {cobranca.dias_em_atraso} dias de atraso
+                            </div>
+                          )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatarData(cobranca.data_vencimento)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          {getStatusIcon(cobranca.status)}
+                          <span
+                            className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
+                              cobranca.status
+                            )}`}
+                          >
+                            {cobranca.status.replace("_", " ").toUpperCase()}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Modal de Criação/Edição */}
@@ -1821,6 +2184,625 @@ export function GestaoCobrancas() {
                 <Receipt className="w-4 h-4" />
                 <span>Registrar Quitação</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Unificado de Ações */}
+      {modalAberto === "acoes" && cobrancaSelecionada && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-0 max-w-5xl w-full max-h-[95vh] overflow-y-auto shadow-2xl border border-gray-200">
+            {/* Header */}
+            <div className="flex items-center justify-between px-8 pt-6 pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Receipt className="w-7 h-7 text-blue-600" />
+                </div>
+                <div>
+                  <div className="text-xl font-bold text-gray-800 leading-tight">
+                    {unidadesPorCnpj[cnpjKey(cobrancaSelecionada.cnpj)]?.nome_franqueado || cobrancaSelecionada.cliente}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {unidadesPorCnpj[cnpjKey(cobrancaSelecionada.cnpj)]?.codigo_unidade || formatarCNPJCPF(cobrancaSelecionada.cnpj)} • Venc.:{" "}
+                    {formatarData(cobrancaSelecionada.data_vencimento)} • Valor:{" "}
+                    {formatarMoeda(
+                      cobrancaSelecionada.valor_atualizado ||
+                        cobrancaSelecionada.valor_original
+                    )}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={fecharModal}
+                className="text-gray-400 hover:text-gray-700 text-2xl px-2"
+                title="Fechar"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Abas */}
+            <div className="flex border-b px-6">
+              {(
+                [
+                  { k: "acoes_rapidas", label: "Ações rápidas" },
+                  { k: "simulacao", label: "Simular parcelamento" },
+                  { k: "mensagem", label: "Enviar mensagem" },
+                  { k: "detalhes", label: "Detalhes" },
+                ] as const
+              ).map((aba) => (
+                <button
+                  key={aba.k}
+                  onClick={() => setAbaAcoes(aba.k)}
+                  className={`px-4 py-3 font-medium -mb-px ${
+                    abaAcoes === aba.k
+                      ? "border-b-2 border-blue-600 text-blue-600"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {aba.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="px-8 py-6">
+              {/* Ações rápidas */}
+              {abaAcoes === "acoes_rapidas" && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <button
+                      onClick={() => abrirModalEditar(cobrancaSelecionada)}
+                      className="flex items-center justify-center gap-2 px-4 py-3 border rounded-lg hover:bg-gray-50"
+                    >
+                      <Edit className="w-4 h-4 text-blue-600" /> Editar cobrança
+                    </button>
+                    <button
+                      onClick={() => enviarCobranca(cobrancaSelecionada)}
+                      className="flex items-center justify-center gap-2 px-4 py-3 border rounded-lg hover:bg-gray-50"
+                      disabled={enviandoWhatsapp === cobrancaSelecionada.id}
+                    >
+                      {enviandoWhatsapp === cobrancaSelecionada.id ? (
+                        <RefreshCw className="w-4 h-4 animate-spin text-green-600" />
+                      ) : (
+                        <MessageSquare className="w-4 h-4 text-green-600" />
+                      )}
+                      Cobrança amigável (WhatsApp)
+                    </button>
+                    {cobrancaSelecionada.status === "em_aberto" && (
+                      <button
+                        onClick={() => marcarQuitadoRapido(cobrancaSelecionada)}
+                        className="flex items-center justify-center gap-2 px-4 py-3 border rounded-lg hover:bg-gray-50"
+                      >
+                        <CheckCircle className="w-4 h-4 text-green-600" />{" "}
+                        Marcar quitado (rápido)
+                      </button>
+                    )}
+                    {cobrancaSelecionada.status === "em_aberto" && (
+                      <button
+                        onClick={() => abrirModalQuitacao(cobrancaSelecionada)}
+                        className="flex items-center justify-center gap-2 px-4 py-3 border rounded-lg hover:bg-gray-50"
+                      >
+                        <Receipt className="w-4 h-4 text-blue-600" /> Quitação
+                        detalhada
+                      </button>
+                    )}
+                    <button
+                      onClick={() => abrirModalStatus(cobrancaSelecionada)}
+                      className="flex items-center justify-center gap-2 px-4 py-3 border rounded-lg hover:bg-gray-50"
+                    >
+                      <Clock className="w-4 h-4 text-purple-600" /> Alterar
+                      status
+                    </button>
+                    <button
+                      onClick={() =>
+                        abrirHistoricoEnvios(cobrancaSelecionada.id!)
+                      }
+                      className="flex items-center justify-center gap-2 px-4 py-3 border rounded-lg hover:bg-gray-50"
+                    >
+                      <Eye className="w-4 h-4 text-gray-700" /> Ver histórico de
+                      envios
+                    </button>
+                    {podeSimularParcelamento(cobrancaSelecionada) && (
+                      <button
+                        onClick={() => setAbaAcoes("simulacao")}
+                        className="flex items-center justify-center gap-2 px-4 py-3 border rounded-lg hover:bg-gray-50"
+                      >
+                        <Calculator className="w-4 h-4 text-emerald-600" />{" "}
+                        Simular parcelamento
+                      </button>
+                    )}
+                    {podeAcionarJuridico(cobrancaSelecionada) && (
+                      <button
+                        onClick={() => acionarJuridico(cobrancaSelecionada)}
+                        className="flex items-center justify-center gap-2 px-4 py-3 border rounded-lg hover:bg-gray-50"
+                      >
+                        <Scale className="w-4 h-4 text-red-600" /> Acionar
+                        jurídico
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Simulação de parcelamento */}
+              {abaAcoes === "simulacao" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-gray-800">
+                      Configurar Parcelamento
+                    </h4>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Quantidade de Parcelas
+                      </label>
+                      <select
+                        value={formSimulacao.quantidade_parcelas}
+                        onChange={(e) =>
+                          setFormSimulacao({
+                            ...formSimulacao,
+                            quantidade_parcelas: parseInt(e.target.value),
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                      >
+                        {[2, 3, 4, 5, 6].map((n) => (
+                          <option key={n} value={n}>
+                            {n}x
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Data da Primeira Parcela *
+                      </label>
+                      <input
+                        type="date"
+                        value={formSimulacao.data_primeira_parcela}
+                        onChange={(e) =>
+                          setFormSimulacao({
+                            ...formSimulacao,
+                            data_primeira_parcela: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Valor de Entrada (opcional)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formSimulacao.valor_entrada}
+                        onChange={(e) =>
+                          setFormSimulacao({
+                            ...formSimulacao,
+                            valor_entrada: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                        placeholder="0,00"
+                      />
+                    </div>
+                    <button
+                      onClick={simularParcelamento}
+                      disabled={
+                        processando || !formSimulacao.data_primeira_parcela
+                      }
+                      className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {processando ? "Simulando..." : "Simular Parcelamento"}
+                    </button>
+                  </div>
+
+                  {simulacaoAtual && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <h4 className="font-medium text-green-800 mb-4">
+                        Resultado da Simulação
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Valor Original:</span>
+                          <span className="font-medium">
+                            {formatarMoeda(simulacaoAtual.valor_original)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Valor Atualizado:</span>
+                          <span className="font-medium text-red-600">
+                            {formatarMoeda(simulacaoAtual.valor_atualizado)}
+                          </span>
+                        </div>
+                        {simulacaoAtual.valor_entrada ? (
+                          <div className="flex justify-between">
+                            <span>Entrada:</span>
+                            <span className="font-medium text-green-600">
+                              {formatarMoeda(simulacaoAtual.valor_entrada)}
+                            </span>
+                          </div>
+                        ) : null}
+                        <div className="flex justify-between">
+                          <span>Parcelas:</span>
+                          <span className="font-medium">
+                            {simulacaoAtual.quantidade_parcelas}x{" "}
+                            {formatarMoeda(simulacaoAtual.parcelas[0].valor)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Multa:</span>
+                          <span className="font-medium">
+                            10% (
+                            {formatarMoeda(simulacaoAtual.parcelas[0].multa)})
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Juros Mora:</span>
+                          <span className="font-medium">
+                            1.5% (
+                            {formatarMoeda(
+                              simulacaoAtual.parcelas[0].juros_mora
+                            )}
+                            )
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span className="font-semibold">Total:</span>
+                          <span className="font-bold text-blue-600">
+                            {formatarMoeda(
+                              simulacaoAtual.valor_total_parcelamento
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-3 mb-4 mt-3">
+                        <h5 className="font-medium mb-2">Cronograma:</h5>
+                        <div className="space-y-1 text-sm">
+                          {simulacaoAtual.parcelas.map(
+                            (parcela: any, index: number) => (
+                              <div key={index} className="flex justify-between">
+                                <span>
+                                  Parcela {parcela.numero} (
+                                  {formatarData(parcela.data_vencimento)}):
+                                </span>
+                                <span className="font-medium">
+                                  {formatarMoeda(parcela.valor)}
+                                </span>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Canais de envio */}
+                      <div className="space-y-2 mb-3">
+                        <div className="text-sm font-medium text-gray-800">
+                          Canais de envio
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <label className="inline-flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={formProposta.canais_envio.includes(
+                                "whatsapp"
+                              )}
+                              onChange={(e) => {
+                                setFormProposta((prev) => ({
+                                  ...prev,
+                                  canais_envio: e.target.checked
+                                    ? Array.from(
+                                        new Set([
+                                          ...prev.canais_envio,
+                                          "whatsapp",
+                                        ])
+                                      )
+                                    : prev.canais_envio.filter(
+                                        (c) => c !== "whatsapp"
+                                      ),
+                                }));
+                              }}
+                            />
+                            WhatsApp
+                          </label>
+                          <label className="inline-flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={formProposta.canais_envio.includes(
+                                "email"
+                              )}
+                              onChange={(e) => {
+                                setFormProposta((prev) => ({
+                                  ...prev,
+                                  canais_envio: e.target.checked
+                                    ? Array.from(
+                                        new Set([...prev.canais_envio, "email"])
+                                      )
+                                    : prev.canais_envio.filter(
+                                        (c) => c !== "email"
+                                      ),
+                                }));
+                              }}
+                            />
+                            Email
+                          </label>
+                        </div>
+                      </div>
+                      <button
+                        onClick={gerarProposta}
+                        disabled={
+                          processando || formProposta.canais_envio.length === 0
+                        }
+                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {processando ? "Gerando..." : "Gerar e Enviar Proposta"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Enviar mensagem */}
+              {abaAcoes === "mensagem" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Canal de envio
+                      </label>
+                      <select
+                        value={formMensagem.canal}
+                        onChange={(e) =>
+                          setFormMensagem({
+                            ...formMensagem,
+                            canal: e.target.value as any,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="email">Email</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Template
+                      </label>
+                      <select
+                        value={formMensagem.template}
+                        onChange={(e) =>
+                          setFormMensagem({
+                            ...formMensagem,
+                            template: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="padrao">Padrão</option>
+                        <option value="formal">Formal</option>
+                        <option value="urgente">Urgente</option>
+                        <option value="personalizada">Personalizada</option>
+                      </select>
+                    </div>
+                    {formMensagem.template === "personalizada" && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Mensagem Personalizada
+                        </label>
+                        <textarea
+                          value={formMensagem.mensagem_personalizada}
+                          onChange={(e) =>
+                            setFormMensagem({
+                              ...formMensagem,
+                              mensagem_personalizada: e.target.value,
+                            })
+                          }
+                          rows={8}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                          placeholder="Digite sua mensagem personalizada..."
+                        />
+                      </div>
+                    )}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <h5 className="font-medium text-blue-800 mb-2">
+                        Variáveis disponíveis:
+                      </h5>
+                      <div className="text-sm text-blue-700 space-y-1">
+                        <div>
+                          {"{{"}cliente{"}}"} - Nome do cliente
+                        </div>
+                        <div>
+                          {"{{"}codigo_unidade{"}}"} - Código da unidade
+                        </div>
+                        <div>
+                          {"{{"}valor_original{"}}"} - Valor original
+                        </div>
+                        <div>
+                          {"{{"}valor_atualizado{"}}"} - Valor atualizado
+                        </div>
+                        <div>
+                          {"{{"}data_vencimento{"}}"} - Data de vencimento
+                        </div>
+                        <div>
+                          {"{{"}dias_atraso{"}}"} - Dias em atraso
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={enviarMensagemPersonalizada}
+                      disabled={processando}
+                      className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                    >
+                      {processando
+                        ? "Enviando..."
+                        : `Enviar via ${
+                            formMensagem.canal === "whatsapp"
+                              ? "WhatsApp"
+                              : "Email"
+                          }`}
+                    </button>
+                  </div>
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-800 mb-4">
+                      Preview da Mensagem
+                    </h4>
+                    <div className="bg-white border rounded-lg p-4 min-h-[300px]">
+                      <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">
+                        {getPreviewMensagem()}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Detalhes */}
+              {abaAcoes === "detalhes" && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Cliente
+                        </label>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {cobrancaSelecionada.cliente}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          CNPJ
+                        </label>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {formatarCNPJCPF(cobrancaSelecionada.cnpj)}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Status
+                        </label>
+                        <span
+                          className={`mt-1 inline-block px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
+                            cobrancaSelecionada.status
+                          )}`}
+                        >
+                          {cobrancaSelecionada.status
+                            .replace("_", " ")
+                            .toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Valor Original
+                        </label>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {formatarMoeda(cobrancaSelecionada.valor_original)}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Valor Atualizado
+                        </label>
+                        <p className="mt-1 text-sm text-red-600 font-medium">
+                          {formatarMoeda(
+                            cobrancaSelecionada.valor_atualizado ||
+                              cobrancaSelecionada.valor_original
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Juros/Multa
+                        </label>
+                        <p className="mt-1 text-sm text-orange-600">
+                          {formatarMoeda(calcularJuros(cobrancaSelecionada))}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Data de Vencimento
+                      </label>
+                      <p className="mt-1 text-sm text-gray-900">
+                        {formatarData(cobrancaSelecionada.data_vencimento)}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Dias em Atraso
+                      </label>
+                      <p className="mt-1 text-sm text-red-600">
+                        {cobrancaSelecionada.dias_em_atraso || 0} dias
+                      </p>
+                    </div>
+                  </div>
+
+                  {unidadeSelecionada && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Nome do Franqueado
+                          </label>
+                          <p className="mt-1 text-sm text-gray-900">
+                            {(unidadeSelecionada as any).nome_franqueado ||
+                              "N/A"}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Código da Unidade
+                          </label>
+                          <p className="mt-1 text-sm text-gray-900">
+                            {(unidadeSelecionada as any).codigo_unidade ||
+                              "N/A"}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Telefone
+                          </label>
+                          <p className="mt-1 text-sm text-gray-900">
+                            {(unidadeSelecionada as any).telefone_franqueado ||
+                              "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Email
+                          </label>
+                          <p className="mt-1 text-sm text-gray-900">
+                            {(unidadeSelecionada as any).email_franqueado ||
+                              "N/A"}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Cidade
+                          </label>
+                          <p className="mt-1 text-sm text-gray-900">
+                            {(unidadeSelecionada as any).cidade || "N/A"}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Estado
+                          </label>
+                          <p className="mt-1 text-sm text-gray-900">
+                            {(unidadeSelecionada as any).estado || "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
