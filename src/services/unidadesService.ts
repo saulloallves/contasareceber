@@ -120,6 +120,58 @@ export class UnidadesService {
   }
 
   /**
+   * Busca múltiplas unidades por uma lista de CNPJs e retorna um mapa cnpj->unidade
+   */
+  async buscarUnidadesPorCnpjs(
+    cnpjs: string[]
+  ): Promise<Record<string, UnidadeFranqueada>> {
+    try {
+      type UnidadeComCnpj = UnidadeFranqueada & { cnpj?: string };
+      const limpos = Array.from(
+        new Set(
+          (cnpjs || [])
+            .filter(Boolean)
+            .map((c) => c.replace(/\D/g, ""))
+            .filter((c) => c.length > 0)
+        )
+      );
+
+      if (limpos.length === 0) return {};
+
+      const { data, error } = await supabase
+        .from("unidades_franqueadas")
+        .select(
+          `
+          *,
+          franqueado_unidades (
+            franqueado_id,
+            franqueados (
+              id, nome, email, telefone
+            )
+          )
+        `
+        )
+        .in("cnpj", limpos);
+
+      if (error) {
+        throw new Error(`Erro ao buscar unidades por CNPJs: ${error.message}`);
+      }
+
+      const mapa: Record<string, UnidadeFranqueada> = {};
+      (data as UnidadeComCnpj[] | null)?.forEach((u) => {
+        const chave = u && (u as UnidadeComCnpj).cnpj;
+        if (chave) {
+          mapa[chave] = u as UnidadeFranqueada;
+        }
+      });
+      return mapa;
+    } catch (error) {
+      console.error("Erro ao buscar unidades por CNPJs:", error);
+      throw error;
+    }
+  }
+
+  /**
    * Cria nova unidade
    */
   async criarUnidade(
