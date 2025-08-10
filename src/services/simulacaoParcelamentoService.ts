@@ -40,12 +40,16 @@ export class SimulacaoParcelamentoService {
         .select(
           `
           *,
-          unidades_franqueadas!inner (
+          unidades_franqueadas!left (
             codigo_unidade,
             nome_unidade,
-            franqueado_unidades!inner (
-              franqueados!inner (
-                nome_completo
+            email_unidade,
+            telefone_unidade,
+            franqueado_unidades!left (
+              franqueados!left (
+                nome_completo,
+                email,
+                telefone
               )
             )
           )
@@ -184,15 +188,15 @@ export class SimulacaoParcelamentoService {
         .select(
           `
           *,
-          cobrancas_franqueados!inner (
+          cobrancas_franqueados!left (
             cliente,
             cnpj,
-            unidades_franqueadas!inner (
+            unidades_franqueadas!left (
               nome_unidade,
               email_unidade,
               telefone_unidade,
-              franqueado_unidades!inner (
-                franqueados!inner (
+              franqueado_unidades!left (
+                franqueados!left (
                   nome_completo,
                   email,
                   telefone
@@ -282,11 +286,11 @@ export class SimulacaoParcelamentoService {
         .select(
           `
           *,
-          cobrancas_franqueados!inner (
-            unidades_franqueadas!inner (
+          cobrancas_franqueados!left (
+            unidades_franqueadas!left (
               telefone_unidade,
-              franqueado_unidades!inner (
-                franqueados!inner (
+              franqueado_unidades!left (
+                franqueados!left (
                   telefone
                 )
               )
@@ -397,15 +401,15 @@ export class SimulacaoParcelamentoService {
         .select(
           `
           *,
-          simulacoes_parcelamento!inner(*),
-          cobrancas_franqueados!inner (
+          simulacoes_parcelamento!left(*),
+          cobrancas_franqueados!left (
             cliente,
-            unidades_franqueadas!inner (
+            unidades_franqueadas!left (
               email_unidade,
               codigo_unidade,
               nome_unidade,
-              franqueado_unidades!inner (
-                franqueados!inner (
+              franqueado_unidades!left (
+                franqueados!left (
                   nome_completo,
                   email
                 )
@@ -553,10 +557,10 @@ export class SimulacaoParcelamentoService {
             cliente,
             cnpj,
             valor_original,
-            unidades_franqueadas!inner (
+            unidades_franqueadas!left (
               nome_unidade,
-              franqueado_unidades!inner (
-                franqueados!inner (
+              franqueado_unidades!left (
+                franqueados!left (
                   nome_completo
                 )
               )
@@ -724,8 +728,8 @@ Equipe Financeira`,
     const template = config.template_whatsapp;
 
     const variaveis = {
-      "{{cliente}}": franqueado?.nome_completo || unidade.nome_unidade || cobranca.cliente,
-      "{{codigo_unidade}}": unidade.codigo_unidade || "N/A",
+      "{{cliente}}": franqueado?.nome_completo || unidade?.nome_unidade || cobranca?.cliente || "Cliente",
+      "{{codigo_unidade}}": unidade?.codigo_unidade || "N/A",
       "{{valor_original}}": this.formatarMoeda(simulacao.valor_original),
       "{{valor_atualizado}}": this.formatarMoeda(simulacao.valor_atualizado),
       "{{valor_entrada}}": simulacao.valor_entrada
