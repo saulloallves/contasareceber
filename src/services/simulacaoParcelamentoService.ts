@@ -52,7 +52,7 @@ export class SimulacaoParcelamentoService {
         `
         )
         .eq("id", tituloId)
-        .single();
+        .maybeSingle();
 
       if (error || !cobranca) {
         throw new Error("Cobrança não encontrada");
