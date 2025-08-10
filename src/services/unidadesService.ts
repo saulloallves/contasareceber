@@ -15,7 +15,7 @@ export class UnidadesService {
           franqueado_unidades (
             franqueado_id,
             franqueados (
-              id, nome, email, telefone
+              id, nome_completo, email, telefone
             )
           )
         `
@@ -67,7 +67,7 @@ export class UnidadesService {
           franqueado_unidades (
             franqueado_id,
             franqueados (
-              id, nome, email, telefone
+              id, nome_completo, email, telefone
             )
           )
         `
@@ -100,7 +100,7 @@ export class UnidadesService {
           franqueado_unidades (
             franqueado_id,
             franqueados (
-              id, nome, email, telefone
+              id, nome_completo, email, telefone
             )
           )
         `
@@ -146,7 +146,7 @@ export class UnidadesService {
           franqueado_unidades (
             franqueado_id,
             franqueados (
-              id, nome, email, telefone
+              id, nome_completo, email, telefone
             )
           )
         `
