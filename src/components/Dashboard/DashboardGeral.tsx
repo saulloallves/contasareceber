@@ -1,15 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
-  TrendingUp, TrendingDown, Target, Users, Calendar, AlertTriangle,
-  CheckCircle, Clock, RefreshCw, Filter, Download
+  TrendingUp, TrendingDown, Users, AlertTriangle,
+  CheckCircle, RefreshCw, Filter, Download, Clock
 } from 'lucide-react';
 import { DashboardService } from '../../services/dashboardService';
-import { IndicadoresMensais } from '../../types/dashboard';
+// tipos específicos não utilizados diretamente aqui
 import { formatMonetaryResponsive } from '../../utils/monetaryUtils';
 
 export function DashboardGeral() {
-  const [indicadores, setIndicadores] = useState<IndicadoresMensais | null>(null);
+  const [indicadores, setIndicadores] = useState<any>(null);
   const [carregando, setCarregando] = useState(true);
   const [filtros, setFiltros] = useState({
     periodo: '30',
@@ -17,24 +17,107 @@ export function DashboardGeral() {
     tipo: ''
   });
 
-  const dashboardService = new DashboardService();
+  const dashboardService = useMemo(() => new DashboardService(), []);
 
-  useEffect(() => {
-    carregarDados();
-  }, [filtros]);
+  // Normaliza o objeto de indicadores para garantir campos e defaults
+  const normalizarIndicadores = useCallback((data: any) => {
+    // Retorna o primeiro valor numérico válido dentre os informados; caso contrário 0
+    const pickNum = (...vals: any[]) => {
+      for (const v of vals) {
+        if (v !== undefined && v !== null) {
+          const n = Number(v);
+          if (!Number.isNaN(n)) return n;
+        }
+      }
+      return 0;
+    };
+    // Retorna o primeiro array válido dentre os informados; caso contrário []
+    const pickArr = (...vals: any[]) => {
+      for (const v of vals) {
+        if (Array.isArray(v)) return v;
+      }
+      return [];
+    };
+    return {
+      // Totais (aceita camelCase, snake_case e campos com sufixo _mes)
+      totalEmAberto: pickNum(
+        data?.totalEmAberto,
+        data?.total_em_aberto,
+        data?.total_em_aberto_mes
+      ),
+      totalQuitado: pickNum(
+        data?.totalQuitado,
+        data?.total_quitado,
+        data?.total_pago_mes
+      ),
+      totalNegociando: pickNum(
+        data?.totalNegociando,
+        data?.total_negociando,
+        data?.total_negociando_mes
+      ),
 
-  const carregarDados = async () => {
+      // Variações (aceita camelCase, snake_case e mapeia do comparativo_mes_anterior)
+      variacaoEmAberto: pickNum(
+        data?.variacaoEmAberto,
+        data?.variacao_em_aberto,
+        data?.comparativo_mes_anterior?.variacao_em_aberto
+      ),
+      variacaoQuitado: pickNum(
+        data?.variacaoQuitado,
+        data?.variacao_quitado,
+        data?.comparativo_mes_anterior?.variacao_pago
+      ),
+      variacaoNegociando: pickNum(
+        data?.variacaoNegociando,
+        data?.variacao_negociando,
+        data?.comparativo_mes_anterior?.variacao_inadimplencia
+      ),
+      variacaoUnidades: pickNum(
+        data?.variacaoUnidades,
+        data?.variacao_unidades
+      ),
+
+      // Métricas auxiliares
+      unidadesInadimplentes: pickNum(
+        data?.unidadesInadimplentes,
+        data?.unidades_inadimplentes
+      ),
+      ticketMedio: pickNum(
+        data?.ticketMedio,
+        data?.ticket_medio,
+        data?.ticket_medio_dividas
+      ),
+      alertasAtivos: pickArr(
+        data?.alertasAtivos,
+        data?.alertas_ativos
+      ),
+      proximasReunioesCount: pickNum(
+        data?.proximasReunioesCount,
+        data?.proximas_reunioes_count
+      ),
+      acoesRecentesCount: pickNum(
+        data?.acoesRecentesCount,
+        data?.acoes_recentes_count
+      ),
+    };
+  }, []);
+
+  const carregarDados = useCallback(async () => {
     setCarregando(true);
     try {
       const indicadoresData = await dashboardService.buscarIndicadoresMensais();
-      
-      setIndicadores(indicadoresData);
+      // Garante que os campos usados no UI existam
+      setIndicadores(normalizarIndicadores(indicadoresData));
     } catch (error) {
       console.error('Erro ao carregar dashboard:', error);
     } finally {
       setCarregando(false);
     }
-  };
+  }, [dashboardService, normalizarIndicadores]);
+
+  useEffect(() => {
+    carregarDados();
+  }, [carregarDados, filtros]);
 
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -224,11 +307,11 @@ export function DashboardGeral() {
             </div>
             <div className="monetary-container">
               <p className="text-sm font-medium text-blue-700">Unidades Inadimplentes</p>
-              <p className="monetary-value text-blue-600">{indicadores.unidadesInadimplentes}</p>
+              <p className="monetary-value text-blue-600">{indicadores.unidadesInadimplentes ?? 0}</p>
               <p className="text-xs text-blue-500 mt-1">
                 Ticket médio: 
                 <span className="font-semibold ml-1">
-                  {formatMonetaryResponsive(indicadores.ticketMedio, { compact: true }).formatted}
+                  {formatMonetaryResponsive(indicadores.ticketMedio ?? 0, { compact: true }).formatted}
                 </span>
               </p>
               <div className="mt-2 flex items-center text-sm">
@@ -252,8 +335,8 @@ export function DashboardGeral() {
           Alertas Automáticos
         </h3>
         <div className="space-y-4">
-          {indicadores.alertasAtivos.length > 0 ? (
-            indicadores.alertasAtivos.map((alerta, index) => (
+          {(indicadores.alertasAtivos?.length ?? 0) > 0 ? (
+            (indicadores.alertasAtivos || []).map((alerta: any, index: number) => (
               <div key={index} className="flex items-center justify-between p-5 bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-xl shadow-sm">
                 <div className="flex items-center">
                   <div className="p-2 bg-red-500 rounded-full mr-4">
@@ -261,11 +344,11 @@ export function DashboardGeral() {
                   </div>
                   <div>
                     <p className="font-semibold text-red-800">{alerta.titulo}</p>
-                    <p className="text-sm text-red-600">Valor total: {formatarMoeda(alerta.valor)}</p>
+                    <p className="text-sm text-red-600">Valor total: {formatarMoeda(Number(alerta.valor ?? 0))}</p>
                   </div>
                 </div>
                 <button className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors shadow-md">
-                  {alerta.acao}
+                  {alerta.acao ?? 'Ver'}
                 </button>
               </div>
             ))
@@ -294,7 +377,7 @@ export function DashboardGeral() {
           <div className="flex items-center justify-between p-5 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl shadow-sm">
             <div className="flex items-center">
               <div className="p-2 bg-blue-500 rounded-full mr-4">
-                <Calendar className="w-5 h-5 text-white" />
+                <Clock className="w-5 h-5 text-white" />
               </div>
               <div>
                 <p className="font-semibold text-blue-800">Relatório mensal pronto para envio</p>
@@ -313,7 +396,7 @@ export function DashboardGeral() {
         <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
           <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
             <div className="p-2 bg-purple-100 rounded-lg mr-3">
-              <Calendar className="w-6 h-6 text-purple-600" />
+              <Clock className="w-6 h-6 text-purple-600" />
             </div>
             Próximas Reuniões
           </h3>

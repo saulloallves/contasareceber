@@ -1,13 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "./databaseService";
-
-interface EmailPayload {
-  to: string;
-  subject: string;
-  text: string;
-  html: string;
-}
+import { n8nService } from "./n8nService";
 
 export interface ConfiguracaoEmail {
   id: string;
@@ -61,34 +54,32 @@ export class EmailService {
         return { sucesso: false, erro: "Serviço de email está desativado" };
       }
 
-      // Adiciona dados do remetente da configuração
       const dadosCompletos: DadosEmail = {
         ...dados,
         remetente_nome: config.nome_remetente,
         remetente_email: config.email_retorno,
       };
 
-      // O corpo da requisição agora é o próprio objeto 'dados'
-      const { data: responseData, error } = await supabase.functions.invoke(
-        "send-email",
-        {
-          body: dadosCompletos,
-        }
-      );
+      // Delegar ao n8n via webhook
+      const resposta = await n8nService.enviarEmail({
+        destinatario: dadosCompletos.destinatario,
+        nome_destinatario: dadosCompletos.nome_destinatario,
+        assunto: dadosCompletos.assunto,
+        corpo_html: dadosCompletos.corpo_html,
+        corpo_texto: dadosCompletos.corpo_texto,
+        remetente_nome: dadosCompletos.remetente_nome,
+        remetente_email: dadosCompletos.remetente_email,
+        anexos: dadosCompletos.anexos,
+        metadata: { origem: "frontend", via: "n8n" },
+      });
 
-      if (error) {
-        throw new Error(`Erro ao invocar a função de e-mail: ${error.message}`);
+      if (!resposta.success) {
+        throw new Error("Falha no envio do e-mail via n8n");
       }
 
-      if (!responseData.success) {
-        throw new Error(`Falha no envio do e-mail: ${responseData.error}`);
-      }
-
-      // O log é feito na edge function, então apenas retornamos o sucesso.
-      return { sucesso: true, message_id: responseData.messageId };
+      return { sucesso: true, message_id: resposta.messageId };
     } catch (error: any) {
       console.error("Erro ao enviar email:", error);
-      // O log de falha também é feito na edge function.
       return { sucesso: false, erro: error.message };
     }
   }

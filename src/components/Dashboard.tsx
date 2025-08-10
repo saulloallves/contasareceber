@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, Area, AreaChart
+  PieChart, Pie, Cell, Line, Area, AreaChart
 } from 'recharts';
 import { 
-  TrendingUp, TrendingDown, DollarSign, Users, Calendar, MessageSquare,
-  Download, Filter, RefreshCw, AlertTriangle, CheckCircle, Clock,
-  Target, Zap, Bell, FileText, Eye, Settings
+  TrendingUp, TrendingDown, DollarSign, Users,
+  Download, Filter, RefreshCw, AlertTriangle, CheckCircle,
+  Target, Zap, Bell, Eye
 } from 'lucide-react';
 import { DashboardService } from '../services/dashboardService';
 import { DashboardData, FiltrosDashboard, IndicadoresMensais, UnidadeRisco, AlertaAutomatico } from '../types/dashboard';
@@ -31,13 +31,9 @@ export function Dashboard() {
   const [exportando, setExportando] = useState(false);
   const [abaSelecionada, setAbaSelecionada] = useState<'geral' | 'unidades' | 'evolucao' | 'alertas'>('geral');
 
-  const dashboardService = new DashboardService();
+  const dashboardService = useMemo(() => new DashboardService(), []);
 
-  useEffect(() => {
-    carregarDados();
-  }, []);
-
-  const carregarDados = async () => {
+  const carregarDados = useCallback(async () => {
     setCarregando(true);
     try {
       const [dadosDashboard, indicadoresMensais, unidadesRiscoData, alertasData] = await Promise.all([
@@ -47,7 +43,7 @@ export function Dashboard() {
         dashboardService.buscarAlertasAutomaticos()
       ]);
       
-      setDados(dadosDashboard);
+  setDados(dadosDashboard as DashboardData);
       setIndicadores(indicadoresMensais);
       setUnidadesRisco(unidadesRiscoData);
       setAlertas(alertasData);
@@ -56,7 +52,13 @@ export function Dashboard() {
     } finally {
       setCarregando(false);
     }
-  };
+  }, [dashboardService, filtros]);
+
+  useEffect(() => {
+    carregarDados();
+  }, [carregarDados]);
+
+  
 
   const aplicarFiltros = () => {
     carregarDados();
@@ -238,17 +240,17 @@ export function Dashboard() {
       {/* Navegação por Abas */}
       <div className="border-b border-gray-200 mb-6">
         <nav className="-mb-px flex space-x-8">
-          {[
+          {([
             { id: 'geral', label: 'Visão Geral', icon: Target },
             { id: 'unidades', label: 'Unidades de Risco', icon: Users },
             { id: 'evolucao', label: 'Evolução Temporal', icon: TrendingUp },
             { id: 'alertas', label: 'Alertas Automáticos', icon: Bell }
-          ].map((aba) => {
+          ] as { id: 'geral' | 'unidades' | 'evolucao' | 'alertas'; label: string; icon: React.ComponentType<{ className?: string }> }[]).map((aba) => {
             const Icon = aba.icon;
             return (
               <button
                 key={aba.id}
-                onClick={() => setAbaSelecionada(aba.id as any)}
+                onClick={() => setAbaSelecionada(aba.id)}
                 className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
                   abaSelecionada === aba.id
                     ? 'border-blue-500 text-blue-600'
@@ -357,7 +359,7 @@ export function Dashboard() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, value }) => `${name}: ${formatarPercentual(value)}`}
+                  label={({ name, value }) => `${name}: ${formatarPercentual(Number(value ?? 0))}`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"

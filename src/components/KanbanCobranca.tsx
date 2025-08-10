@@ -759,7 +759,6 @@ export function KanbanCobranca() {
                 executarAcao={executarAcao}
                 setObservacaoEditando={setObservacaoEditando}
                 setModalAberto={setModalAberto}
-                setUnitSelecionada={setUnitSelecionada}
               />
             </div>
             {/* Observações da unidade */}
@@ -1042,13 +1041,11 @@ function ChargesGrid({
   executarAcao,
   setObservacaoEditando,
   setModalAberto,
-  setUnitSelecionada,
 }: {
   charges: CardCobranca[];
   executarAcao: (cardId: string, acao: string) => void;
   setObservacaoEditando: (obs: string) => void;
   setModalAberto: (modal: "detalhes" | "acao" | "observacao" | null) => void;
-  setUnitSelecionada: (unit: any) => void;
 }) {
   // Split charges into columns of max 4
   const columns: CardCobranca[][] = [];

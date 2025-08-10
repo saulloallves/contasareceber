@@ -1,22 +1,4 @@
-import axios from "axios";
-
-// Configurações da Evolution API via variáveis de ambiente
-const API_URL = import.meta.env.VITE_EVOLUTION_API_URL;
-const API_KEY = import.meta.env.VITE_EVOLUTION_API_KEY;
-
-if (!API_URL || !API_KEY) {
-  console.error(
-    "As variáveis de ambiente da Evolution API não estão configuradas."
-  );
-}
-
-const apiClient = axios.create({
-  baseURL: API_URL,
-  headers: {
-    apikey: API_KEY,
-    "Content-Type": "application/json",
-  },
-});
+import { n8nService } from "./n8nService";
 
 // Interface atualizada para corresponder à documentação da API
 export interface SendTextMessagePayload {
@@ -59,39 +41,18 @@ function formatPhoneNumber(number: string): string {
 
 export class EvolutionApiService {
   /**
-   * Envia uma mensagem de texto simples usando a Evolution API.
-   * @param payload - Os dados da mensagem a ser enviada.
-   * @returns A resposta da API.
+   * Envia uma mensagem de texto simples delegando ao n8n.
+   * Mantém a assinatura original para compatibilidade.
    */
   async sendTextMessage(payload: SendTextMessagePayload) {
-    try {
-      // Formata o número com prefixo 55
-      const formattedNumber = formatPhoneNumber(payload.number);
-
-      console.log(
-        `Enviando WhatsApp para: ${formattedNumber} (original: ${payload.number})`
-      );
-
-      const endpoint = `/message/sendText/${payload.instanceName}`;
-
-      const requestBody = {
-        number: formattedNumber,
-        text: payload.text,
-      };
-
-      const response = await apiClient.post(endpoint, requestBody);
-
-      console.log("Resposta da Evolution API:", response.data);
-
-      return response.data;
-    } catch (error) {
-      console.error("Erro ao enviar mensagem pela Evolution API:", error);
-      // Adiciona um log mais detalhado do erro da API, se disponível
-      if (axios.isAxiosError(error) && error.response) {
-        console.error("Detalhes do erro da API:", error.response.data);
-      }
-      throw error;
-    }
+    const formattedNumber = formatPhoneNumber(payload.number);
+    const res = await n8nService.enviarWhatsApp({
+      number: formattedNumber,
+      text: payload.text,
+      instanceName: payload.instanceName,
+      metadata: { origem: "frontend", via: "n8n" },
+    });
+    return res;
   }
 }
 

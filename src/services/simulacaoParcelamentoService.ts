@@ -62,8 +62,8 @@ export class SimulacaoParcelamentoService {
         throw new Error("Cobrança não encontrada");
       }
 
-      // Busca configuração
-      const config = await this.buscarConfiguracao();
+  // Busca configuração
+  const config = await this.buscarConfiguracao();
 
       // Validação de valor mínimo
       const valorAtualizado =
@@ -340,9 +340,7 @@ export class SimulacaoParcelamentoService {
         logId = logData.id;
       }
 
-      const evolutionResponse = await evolutionApiService.sendTextMessage(
-        payload
-      );
+  const evolutionResponse = await evolutionApiService.sendTextMessage(payload);
 
       // Atualiza o log com sucesso
       if (logId) {
@@ -350,7 +348,7 @@ export class SimulacaoParcelamentoService {
           .from("logs_envio_whatsapp")
           .update({
             sucesso: true,
-            evolution_message_id: evolutionResponse?.key?.id || "N/A",
+            evolution_message_id: (evolutionResponse as any)?.messageId || (evolutionResponse as any)?.key?.id || "N/A",
           })
           .eq("id", logId);
       }

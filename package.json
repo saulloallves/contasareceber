@@ -13,10 +13,8 @@
     "@hookform/resolvers": "^5.2.1",
     "@supabase/supabase-js": "^2.52.0",
     "@types/react-beautiful-dnd": "^13.1.8",
-    "axios": "^1.11.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.344.0",
-    "nodemailer": "^7.0.5",
     "react": "^18.3.1",
     "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^18.3.1",
@@ -27,7 +25,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
-    "@types/nodemailer": "^6.4.17",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

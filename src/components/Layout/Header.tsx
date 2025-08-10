@@ -23,7 +23,6 @@ interface HeaderProps {
 }
 
 export function Header({ user }: HeaderProps) {
-  const [fullscreen, setFullscreen] = useState(false);
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   // Estado para controlar o modal de conclusão da importação
@@ -80,10 +79,8 @@ export function Header({ user }: HeaderProps) {
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen();
-      setFullscreen(true);
     } else {
       document.exitFullscreen();
-      setFullscreen(false);
     }
   };
 

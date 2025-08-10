@@ -1,44 +1,41 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, Suspense, lazy } from "react";
 import { AuthProvider, useAuth } from "./components/Auth/AuthProvider";
 import { SimpleAuth } from "./components/Auth/SimpleAuth";
-import { Header } from "./components/Layout/Header";
-import { Sidebar } from "./components/Layout/Sidebar";
-import { Dashboard } from "./components/Dashboard";
-import { DashboardGeral } from "./components/Dashboard/DashboardGeral";
-import { GestaoCobrancas } from "./components/Cobrancas/GestaoCobrancas";
-import { ImportacaoPlanilha } from "./components/ImportacaoPlanilha";
-import { CadastroUnidades } from "./components/CadastroUnidades";
-import { GestaoReunioes } from "./components/GestaoReunioes";
-import { GestaoEscalonamentos } from "./components/GestaoEscalonamentos";
-import { GestaoAcordos } from "./components/GestaoAcordos";
-import { ScoreRisco } from "./components/ScoreRisco";
-import { GestaoBloqueios } from "./components/GestaoBloqueios";
-import { PainelJuridico } from "./components/PainelJuridico";
-import { HistoricoEnvios } from "./components/HistoricoEnvios";
-import { ConfiguracaoAdmin } from "./components/ConfiguracaoAdmin";
-import { HistoricoTratativas } from "./components/HistoricoTratativas";
-import { PainelOperacional } from "./components/PainelOperacional";
-import { GeradorDocumentos } from "./components/GeradorDocumentos";
-import { RelatoriosMensais } from "./components/RelatoriosMensais";
-import { PainelFranqueado } from "./components/PainelFranqueado";
-import { OperacaoManual } from "./components/OperacaoManual";
-import { LinhaTempoUnidade } from "./components/LinhaTempoUnidade";
-import { PainelPriorizacao } from "./components/PainelPriorizacao";
-import { PainelCentralUnidade } from "./components/PainelCentralUnidade";
-import { PainelIndicadoresEstrategicos } from "./components/PainelIndicadoresEstrategicos";
-import { ModuloIntegracoes } from "./components/ModuloIntegracoes";
-import { GestaoUsuarios } from "./components/Usuarios/GestaoUsuarios";
-import { AuditoriaLogs } from "./components/AuditoriaLogs";
-import { TemplatesJuridicos } from "./components/TemplatesJuridicos";
-import { KanbanCobranca } from "./components/KanbanCobranca";
+// Header e Sidebar são usados dentro de Layout
+// Lazy screens for code-splitting
+const DashboardGeral = lazy(() => import("./components/Dashboard/DashboardGeral").then(m => ({ default: m.DashboardGeral })));
+const GestaoCobrancas = lazy(() => import("./components/Cobrancas/GestaoCobrancas").then(m => ({ default: m.GestaoCobrancas })));
+const ImportacaoPlanilha = lazy(() => import("./components/ImportacaoPlanilha").then(m => ({ default: m.ImportacaoPlanilha })));
+const CadastroUnidades = lazy(() => import("./components/CadastroUnidades").then(m => ({ default: m.CadastroUnidades })));
+const GestaoReunioes = lazy(() => import("./components/GestaoReunioes").then(m => ({ default: m.GestaoReunioes })));
+const GestaoAcordos = lazy(() => import("./components/GestaoAcordos").then(m => ({ default: m.GestaoAcordos })));
+const ScoreRisco = lazy(() => import("./components/ScoreRisco").then(m => ({ default: m.ScoreRisco })));
+const GestaoBloqueios = lazy(() => import("./components/GestaoBloqueios").then(m => ({ default: m.GestaoBloqueios })));
+const PainelJuridico = lazy(() => import("./components/PainelJuridico").then(m => ({ default: m.PainelJuridico })));
+const ConfiguracaoAdmin = lazy(() => import("./components/ConfiguracaoAdmin").then(m => ({ default: m.ConfiguracaoAdmin })));
+const PainelOperacional = lazy(() => import("./components/PainelOperacional").then(m => ({ default: m.PainelOperacional })));
+const GeradorDocumentos = lazy(() => import("./components/GeradorDocumentos").then(m => ({ default: m.GeradorDocumentos })));
+const RelatoriosMensais = lazy(() => import("./components/RelatoriosMensais").then(m => ({ default: m.RelatoriosMensais })));
+const PainelFranqueado = lazy(() => import("./components/PainelFranqueado").then(m => ({ default: m.PainelFranqueado })));
+const ModuloIntegracoes = lazy(() => import("./components/ModuloIntegracoes").then(m => ({ default: m.ModuloIntegracoes })));
+const GestaoUsuarios = lazy(() => import("./components/Usuarios/GestaoUsuarios").then(m => ({ default: m.GestaoUsuarios })));
+const AuditoriaLogs = lazy(() => import("./components/AuditoriaLogs").then(m => ({ default: m.AuditoriaLogs })));
+const TemplatesJuridicos = lazy(() => import("./components/TemplatesJuridicos").then(m => ({ default: m.TemplatesJuridicos })));
+const KanbanCobranca = lazy(() => import("./components/KanbanCobranca").then(m => ({ default: m.KanbanCobranca })));
+const SimulacaoParcelamento = lazy(() => import("./components/SimulacaoParcelamento").then(m => ({ default: m.SimulacaoParcelamento })));
+const Franqueados = lazy(() => import("./components/Franqueados").then(m => ({ default: m.Franqueados })));
+const LinhaTempoUnidade = lazy(() => import("./components/LinhaTempoUnidade").then(m => ({ default: m.LinhaTempoUnidade })));
+const PainelIndicadoresEstrategicos = lazy(() => import("./components/PainelIndicadoresEstrategicos").then(m => ({ default: m.PainelIndicadoresEstrategicos })));
+// The following are currently not wired in the UI; keep them non-imported to avoid bundle bloat
+// const HistoricoEnvios = lazy(() => import("./components/HistoricoEnvios").then(m => ({ default: m.HistoricoEnvios })));
+// const HistoricoTratativas = lazy(() => import("./components/HistoricoTratativas").then(m => ({ default: m.HistoricoTratativas })));
+// const GestaoEscalonamentos = lazy(() => import("./components/GestaoEscalonamentos").then(m => ({ default: m.GestaoEscalonamentos })));
 import { Layout } from "./components/Layout/Layout";
-import { SimulacaoParcelamento } from "./components/SimulacaoParcelamento";
-import { Franqueados } from "./components/Franqueados";
-import { supabase } from "./lib/supabaseClient";
+import { useUserProfile } from "./hooks/useUserProfile";
 
 function AppContent() {
-  const { user, loading, profile } = useAuth();
+  const { user, loading } = useAuth();
+  const { profile } = useUserProfile(user?.id);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [cnpjSelecionado, setCnpjSelecionado] = useState("");
 
@@ -98,9 +95,9 @@ function AppContent() {
   }
 
   const renderContent = () => {
-    switch (activeTab) {
+  switch (activeTab) {
       case "dashboard":
-        return <DashboardGeral />;
+    return <DashboardGeral />;
       case "cobrancas":
         return <KanbanCobranca />;
       case "cobrancas-lista":
@@ -191,7 +188,15 @@ function AppContent() {
       userPermissions={userPermissions}
       user={mappedUser}
     >
-      {renderContent()}
+      <Suspense
+        fallback={
+          <div className="w-full h-[50vh] flex items-center justify-center text-gray-600">
+            Carregando conteúdo...
+          </div>
+        }
+      >
+        {renderContent()}
+      </Suspense>
     </Layout>
   );
 }

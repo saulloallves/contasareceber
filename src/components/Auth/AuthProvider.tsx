@@ -21,15 +21,7 @@ function saveSessionToStorage(session: Session | null) {
   }
 }
 
-function getSessionFromStorage(): Session | null {
-  const raw = localStorage.getItem(SESSION_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
+// getSessionFromStorage não é utilizado; mantemos apenas a persistência via saveSessionToStorage
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -46,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setUser(null);
       }
-    } catch (err) {
+  } catch {
       setUser(null);
     } finally {
       setLoading(false);

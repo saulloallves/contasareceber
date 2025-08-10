@@ -29,6 +29,22 @@ graph TD
 
 ## 🔧 Configuração dos Workflows
 
+## 🌐 Configuração no Frontend (Vite)
+
+Defina as variáveis de ambiente (arquivo `.env` ou `.env.local`) para que o frontend consiga acionar os webhooks do n8n:
+
+```
+VITE_N8N_WHATSAPP_WEBHOOK_URL=https://seu-n8n.com/webhook/whatsapp
+VITE_N8N_EMAIL_WEBHOOK_URL=https://seu-n8n.com/webhook/email
+```
+
+Contrato esperado pelos webhooks:
+
+- WhatsApp: `{ number: string; text: string; instanceName?: string; metadata?: Record<string, any> }`
+- E-mail: `{ destinatario: string; assunto: string; corpo_html: string; corpo_texto: string; nome_destinatario?: string; anexos?: { nome: string; conteudo: string; tipo: string }[]; remetente_*?: string; metadata?: Record<string, any> }`
+
+O frontend aguarda a resposta do n8n e considera sucesso quando `success` é true (ou ausente). Deve retornar opcionalmente `messageId`.
+
 ### 1. Workflow Principal: Processamento Semanal
 
 **Arquivo**: `workflows/processamento-planilha.json`

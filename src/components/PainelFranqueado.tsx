@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   Building2, DollarSign, Calendar, FileText, AlertTriangle, 
   CheckCircle, Clock, Eye, Download, Phone, Mail, LogIn, 
-  RefreshCw, User, MapPin, CreditCard
+  RefreshCw
 } from 'lucide-react';
 import { FranqueadoService } from '../services/franqueadoService';
 import { DadosFranqueado, SolicitacaoAuth } from '../types/franqueado';
@@ -38,7 +38,7 @@ export function PainelFranqueado() {
       } else {
         mostrarMensagem('erro', resposta.mensagem);
       }
-    } catch (error) {
+  } catch {
       mostrarMensagem('erro', 'Erro ao solicitar acesso');
     } finally {
       setCarregando(false);
@@ -62,7 +62,7 @@ export function PainelFranqueado() {
       } else {
         mostrarMensagem('erro', 'Token inválido ou expirado');
       }
-    } catch (error) {
+  } catch {
       mostrarMensagem('erro', 'Erro ao validar token');
     } finally {
       setCarregando(false);

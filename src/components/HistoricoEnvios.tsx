@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { MessageSquare, Calendar, User, Phone, CheckCircle, XCircle, Clock, Filter } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { MessageSquare, Calendar, Phone, CheckCircle, XCircle, Clock, Filter } from 'lucide-react';
 import { WhatsAppService } from '../services/whatsappService';
 import { EnvioMensagem } from '../types/cobranca';
 
@@ -14,16 +14,12 @@ export function HistoricoEnvios() {
   });
 
   // Instância do serviço (em produção, usar configuração real)
-  const whatsappService = new WhatsAppService({
+  const whatsappService = useMemo(() => new WhatsAppService({
     token: localStorage.getItem('whatsapp_token') || '',
     phone_number_id: localStorage.getItem('whatsapp_phone_id') || ''
-  });
+  }), []);
 
-  useEffect(() => {
-    carregarHistorico();
-  }, []);
-
-  const carregarHistorico = async () => {
+  const carregarHistorico = useCallback(async () => {
     setCarregando(true);
     try {
       const dados = await whatsappService.buscarHistoricoEnvios(filtros);
@@ -33,7 +29,13 @@ export function HistoricoEnvios() {
     } finally {
       setCarregando(false);
     }
-  };
+  }, [filtros, whatsappService]);
+
+  useEffect(() => {
+    carregarHistorico();
+  }, [carregarHistorico]);
+
+  
 
   const aplicarFiltros = () => {
     carregarHistorico();

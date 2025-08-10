@@ -1,8 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  User, Settings, LogOut, ChevronDown, Edit, 
-  Mail, Phone, Camera, Check, X, Loader2 
-} from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Settings, LogOut, ChevronDown, Loader2 } from 'lucide-react';
 import { UserSettingsModal } from './UserSettingsModal';
 import { useAuth } from '../Auth/AuthProvider';
 
