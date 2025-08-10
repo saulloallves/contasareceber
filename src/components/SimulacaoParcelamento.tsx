@@ -106,7 +106,7 @@ export function SimulacaoParcelamento() {
 
       setSimulacaoAtual(simulacao);
     } catch (error) {
-      alert(`Erro na simulação: ${error}`);
+      alert(`Erro na simulação: ${error instanceof Error ? error.message : error}`);
     } finally {
       setProcessando(false);
     }
