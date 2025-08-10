@@ -105,7 +105,7 @@ export class UnidadesService {
           )
         `
         )
-        .eq("cnpj", cnpjLimpo)
+        .eq("codigo_interno", cnpjLimpo)
         .maybeSingle();
 
       if (error) {
@@ -126,7 +126,7 @@ export class UnidadesService {
     cnpjs: string[]
   ): Promise<Record<string, UnidadeFranqueada>> {
     try {
-      type UnidadeComCnpj = UnidadeFranqueada & { cnpj?: string };
+      type UnidadeComCnpj = UnidadeFranqueada & { codigo_interno?: string };
       const limpos = Array.from(
         new Set(
           (cnpjs || [])
@@ -151,7 +151,7 @@ export class UnidadesService {
           )
         `
         )
-        .in("cnpj", limpos);
+        .in("codigo_interno", limpos);
 
       if (error) {
         throw new Error(`Erro ao buscar unidades por CNPJs: ${error.message}`);
@@ -159,7 +159,7 @@ export class UnidadesService {
 
       const mapa: Record<string, UnidadeFranqueada> = {};
       (data as UnidadeComCnpj[] | null)?.forEach((u) => {
-        const chave = u && (u as UnidadeComCnpj).cnpj;
+        const chave = u && (u as UnidadeComCnpj).codigo_interno;
         if (chave) {
           mapa[chave] = u as UnidadeFranqueada;
         }
