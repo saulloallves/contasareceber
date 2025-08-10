@@ -40,9 +40,14 @@ export class SimulacaoParcelamentoService {
         .select(
           `
           *,
-          unidades_franqueadas (
+          unidades_franqueadas!inner (
             codigo_unidade,
-            nome_franqueado
+            nome_unidade,
+            franqueado_unidades!inner (
+              franqueados!inner (
+                nome_completo
+              )
+            )
           )
         `
         )
@@ -179,13 +184,20 @@ export class SimulacaoParcelamentoService {
         .select(
           `
           *,
-          cobrancas_franqueados (
+          cobrancas_franqueados!inner (
             cliente,
             cnpj,
-            unidades_franqueadas (
-              nome_franqueado,
-              email_franqueado,
-              telefone_franqueado
+            unidades_franqueadas!inner (
+              nome_unidade,
+              email_unidade,
+              telefone_unidade,
+              franqueado_unidades!inner (
+                franqueados!inner (
+                  nome_completo,
+                  email,
+                  telefone
+                )
+              )
             )
           )
         `
@@ -200,12 +212,14 @@ export class SimulacaoParcelamentoService {
       const config = await this.buscarConfiguracao();
       const cobranca = (simulacao as any).cobrancas_franqueados;
       const unidade = cobranca.unidades_franqueadas;
+      const franqueado = unidade.franqueado_unidades?.[0]?.franqueados;
 
       // Gera mensagem personalizada
       const mensagem = this.gerarMensagemProposta(
         simulacao,
         cobranca,
         unidade,
+        franqueado,
         config
       );
 
@@ -268,9 +282,14 @@ export class SimulacaoParcelamentoService {
         .select(
           `
           *,
-          cobrancas_franqueados (
-            unidades_franqueadas (
-              telefone_franqueado
+          cobrancas_franqueados!inner (
+            unidades_franqueadas!inner (
+              telefone_unidade,
+              franqueado_unidades!inner (
+                franqueados!inner (
+                  telefone
+                )
+              )
             )
           )
         `
@@ -282,8 +301,9 @@ export class SimulacaoParcelamentoService {
         throw new Error("Proposta não encontrada");
       }
 
-      const telefone = (proposta as any).cobrancas_franqueados
-        ?.unidades_franqueadas?.telefone_franqueado;
+      const unidade = (proposta as any).cobrancas_franqueados?.unidades_franqueadas;
+      const telefone = unidade?.telefone_unidade || 
+                      unidade?.franqueado_unidades?.[0]?.franqueados?.telefone;
 
       if (!telefone) {
         throw new Error("Telefone não cadastrado para esta unidade.");
@@ -377,13 +397,19 @@ export class SimulacaoParcelamentoService {
         .select(
           `
           *,
-          simulacoes_parcelamento!inner(*, parcelas(*)),
+          simulacoes_parcelamento!inner(*),
           cobrancas_franqueados!inner (
             cliente,
             unidades_franqueadas!inner (
-              email_franqueado,
+              email_unidade,
               codigo_unidade,
-              nome_franqueado
+              nome_unidade,
+              franqueado_unidades!inner (
+                franqueados!inner (
+                  nome_completo,
+                  email
+                )
+              )
             )
           )
         `
@@ -395,8 +421,10 @@ export class SimulacaoParcelamentoService {
         throw new Error(`Proposta não encontrada: ${propostaError?.message}`);
       }
 
-      const email = (proposta as any).cobrancas_franqueados.unidades_franqueadas
-        .email_franqueado;
+      const unidade = (proposta as any).cobrancas_franqueados.unidades_franqueadas;
+      const email = unidade.email_unidade || 
+                   unidade.franqueado_unidades?.[0]?.franqueados?.email;
+      
       if (!email) {
         throw new Error("Email não cadastrado para a unidade.");
       }
@@ -412,8 +440,8 @@ export class SimulacaoParcelamentoService {
 
       const dadosEmail = {
         destinatario: email,
-        nome_destinatario: (proposta as any).cobrancas_franqueados
-          .unidades_franqueadas.nome_franqueado,
+        nome_destinatario: unidade.nome_unidade || 
+                          unidade.franqueado_unidades?.[0]?.franqueados?.nome_completo,
         assunto: template.assunto,
         corpo_html: template.corpo_html,
         corpo_texto: template.corpo_texto,
@@ -525,8 +553,13 @@ export class SimulacaoParcelamentoService {
             cliente,
             cnpj,
             valor_original,
-            unidades_franqueadas (
-              nome_franqueado
+            unidades_franqueadas!inner (
+              nome_unidade,
+              franqueado_unidades!inner (
+                franqueados!inner (
+                  nome_completo
+                )
+              )
             )
           )
         `
@@ -685,12 +718,13 @@ Equipe Financeira`,
     simulacao: any,
     cobranca: any,
     unidade: any,
+    franqueado: any,
     config: ConfiguracaoParcelamento
   ): string {
     const template = config.template_whatsapp;
 
     const variaveis = {
-      "{{cliente}}": unidade.nome_franqueado || cobranca.cliente,
+      "{{cliente}}": franqueado?.nome_completo || unidade.nome_unidade || cobranca.cliente,
       "{{codigo_unidade}}": unidade.codigo_unidade || "N/A",
       "{{valor_original}}": this.formatarMoeda(simulacao.valor_original),
       "{{valor_atualizado}}": this.formatarMoeda(simulacao.valor_atualizado),
