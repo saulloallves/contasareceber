@@ -352,6 +352,40 @@ export function KanbanCobranca() {
     }
   };
 
+  const formatarStatusCobranca = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'em_aberto': 'Em Aberto',
+      'notificado': 'Notificado',
+      'reuniao_agendada': 'Reunião Agendada',
+      'em_negociacao': 'Em Negociação',
+      'proposta_enviada': 'Proposta Enviada',
+      'aguardando_pagamento': 'Aguardando Pagamento',
+      'pagamento_parcial': 'Pagamento Parcial',
+      'quitado': 'Quitado',
+      'ignorado': 'Ignorado',
+      'notificacao_formal': 'Notificação Formal',
+      'escalado_juridico': 'Escalado Jurídico',
+      'inadimplencia_critica': 'Inadimplência Crítica',
+      'cobrado': 'Cobrado',
+      'negociando': 'Negociando',
+      'em_tratativa_juridica': 'Em Tratativa Jurídica',
+      'em_tratativa_critica': 'Em Tratativa Crítica'
+    };
+    return statusMap[status] || status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const formatarTipoDebito = (tipo: string) => {
+    const tipoMap: Record<string, string> = {
+      'royalties': 'Royalties',
+      'insumos': 'Insumos',
+      'aluguel': 'Aluguel',
+      'multa': 'Multa',
+      'taxa': 'Taxa',
+      'outros': 'Outros'
+    };
+    return tipoMap[tipo] || tipo.replace(/\b\w/g, l => l.toUpperCase());
+  };
+
   const renderCardUnidade = (unit: UnitKanbanCard, index: number) => {
     const temStatusMisto = unidadesComStatusMisto.has(unit.cnpj);
     
@@ -890,6 +924,14 @@ export function KanbanCobranca() {
                   <div>
                     <label className="text-sm font-medium text-gray-600">Vencimento</label>
                     <p className="text-gray-800">{formatarData(cobrancaSelecionada.data_vencimento_antiga)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Status</label>
+                    <p className="text-gray-800">{formatarStatusCobranca(cobrancaSelecionada.status_atual)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Tipo</label>
+                    <p className="text-gray-800">{formatarTipoDebito(cobrancaSelecionada.tipo_debito)}</p>
                   </div>
                 </div>
 
