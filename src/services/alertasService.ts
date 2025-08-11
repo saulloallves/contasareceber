@@ -8,19 +8,17 @@ export const alertasService = {
       .select(
         `
         id,
+        cnpj_unidade,
         tipo_alerta,
-        titulo_id,
+        titulo,
         descricao,
         nivel_urgencia,
-        status,
+        resolvido,
         data_criacao,
-        cobrancas_franqueados (
-          cliente,
-          valor_atualizado
-        )
+        data_resolucao
       `
       )
-      .in("status", ["novo", "em_andamento"])
+      .eq("resolvido", false)
       .order("data_criacao", { ascending: false });
 
     if (error) {
@@ -28,19 +26,14 @@ export const alertasService = {
       throw new Error("Não foi possível buscar os alertas do sistema.");
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return data.map((item: any) => ({
-      ...item,
-      cobranca: item.cobrancas_franqueados,
-    })) as Alerta[];
+    return data as Alerta[];
   },
 
-  async marcarComoResolvido(alertaId: number, userId: string): Promise<void> {
+  async marcarComoResolvido(alertaId: string): Promise<void> {
     const { error } = await supabase
       .from("alertas_sistema")
       .update({
-        status: "resolvido",
-        resolvido_por_id: userId,
+        resolvido: true,
         data_resolucao: new Date().toISOString(),
       })
       .eq("id", alertaId);
