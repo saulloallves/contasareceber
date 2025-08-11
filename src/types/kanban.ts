@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export interface CardCobranca {
   id: string;
   codigo_unidade: string;

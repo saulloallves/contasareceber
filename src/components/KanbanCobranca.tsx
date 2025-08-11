@@ -66,9 +66,8 @@ export function KanbanCobranca() {
       setColunas(colunasData);
       setCards(cardsData);
       setEstatisticas(statsData);
-      console.log(`Kanban carregado: ${cardsData.length} cards encontrados`);
     } catch (error) {
-      console.error("Erro ao carregar dados do Kanban:", error);
+      console.error("❌ Erro ao carregar dados do Kanban:", error);
       alert("Erro ao carregar dados do Kanban. Verifique a conexão.");
     } finally {
       setCarregando(false);
@@ -175,6 +174,15 @@ export function KanbanCobranca() {
 
     console.log(`Movendo card individual: ${draggableId} de ${source.droppableId} para ${destination.droppableId}`);
 
+    // Atualização otimista da UI: primeiro atualiza a UI localmente
+    const originalCards = [...cards];
+    const updatedCards = cards.map((card) =>
+      card.id === draggableId
+        ? { ...card, status_atual: destination.droppableId }
+        : card
+    );
+    setCards(updatedCards);
+
     setProcessando(true);
     try {
       await kanbanService.moverCard(
@@ -184,14 +192,13 @@ export function KanbanCobranca() {
         "Movimentação manual via Kanban"
       );
       
-      // Recarrega os dados para garantir sincronização
-      await carregarDados();
       console.log(`Card ${draggableId} movido com sucesso`);
+      // Não recarrega os dados imediatamente - mantém a atualização otimista
     } catch (error) {
       console.error("Erro ao mover cobrança, revertendo:", error);
       alert(`Erro ao mover cobrança: ${error}`);
-      // Recarrega para reverter qualquer mudança visual
-      await carregarDados();
+      // Se falhar, reverte para o estado original
+      setCards(originalCards);
     } finally {
       setProcessando(false);
     }
@@ -334,7 +341,9 @@ export function KanbanCobranca() {
               Exportar
             </button>
             <button
-              onClick={carregarDados}
+              onClick={() => {
+                carregarDados();
+              }}
               disabled={carregando}
               className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
