@@ -13,6 +13,7 @@ import {
 import { KanbanService } from "../services/kanbanService";
 import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban, } from "../types/kanban";
 import { formatarCNPJCPF, formatarMoeda, formatarData, } from "../utils/formatters";
+import { supabase } from "../lib/supabaseClient";
 
 type UnitKanbanCard = {
   codigo_unidade: string;
