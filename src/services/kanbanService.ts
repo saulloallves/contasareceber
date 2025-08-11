@@ -120,6 +120,8 @@ export class KanbanService {
         
         const card: CardCobranca = {
           id: cobranca.id, // Usa o ID real da cobrança (UUID)
+          codigo_unidade: unidade?.codigo_unidade || cobranca.cnpj,
+          nome_unidade: unidade?.nome_franqueado || cobranca.cliente,
           cnpj: cobranca.cnpj,
           tipo_debito: this.determinarTipoDebito([cobranca]),
           valor_total: valorAtual,
@@ -396,9 +398,10 @@ export class KanbanService {
 
   /**
    * Busca estatísticas do Kanban
+   */
   async buscarEstatisticas(agrupadoPorUnidade: boolean = false): Promise<EstatisticasKanban> {
     try {
-      const cards = await this.buscarCards({}, false);
+      const cards = await this.buscarCards({}, agrupadoPorUnidade);
       
       const stats: EstatisticasKanban = {
         total_cards: cards.length,
