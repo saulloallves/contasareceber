@@ -70,6 +70,10 @@ export function KanbanCobranca() {
   const [aba, setAba] = useState<"unidade" | "individual">("unidade");
   const [cobrancaSelecionada, setCobrancaSelecionada] =
     useState<CardCobranca | null>(null);
+  const [modalConfirmacaoAberto, setModalConfirmacaoAberto] = useState(false);
+  const [movimentoPendente, setMovimentoPendente] = useState<DropResult | null>(
+    null
+  );
 
   const kanbanService = new KanbanService();
 
@@ -136,11 +140,21 @@ export function KanbanCobranca() {
   };
 
   // Handler para drag-and-drop agrupado por unidade
-  const onDragEndUnidade = async (result: DropResult) => {
-    if (!result.destination) return;
-    const { source, destination, draggableId } = result;
-    if (source.droppableId === destination.droppableId) return;
+  const onDragEndUnidade = (result: DropResult) => {
+    if (!result.destination || result.source.droppableId === result.destination.droppableId) {
+      return;
+    }
+    setMovimentoPendente(result);
+    setModalConfirmacaoAberto(true);
+  };
+
+  const confirmarMovimentoUnidade = async () => {
+    if (!movimentoPendente || !movimentoPendente.destination) return;
+
+    const { source, destination, draggableId } = movimentoPendente;
     setProcessando(true);
+    setModalConfirmacaoAberto(false);
+
     try {
       const unit = getUnitCardsByColuna(source.droppableId).find(
         (u) => u.codigo_unidade === draggableId
@@ -150,18 +164,20 @@ export function KanbanCobranca() {
           unit.charges.map((card) =>
             kanbanService.moverCard(
               card.id,
-              destination.droppableId,
+              destination!.droppableId,
               "usuario_atual",
-              "Movimentação manual via Kanban"
+              "Movimentação manual via Kanban (em massa)"
             )
           )
         );
-        carregarDados();
+        await carregarDados(); // Garante que a UI está sincronizada
       }
     } catch (error) {
-      console.error("Erro ao mover card:", error);
+      console.error("Erro ao mover card da unidade:", error);
+      // Adicionar um feedback de erro para o usuário aqui seria uma boa prática
     } finally {
       setProcessando(false);
+      setMovimentoPendente(null);
     }
   };
 
@@ -170,6 +186,16 @@ export function KanbanCobranca() {
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
     if (source.droppableId === destination.droppableId) return;
+
+    // Atualização otimista da UI
+    const originalCards = cards;
+    const updatedCards = cards.map((card) =>
+      card.id === draggableId
+        ? { ...card, status_atual: destination.droppableId }
+        : card
+    );
+    setCards(updatedCards);
+
     setProcessando(true);
     try {
       await kanbanService.moverCard(
@@ -178,9 +204,12 @@ export function KanbanCobranca() {
         "usuario_atual",
         "Movimentação manual via Kanban"
       );
-      carregarDados();
+      // A UI já foi atualizada. Para garantir a consistência, podemos recarregar os dados em segundo plano.
+      await carregarDados();
     } catch (error) {
-      console.error("Erro ao mover cobrança:", error);
+      console.error("Erro ao mover cobrança, revertendo:", error);
+      // Se a chamada falhar, reverte a UI para o estado original
+      setCards(originalCards);
     } finally {
       setProcessando(false);
     }
@@ -681,6 +710,41 @@ export function KanbanCobranca() {
           </DragDropContext>
         )}
       </div>
+
+      {/* Modal de Confirmação de Movimentação em Massa */}
+      {modalConfirmacaoAberto && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full shadow-2xl">
+            <div className="flex items-center mb-6">
+              <AlertTriangle className="w-8 h-8 text-yellow-500 mr-4" />
+              <h3 className="text-xl font-bold text-gray-800">Confirmação Necessária</h3>
+            </div>
+            <p className="text-gray-600 mb-8">
+              Todas as cobranças dessa unidade terão seu status alterado. Tem certeza que deseja continuar?
+            </p>
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={() => {
+                  setModalConfirmacaoAberto(false);
+                  setMovimentoPendente(null);
+                  carregarDados(); // Recarrega para reverter a mudança visual otimista
+                }}
+                disabled={processando}
+                className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarMovimentoUnidade}
+                disabled={processando}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {processando ? "Processando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Detalhes da Unidade */}
       {aba === "unidade" && modalAberto === "detalhes" && unitSelecionada && (
