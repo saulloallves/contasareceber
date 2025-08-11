@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from './databaseService';
 import { CardCobranca, ColunaKanban, MovimentacaoCard, FiltrosKanban, EstatisticasKanban, LogMovimentacao } from '../types/kanban';
 import { TrativativasService } from './tratativasService';
@@ -41,10 +42,10 @@ export class KanbanService {
   async buscarCards(filtros: FiltrosKanban = {}, agruparPorUnidade: boolean = false): Promise<CardCobranca[]> {
     try {
       // Busca dados das cobranças com join correto
-      let query = supabase
+  let query = supabase
         .from('cobrancas_franqueados')
         .select(`
-          id,
+          cobranca_id:id,
           cnpj,
           cliente,
           valor_original,
@@ -110,7 +111,7 @@ export class KanbanService {
         const valorAtual = cobranca.valor_atualizado || cobranca.valor_original;
         
         const card: CardCobranca = {
-          id: cobranca.id,
+          id: String(cobranca.cobranca_id), // garante string para o DnD e mantém o ID real do banco
           codigo_unidade: unidade?.codigo_unidade || cobranca.cnpj,
           nome_unidade: unidade?.nome_unidade || cobranca.cliente,
           cnpj: cobranca.cnpj,
@@ -217,72 +218,59 @@ export class KanbanService {
     cardId: string,
     novoStatus: string,
     usuario: string,
-    motivo: string,
-    agrupadoPorUnidade: boolean = false
+    motivo: string
   ): Promise<void> {
     try {
-      const novoStatusCobranca = this.mapearStatusKanbanParaCobranca(novoStatus);
-      
-      if (agrupadoPorUnidade) {
-        // Atualiza todas as cobranças da unidade
-        const { error } = await supabase
-          .from('cobrancas_franqueados')
-          .update({ status: novoStatusCobranca })
-          .eq('cnpj', cardId);
+      // Converte o ID para número quando possível (tabelas com id inteiro)
+      const parsedId = Number(cardId);
+      const idFilter: any = isNaN(parsedId) ? cardId : parsedId;
 
-        if (error) {
-          throw new Error(`Erro ao atualizar status: ${error.message}`);
-        }
-      } else {
-        // Atualiza apenas a cobrança específica
-        const { error } = await supabase
-          .from('cobrancas_franqueados')
-          .update({ status: novoStatusCobranca })
-          .eq('id', cardId);
+      const { data: cobranca, error: fetchError } = await supabase
+        .from('cobrancas_franqueados')
+        .select('status')
+        .eq('id', idFilter)
+        .single();
 
-        if (error) {
-          throw new Error(`Erro ao atualizar status: ${error.message}`);
-        }
+      if (fetchError || !cobranca) {
+        throw new Error(`Cobrança com ID ${cardId} não encontrada.`);
       }
 
-      // Registra movimentação
+      const statusOrigem = this.determinarStatusKanban(cobranca.status);
+      const novoStatusCobranca = this.mapearStatusKanbanParaCobranca(novoStatus);
+
+      // 1. Atualiza o status na tabela principal
+      const { data: updatedRows, error: updateError } = await supabase
+        .from('cobrancas_franqueados')
+        .update({ status: novoStatusCobranca })
+        .eq('id', idFilter)
+        .select('id');
+
+      if (updateError) {
+        throw new Error(`Erro ao atualizar status da cobrança: ${updateError.message}`);
+      }
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error(`Nenhuma linha atualizada para a cobrança ID ${cardId}. Verifique se o ID corresponde ao registro no banco.`);
+      }
+
+      // 2. Registra a movimentação em uma tabela de histórico
       await this.registrarMovimentacao({
         card_id: cardId,
-        status_origem: '', // Será preenchido com o status atual
+        status_origem: statusOrigem,
         status_destino: novoStatus,
         usuario,
         motivo,
         data_movimentacao: new Date().toISOString(),
-        automatica: false
+        automatica: false,
       });
 
-      // Registra tratativa
-      if (agrupadoPorUnidade) {
-        // Para unidades agrupadas, registra tratativa na primeira cobrança
-        const { data: cobranca } = await supabase
-          .from('cobrancas_franqueados')
-          .select('id')
-          .eq('cnpj', cardId)
-          .limit(1)
-          .single();
+      // 3. Adiciona uma observação na tabela de tratativas
+      await this.tratativasService.registrarObservacao(
+        cardId,
+        usuario,
+        `Card movido no Kanban de '${statusOrigem}' para '${novoStatus}'. Motivo: ${motivo}`,
+        novoStatusCobranca
+      );
 
-        if (cobranca) {
-          await this.tratativasService.registrarObservacao(
-            cobranca.id,
-            usuario,
-            `Unidade movida no Kanban para: ${novoStatus}. ${motivo}`,
-            novoStatusCobranca
-          );
-        }
-      } else {
-        // Para cobranças individuais
-        await this.tratativasService.registrarObservacao(
-          cardId,
-          usuario,
-          `Card movido no Kanban para: ${novoStatus}. ${motivo}`,
-          novoStatusCobranca
-        );
-      }
     } catch (error) {
       console.error('Erro ao mover card:', error);
       throw error;
@@ -330,7 +318,8 @@ export class KanbanService {
 
       // Se mudou o status, move o card
       if (novoStatus !== card.status_atual) {
-        await this.moverCard(cardId, novoStatus, usuario, descricaoAcao, agrupadoPorUnidade);
+  // Removido parâmetro extra; moverCard espera apenas (cardId, novoStatus, usuario, motivo)
+  await this.moverCard(cardId, novoStatus, usuario, descricaoAcao);
       } else {
         // Apenas registra a ação
         await this.registrarLog({
@@ -371,7 +360,7 @@ export class KanbanService {
             cobranca.id,
             usuario,
             observacao,
-            null
+            undefined
           );
         }
       } else {
@@ -380,7 +369,7 @@ export class KanbanService {
           cardId,
           usuario,
           observacao,
-          null
+          undefined
         );
       }
     } catch (error) {
@@ -480,13 +469,13 @@ export class KanbanService {
     if (!cobrancas || cobrancas.length === 0) return 'royalties';
     
     const tipos = cobrancas.map(c => c.tipo_cobranca || 'royalties');
-    const contagem = tipos.reduce((acc, tipo) => {
+    const contagem = tipos.reduce((acc: Record<string, number>, tipo: string) => {
       acc[tipo] = (acc[tipo] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    
+
     const tipoMaisFrequente = Object.entries(contagem)
-      .sort(([,a], [,b]) => b - a)[0]?.[0];
+      .sort(([, a], [, b]) => (b as number) - (a as number))[0]?.[0];
     
     return (tipoMaisFrequente as any) || 'royalties';
   }

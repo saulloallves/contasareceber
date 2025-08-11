@@ -1,41 +1,15 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from "react";
-import {
-  DragDropContext,
-  Droppable,
-  Draggable,
-  DropResult,
-} from "react-beautiful-dnd";
-import {
-  MessageSquare,
-  Calendar,
-  Scale,
-  Mail,
-  Clock,
-  DollarSign,
-  AlertTriangle,
-  CheckCircle,
-  User,
-  Filter,
-  Download,
-  RefreshCw,
-  Edit,
-  X,
-  Save,
-  CircleDollarSign,
+import { DragDropContext, Droppable, Draggable, DropResult, } from "react-beautiful-dnd";
+import { 
+  MessageSquare, Calendar, Scale, Mail,
+  Clock, DollarSign, AlertTriangle, CheckCircle, User,
+  Filter, Download, RefreshCw, Edit, X,
+  Save, CircleDollarSign,
 } from "lucide-react";
 import { KanbanService } from "../services/kanbanService";
-import {
-  CardCobranca,
-  ColunaKanban,
-  FiltrosKanban,
-  EstatisticasKanban,
-} from "../types/kanban";
-import {
-  formatarCNPJCPF,
-  formatarMoeda,
-  formatarData,
-} from "../utils/formatters";
+import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban, } from "../types/kanban";
+import { formatarCNPJCPF, formatarMoeda, formatarData, } from "../utils/formatters";
 
 type UnitKanbanCard = {
   codigo_unidade: string;
@@ -204,8 +178,8 @@ export function KanbanCobranca() {
         "usuario_atual",
         "Movimentação manual via Kanban"
       );
-      // A UI já foi atualizada. Para garantir a consistência, podemos recarregar os dados em segundo plano.
-      await carregarDados();
+      // A UI já foi atualizada otimisticamente. Não é necessário recarregar.
+      // Apenas em caso de erro, a UI será revertida.
     } catch (error) {
       console.error("Erro ao mover cobrança, revertendo:", error);
       // Se a chamada falhar, reverte a UI para o estado original
