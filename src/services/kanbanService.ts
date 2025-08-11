@@ -41,7 +41,9 @@ export class KanbanService {
    */
   async buscarCards(filtros: FiltrosKanban = {}, agruparPorUnidade: boolean = false): Promise<CardCobranca[]> {
     try {
-      // Busca dados das cobranças com join correto
+      console.log('🔍 Iniciando busca de cards do Kanban...');
+      
+      // Query atualizada para a nova estrutura do banco
       let query = supabase
         .from('cobrancas_franqueados')
         .select(`
@@ -61,9 +63,16 @@ export class KanbanService {
           unidades_franqueadas!unidade_id_fk (
             id,
             codigo_unidade,
-            nome_franqueado,
             cidade,
-            estado
+            estado,
+            franqueado_unidades!inner (
+              franqueados (
+                id,
+                nome_completo,
+                email,
+                telefone
+              )
+            )
           )
         `)
         .neq('status', 'quitado')
@@ -86,17 +95,20 @@ export class KanbanService {
         query = query.lte('valor_atualizado', filtros.valor_max);
       }
 
+      console.log('📊 Executando query no Supabase...');
       const { data: cobrancas, error } = await query;
 
       if (error) {
+        console.error('❌ Erro na query:', error);
         throw new Error(`Erro ao buscar cobranças: ${error.message}`);
       }
 
       if (!cobrancas || cobrancas.length === 0) {
+        console.log('⚠️ Nenhuma cobrança encontrada');
         return [];
       }
 
-      console.log(`Encontradas ${cobrancas.length} cobranças para o Kanban`);
+      console.log(`✅ Encontradas ${cobrancas.length} cobranças para o Kanban`);
 
       if (agruparPorUnidade) {
         return this.agruparCobrancasPorUnidade(cobrancas, filtros);
@@ -104,7 +116,7 @@ export class KanbanService {
         return this.criarCardsIndividuais(cobrancas, filtros);
       }
     } catch (error) {
-      console.error('Erro ao buscar cards:', error);
+      console.error('❌ Erro ao buscar cards:', error);
       return [];
     }
   }
@@ -113,15 +125,18 @@ export class KanbanService {
    * Cria cards individuais para cada cobrança
    */
   private criarCardsIndividuais(cobrancas: any[], filtros: FiltrosKanban): CardCobranca[] {
+    console.log('🔨 Criando cards individuais...');
+    
     return cobrancas
       .map(cobranca => {
         const unidade = cobranca.unidades_franqueadas;
+        const franqueado = unidade?.franqueado_unidades?.[0]?.franqueados;
         const valorAtual = cobranca.valor_atualizado || cobranca.valor_original;
         
         const card: CardCobranca = {
           id: cobranca.id, // Usa o ID real da cobrança (UUID)
           codigo_unidade: unidade?.codigo_unidade || cobranca.cnpj,
-          nome_unidade: unidade?.nome_franqueado || cobranca.cliente,
+          nome_unidade: franqueado?.nome_completo || cobranca.cliente,
           cnpj: cobranca.cnpj,
           tipo_debito: this.determinarTipoDebito([cobranca]),
           valor_total: valorAtual,
@@ -140,6 +155,7 @@ export class KanbanService {
           quantidade_titulos: 1
         };
 
+        console.log(`📋 Card criado: ${card.codigo_unidade} - ${card.nome_unidade} - Status: ${card.status_atual}`);
         return card;
       })
       .filter(card => this.aplicarFiltrosCard(card, filtros));
@@ -149,6 +165,7 @@ export class KanbanService {
    * Agrupa cobranças por unidade
    */
   private agruparCobrancasPorUnidade(cobrancas: any[], filtros: FiltrosKanban): CardCobranca[] {
+    console.log('🔗 Agrupando cobranças por unidade...');
     const cardsMap = new Map<string, CardCobranca>();
 
     cobrancas.forEach(cobranca => {
@@ -156,11 +173,12 @@ export class KanbanService {
       
       if (!cardsMap.has(cnpj)) {
         const unidade = cobranca.unidades_franqueadas;
+        const franqueado = unidade?.franqueado_unidades?.[0]?.franqueados;
         
         cardsMap.set(cnpj, {
           id: cnpj,
           codigo_unidade: unidade?.codigo_unidade || cnpj,
-          nome_unidade: unidade?.nome_franqueado || cobranca.cliente,
+          nome_unidade: franqueado?.nome_completo || cobranca.cliente,
           cnpj: cnpj,
           tipo_debito: 'royalties',
           valor_total: 0,
@@ -242,6 +260,8 @@ export class KanbanService {
     motivo: string
   ): Promise<void> {
     try {
+      console.log(`🔄 Iniciando movimentação do card ${cardId} para ${novoStatus}`);
+      
       // Busca a cobrança pelo ID (que é UUID)
       const { data: cobranca, error: fetchError } = await supabase
         .from('cobrancas_franqueados')
@@ -250,13 +270,14 @@ export class KanbanService {
         .single();
 
       if (fetchError || !cobranca) {
+        console.error('❌ Cobrança não encontrada:', fetchError);
         throw new Error(`Cobrança com ID ${cardId} não encontrada: ${fetchError?.message}`);
       }
 
       const statusOrigem = this.determinarStatusKanban(cobranca.status);
       const novoStatusCobranca = this.mapearStatusKanbanParaCobranca(novoStatus);
 
-      console.log(`Movendo card ${cardId}: ${statusOrigem} -> ${novoStatus} (DB: ${cobranca.status} -> ${novoStatusCobranca})`);
+      console.log(`📊 Movendo card ${cardId}: ${statusOrigem} -> ${novoStatus} (DB: ${cobranca.status} -> ${novoStatusCobranca})`);
 
       // Atualiza o status na tabela principal
       const { error: updateError } = await supabase
@@ -268,8 +289,11 @@ export class KanbanService {
         .eq('id', cardId);
 
       if (updateError) {
+        console.error('❌ Erro ao atualizar status:', updateError);
         throw new Error(`Erro ao atualizar status da cobrança: ${updateError.message}`);
       }
+
+      console.log('✅ Status atualizado no banco de dados');
 
       // Registra a movimentação
       await this.registrarMovimentacao({
@@ -290,10 +314,10 @@ export class KanbanService {
         novoStatusCobranca
       );
 
-      console.log(`Card ${cardId} movido com sucesso para ${novoStatus}`);
+      console.log(`✅ Card ${cardId} movido com sucesso para ${novoStatus}`);
 
     } catch (error) {
-      console.error('Erro ao mover card:', error);
+      console.error('❌ Erro ao mover card:', error);
       throw error;
     }
   }
@@ -338,6 +362,7 @@ export class KanbanService {
 
       // Se mudou o status, move o card
       if (novoStatus !== card.status_atual) {
+        await this.moverCard(cardId, novoStatus, usuario, descricaoAcao);
       } else {
         // Apenas registra a ação
         await this.registrarLog({
@@ -401,6 +426,7 @@ export class KanbanService {
    */
   async buscarEstatisticas(agrupadoPorUnidade: boolean = false): Promise<EstatisticasKanban> {
     try {
+      console.log('📈 Buscando estatísticas do Kanban...');
       const cards = await this.buscarCards({}, agrupadoPorUnidade);
       
       const stats: EstatisticasKanban = {
@@ -419,9 +445,10 @@ export class KanbanService {
           (stats.distribuicao_por_status[card.status_atual] || 0) + 1;
       });
 
+      console.log('✅ Estatísticas calculadas:', stats);
       return stats;
     } catch (error) {
-      console.error('Erro ao buscar estatísticas:', error);
+      console.error('❌ Erro ao buscar estatísticas:', error);
       return {
         total_cards: 0,
         cards_criticos: 0,
@@ -502,6 +529,7 @@ export class KanbanService {
     const mapeamento: Record<string, string> = {
       'novo': 'em_aberto',
       'em_aberto': 'em_aberto',
+      'pendente': 'em_aberto',
       'cobrado': 'notificado',
       'negociando': 'em_negociacao',
       'quitado': 'quitado',
@@ -509,7 +537,7 @@ export class KanbanService {
       'em_tratativa_critica': 'inadimplencia_critica'
     };
     
-    console.log(`Determinando status Kanban para '${statusCobranca}': '${mapeamento[statusCobranca] || 'em_aberto'}'`);
+    console.log(`🔄 Determinando status Kanban para '${statusCobranca}': '${mapeamento[statusCobranca] || 'em_aberto'}'`);
     return mapeamento[statusCobranca] || 'em_aberto';
   }
 
@@ -529,7 +557,7 @@ export class KanbanService {
       'inadimplencia_critica': 'em_tratativa_critica'
     };
     
-    console.log(`Mapeando status Kanban '${statusKanban}' para status DB '${mapeamento[statusKanban] || 'em_aberto'}'`);
+    console.log(`🔄 Mapeando status Kanban '${statusKanban}' para status DB '${mapeamento[statusKanban] || 'em_aberto'}'`);
     return mapeamento[statusKanban] || 'em_aberto';
   }
 
@@ -548,6 +576,7 @@ export class KanbanService {
     const acoes: Record<string, string> = {
       'novo': 'Cobrança registrada',
       'em_aberto': 'Aguardando primeira ação',
+      'pendente': 'Aguardando primeira ação',
       'cobrado': 'Notificação enviada',
       'negociando': 'Em processo de negociação',
       'quitado': 'Débito quitado',
@@ -635,9 +664,9 @@ export class KanbanService {
           user_agent: navigator.userAgent
         });
       
-      console.log('Movimentação registrada no log:', movimentacao);
+      console.log('📝 Movimentação registrada no log:', movimentacao);
     } catch (error) {
-      console.error('Erro ao registrar movimentação:', error);
+      console.error('❌ Erro ao registrar movimentação:', error);
       // Não falha a operação principal se o log falhar
     }
   }
@@ -657,9 +686,9 @@ export class KanbanService {
           user_agent: navigator.userAgent
         });
       
-      console.log('Log de ação registrado:', log);
+      console.log('📝 Log de ação registrado:', log);
     } catch (error) {
-      console.error('Erro ao registrar log:', error);
+      console.error('❌ Erro ao registrar log:', error);
       // Não falha a operação principal se o log falhar
     }
   }
