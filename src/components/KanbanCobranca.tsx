@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useCallback } from "react";
-import { DragDropContext, Droppable, Draggable, DropResult, } from "react-beautiful-dnd";
+import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 import { 
   MessageSquare, Calendar, Scale, Mail,
   Clock, DollarSign, AlertTriangle, CheckCircle, User,
@@ -11,8 +11,8 @@ import {
   Info,
 } from "lucide-react";
 import { KanbanService } from "../services/kanbanService";
-import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban, } from "../types/kanban";
-import { formatarCNPJCPF, formatarMoeda, formatarData, } from "../utils/formatters";
+import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban } from "../types/kanban";
+import { formatarCNPJCPF, formatarMoeda, formatarData } from "../utils/formatters";
 import { supabase } from "../lib/supabaseClient";
 
 type UnitKanbanCard = {
@@ -34,58 +34,20 @@ export function KanbanCobranca() {
   const [cards, setCards] = useState<CardCobranca[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [filtros, setFiltros] = useState<FiltrosKanban>({});
-  const [estatisticas, setEstatisticas] = useState<EstatisticasKanban | null>(
-    null
-  );
-  const [unitSelecionada, setUnitSelecionada] = useState<UnitKanbanCard | null>(
-    null
-  );
-  const [modalAberto, setModalAberto] = useState<
-    "detalhes" | "acao" | "observacao" | null
-  >(null);
+  const [estatisticas, setEstatisticas] = useState<EstatisticasKanban | null>(null);
+  const [unitSelecionada, setUnitSelecionada] = useState<UnitKanbanCard | null>(null);
+  const [modalAberto, setModalAberto] = useState<"detalhes" | "acao" | "observacao" | null>(null);
   const [observacaoEditando, setObservacaoEditando] = useState("");
   const [processando, setProcessando] = useState(false);
   const [aba, setAba] = useState<"unidade" | "individual">("unidade");
-  const [cobrancaSelecionada, setCobrancaSelecionada] =
-    useState<CardCobranca | null>(null);
+  const [cobrancaSelecionada, setCobrancaSelecionada] = useState<CardCobranca | null>(null);
   const [modalConfirmacaoAberto, setModalConfirmacaoAberto] = useState(false);
-  const [movimentoPendente, setMovimentoPendente] = useState<DropResult | null>(
-    null
-  );
+  const [movimentoPendente, setMovimentoPendente] = useState<DropResult | null>(null);
   const [movimentacaoIndividualFeita, setMovimentacaoIndividualFeita] = useState(false);
   const [unidadesComStatusMisto, setUnidadesComStatusMisto] = useState<Set<string>>(new Set());
   const [showMixedStatusWarning, setShowMixedStatusWarning] = useState(false);
 
   const kanbanService = new KanbanService();
-
-  const carregarDados = useCallback(async () => {
-    setCarregando(true);
-    try {
-      const [colunasData, cardsData, statsData] = await Promise.all([
-        kanbanService.buscarColunas(),
-        kanbanService.buscarCards(filtros),
-        kanbanService.buscarEstatisticas(),
-      ]);
-      setColunas(colunasData);
-      setCards(cardsData);
-      setEstatisticas(statsData);
-      
-      // Detecta unidades com status misto automaticamente
-      if (aba === "unidade") {
-        const unidadesMistas = await detectarUnidadesComStatusMisto();
-        setUnidadesComStatusMisto(unidadesMistas);
-      }
-    } catch (error) {
-      console.error("❌ Erro ao carregar dados do Kanban:", error);
-      alert("Erro ao carregar dados do Kanban. Verifique a conexão.");
-    } finally {
-      setCarregando(false);
-    }
-  }, [filtros, aba]);
-
-  useEffect(() => {
-    carregarDados();
-  }, [filtros]);
 
   // Função para detectar unidades com status misto
   const detectarUnidadesComStatusMisto = async (): Promise<Set<string>> => {
@@ -125,10 +87,40 @@ export function KanbanCobranca() {
     }
   };
 
+  const carregarDados = useCallback(async () => {
+    setCarregando(true);
+    try {
+      const [colunasData, cardsData, statsData] = await Promise.all([
+        kanbanService.buscarColunas(),
+        kanbanService.buscarCards(filtros, aba === "unidade"),
+        kanbanService.buscarEstatisticas(aba === "unidade"),
+      ]);
+      setColunas(colunasData);
+      setCards(cardsData);
+      setEstatisticas(statsData);
+      
+      // Detecta unidades com status misto automaticamente
+      if (aba === "unidade") {
+        const unidadesMistas = await detectarUnidadesComStatusMisto();
+        setUnidadesComStatusMisto(unidadesMistas);
+      }
+    } catch (error) {
+      console.error("❌ Erro ao carregar dados do Kanban:", error);
+      alert("Erro ao carregar dados do Kanban. Verifique a conexão.");
+    } finally {
+      setCarregando(false);
+    }
+  }, [filtros, aba]);
+
+  useEffect(() => {
+    carregarDados();
+  }, [filtros, aba]);
+
   // Agrupa cards por unidade
   const getUnitCardsByColuna = (colunaId: string): UnitKanbanCard[] => {
     const filtered = cards.filter((card) => card.status_atual === colunaId);
     const unitMap: Record<string, UnitKanbanCard> = {};
+    
     filtered.forEach((card) => {
       if (!unitMap[card.codigo_unidade]) {
         unitMap[card.codigo_unidade] = {
@@ -147,21 +139,24 @@ export function KanbanCobranca() {
       }
       unitMap[card.codigo_unidade].charges.push(card);
       unitMap[card.codigo_unidade].valor_total += card.valor_total;
+      
       if (
         !unitMap[card.codigo_unidade].data_vencimento_antiga ||
         new Date(card.data_vencimento_antiga) <
           new Date(unitMap[card.codigo_unidade].data_vencimento_antiga)
       ) {
-        unitMap[card.codigo_unidade].data_vencimento_antiga =
-          card.data_vencimento_antiga;
+        unitMap[card.codigo_unidade].data_vencimento_antiga = card.data_vencimento_antiga;
       }
+      
       if (card.dias_parado > unitMap[card.codigo_unidade].dias_parado) {
         unitMap[card.codigo_unidade].dias_parado = card.dias_parado;
       }
+      
       if (card.observacoes) {
         unitMap[card.codigo_unidade].observacoes = card.observacoes;
       }
     });
+    
     return Object.values(unitMap);
   };
 
@@ -281,7 +276,7 @@ export function KanbanCobranca() {
     setProcessando(true);
     try {
       console.log(`Executando ação '${acao}' no card ${cardId}`);
-      await kanbanService.executarAcaoRapida(cardId, acao, "usuario_atual");
+      await kanbanService.executarAcaoRapida(cardId, acao, "usuario_atual", aba === "unidade");
       carregarDados();
       setModalAberto(null);
       console.log(`Ação '${acao}' executada com sucesso`);
@@ -291,5 +286,691 @@ export function KanbanCobranca() {
     } finally {
       setProcessando(false);
     }
-  }
+  };
+
+  const salvarObservacao = async () => {
+    if (!observacaoEditando.trim()) return;
+
+    setProcessando(true);
+    try {
+      const cardId = unitSelecionada?.codigo_unidade || cobrancaSelecionada?.id;
+      if (cardId) {
+        await kanbanService.atualizarObservacao(
+          cardId,
+          observacaoEditando,
+          "usuario_atual",
+          aba === "unidade"
+        );
+        carregarDados();
+        setModalAberto(null);
+        setObservacaoEditando("");
+      }
+    } catch (error) {
+      console.error("Erro ao salvar observação:", error);
+      alert(`Erro ao salvar observação: ${error}`);
+    } finally {
+      setProcessando(false);
+    }
+  };
+
+  const exportarDados = async () => {
+    try {
+      const csv = await kanbanService.exportarKanban(filtros, aba === "unidade");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `kanban-cobrancas-${aba}-${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      alert("Erro ao exportar dados");
+    }
+  };
+
+  const getCriticidadeColor = (criticidade: string) => {
+    switch (criticidade) {
+      case "critica":
+        return "border-red-500 bg-red-50";
+      case "atencao":
+        return "border-yellow-500 bg-yellow-50";
+      default:
+        return "border-gray-300 bg-white";
+    }
+  };
+
+  const getCriticidadeBadge = (criticidade: string) => {
+    switch (criticidade) {
+      case "critica":
+        return "bg-red-100 text-red-800";
+      case "atencao":
+        return "bg-yellow-100 text-yellow-800";
+      default:
+        return "bg-green-100 text-green-800";
+    }
+  };
+
+  const renderCardUnidade = (unit: UnitKanbanCard, index: number) => {
+    const temStatusMisto = unidadesComStatusMisto.has(unit.cnpj);
+    
+    return (
+      <Draggable
+        key={unit.codigo_unidade}
+        draggableId={unit.codigo_unidade}
+        index={index}
+        isDragDisabled={temStatusMisto}
+      >
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.draggableProps}
+            {...provided.dragHandleProps}
+            className={`p-4 mb-3 rounded-lg border-2 cursor-pointer transition-all ${
+              snapshot.isDragging ? "shadow-lg rotate-2" : "hover:shadow-md"
+            } ${getCriticidadeColor(unit.charges[0]?.criticidade || "normal")} ${
+              temStatusMisto ? "opacity-60" : ""
+            }`}
+            onClick={() => {
+              setUnitSelecionada(unit);
+              setModalAberto("detalhes");
+            }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center">
+                <CircleDollarSign className="w-5 h-5 text-blue-600 mr-2" />
+                <div>
+                  <h4 className="font-semibold text-gray-800 text-sm">
+                    {unit.nome_unidade}
+                  </h4>
+                  <p className="text-xs text-gray-600">
+                    {formatarCNPJCPF(unit.cnpj)}
+                  </p>
+                </div>
+              </div>
+              {temStatusMisto && (
+                <div className="flex items-center text-orange-600" title="Unidade com status misto - bloqueada">
+                  <Lock className="w-4 h-4" />
+                </div>
+              )}
+            </div>
+
+            {temStatusMisto && (
+              <div className="mb-2 p-2 bg-orange-50 border border-orange-200 rounded text-xs text-orange-800">
+                ⚠️ Status misto detectado - use modo individual
+              </div>
+            )}
+
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Valor Total:</span>
+                <span className="font-semibold text-red-600">
+                  {formatarMoeda(unit.valor_total)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Cobranças:</span>
+                <span className="font-medium">{unit.charges.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Vencimento:</span>
+                <span className="font-medium">
+                  {formatarData(unit.data_vencimento_antiga)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Parado há:</span>
+                <span className={`font-medium ${unit.dias_parado > 7 ? "text-red-600" : "text-gray-800"}`}>
+                  {unit.dias_parado} dias
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-2 flex items-center justify-between">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCriticidadeBadge(unit.charges[0]?.criticidade || "normal")}`}>
+                {unit.charges[0]?.criticidade?.toUpperCase() || "NORMAL"}
+              </span>
+              <span className="text-xs text-gray-500">{unit.responsavel_atual}</span>
+            </div>
+          </div>
+        )}
+      </Draggable>
+    );
+  };
+
+  const renderCardIndividual = (card: CardCobranca, index: number) => {
+    return (
+      <Draggable key={card.id} draggableId={card.id} index={index}>
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.draggableProps}
+            {...provided.dragHandleProps}
+            className={`p-4 mb-3 rounded-lg border-2 cursor-pointer transition-all ${
+              snapshot.isDragging ? "shadow-lg rotate-2" : "hover:shadow-md"
+            } ${getCriticidadeColor(card.criticidade)}`}
+            onClick={() => {
+              setCobrancaSelecionada(card);
+              setModalAberto("detalhes");
+            }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center">
+                <DollarSign className="w-5 h-5 text-green-600 mr-2" />
+                <div>
+                  <h4 className="font-semibold text-gray-800 text-sm">
+                    {card.nome_unidade}
+                  </h4>
+                  <p className="text-xs text-gray-600">
+                    {formatarCNPJCPF(card.cnpj)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Valor:</span>
+                <span className="font-semibold text-red-600">
+                  {formatarMoeda(card.valor_total)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Vencimento:</span>
+                <span className="font-medium">
+                  {formatarData(card.data_vencimento_antiga)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Tipo:</span>
+                <span className="font-medium">{card.tipo_debito}</span>
+              </div>
+              {card.descricao_cobranca && (
+                <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
+                  {card.descricao_cobranca}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-2 flex items-center justify-between">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCriticidadeBadge(card.criticidade)}`}>
+                {card.criticidade.toUpperCase()}
+              </span>
+              <span className="text-xs text-gray-500">{card.responsavel_atual}</span>
+            </div>
+          </div>
+        )}
+      </Draggable>
+    );
+  };
+
+  const unidadesMistasCount = unidadesComStatusMisto.size;
+
+  return (
+    <div className="max-w-full mx-auto p-6">
+      <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
+              <CircleDollarSign className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">
+                Kanban de Cobranças
+              </h1>
+              <p className="text-gray-600">
+                Gestão visual do fluxo de cobrança
+              </p>
+            </div>
+          </div>
+
+          <div className="flex space-x-3">
+            <button
+              onClick={exportarDados}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Exportar
+            </button>
+            <button
+              onClick={carregarDados}
+              disabled={carregando}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${carregando ? "animate-spin" : ""}`} />
+              Atualizar
+            </button>
+          </div>
+        </div>
+
+        {/* Estatísticas */}
+        {estatisticas && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="bg-blue-50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-blue-600">
+                {estatisticas.total_cards}
+              </div>
+              <div className="text-sm text-blue-800">Total de Cards</div>
+            </div>
+            <div className="bg-red-50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-red-600">
+                {estatisticas.cards_criticos}
+              </div>
+              <div className="text-sm text-red-800">Cards Críticos</div>
+            </div>
+            <div className="bg-yellow-50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-yellow-600">
+                {estatisticas.cards_parados}
+              </div>
+              <div className="text-sm text-yellow-800">Cards Parados</div>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-green-600">
+                {formatarMoeda(estatisticas.valor_total_fluxo)}
+              </div>
+              <div className="text-sm text-green-800">Valor Total</div>
+            </div>
+          </div>
+        )}
+
+        {/* Seletor de Modo */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-4">
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => {
+                  if (movimentacaoIndividualFeita) {
+                    if (confirm(
+                      "⚠️ ATENÇÃO: Você moveu cobranças individuais nesta sessão.\n\n" +
+                      "Alternar para modo agrupado pode causar inconsistências.\n\n" +
+                      "Recomendamos recarregar a página antes de usar o modo agrupado.\n\n" +
+                      "Deseja continuar mesmo assim?"
+                    )) {
+                      setAba("unidade");
+                      setMovimentacaoIndividualFeita(false);
+                    }
+                  } else {
+                    setAba("unidade");
+                  }
+                }}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  aba === "unidade"
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-600 hover:text-gray-800"
+                } ${movimentacaoIndividualFeita ? "opacity-50" : ""}`}
+                disabled={movimentacaoIndividualFeita}
+                title={movimentacaoIndividualFeita ? "Modo bloqueado - houve movimentação individual" : ""}
+              >
+                Por Unidade
+                {unidadesMistasCount > 0 && (
+                  <span className="ml-2 px-2 py-1 bg-orange-500 text-white rounded-full text-xs">
+                    {unidadesMistasCount} bloqueadas
+                  </span>
+                )}
+                {movimentacaoIndividualFeita && (
+                  <Lock className="w-4 h-4 ml-2" />
+                )}
+              </button>
+              <button
+                onClick={() => setAba("individual")}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  aba === "individual"
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                Por Cobrança
+                {movimentacaoIndividualFeita && (
+                  <span className="ml-2 px-2 py-1 bg-green-500 text-white rounded-full text-xs">
+                    Ativo
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {movimentacaoIndividualFeita && (
+              <div className="flex items-center px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg">
+                <AlertTriangle className="w-4 h-4 text-orange-600 mr-2" />
+                <span className="text-sm text-orange-800 font-medium">
+                  Modo Individual Ativo - Continue movendo uma por uma
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Filtros */}
+          <div className="flex items-center space-x-3">
+            <Filter className="w-5 h-5 text-gray-600" />
+            <select
+              value={filtros.tipo_debito || ""}
+              onChange={(e) => setFiltros({ ...filtros, tipo_debito: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos os Tipos</option>
+              <option value="royalties">Royalties</option>
+              <option value="insumos">Insumos</option>
+              <option value="aluguel">Aluguel</option>
+              <option value="multa">Multa</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Avisos */}
+        {aba === "unidade" && unidadesMistasCount > 0 && (
+          <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+            <div className="flex items-center">
+              <AlertTriangle className="w-5 h-5 text-orange-600 mr-2" />
+              <div>
+                <p className="text-orange-800 font-medium">
+                  {unidadesMistasCount} unidade(s) com status misto detectada(s)
+                </p>
+                <p className="text-orange-700 text-sm">
+                  Essas unidades estão bloqueadas no modo agrupado. Use o modo "Por Cobrança" para movê-las individualmente.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Kanban Board */}
+        <DragDropContext
+          onDragEnd={aba === "unidade" ? onDragEndUnidade : onDragEndIndividual}
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {colunas
+              .filter((col) => col.ativa)
+              .map((coluna) => (
+                <div key={coluna.id} className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-gray-800 text-sm">
+                      {coluna.nome}
+                    </h3>
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: coluna.cor }}
+                    ></div>
+                  </div>
+
+                  <Droppable droppableId={coluna.id}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`min-h-[200px] transition-colors ${
+                          snapshot.isDraggingOver ? "bg-blue-50" : ""
+                        }`}
+                      >
+                        {aba === "unidade"
+                          ? getUnitCardsByColuna(coluna.id).map((unit, index) =>
+                              renderCardUnidade(unit, index)
+                            )
+                          : cards
+                              .filter((card) => card.status_atual === coluna.id)
+                              .map((card, index) => renderCardIndividual(card, index))}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </div>
+              ))}
+          </div>
+        </DragDropContext>
+
+        {carregando && (
+          <div className="flex items-center justify-center py-8">
+            <RefreshCw className="w-8 h-8 animate-spin text-blue-600 mr-2" />
+            <span className="text-gray-600">Carregando Kanban...</span>
+          </div>
+        )}
+      </div>
+
+      {/* Modal de Confirmação de Movimento */}
+      {modalConfirmacaoAberto && movimentoPendente && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">Confirmar Movimentação</h3>
+            <p className="text-gray-700 mb-6">
+              Deseja mover todas as cobranças desta unidade para a nova coluna?
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={confirmarMovimentoUnidade}
+                disabled={processando}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {processando ? "Movendo..." : "Confirmar"}
+              </button>
+              <button
+                onClick={() => {
+                  setModalConfirmacaoAberto(false);
+                  setMovimentoPendente(null);
+                }}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Aviso de Status Misto */}
+      {showMixedStatusWarning && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <div className="flex items-center mb-4">
+              <Lock className="w-6 h-6 text-orange-600 mr-3" />
+              <h3 className="text-lg font-semibold text-gray-800">Unidade Bloqueada</h3>
+            </div>
+            <div className="space-y-3 mb-6">
+              <p className="text-gray-700">
+                Esta unidade possui cobranças com status diferentes e não pode ser movida no modo agrupado.
+              </p>
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                <p className="text-orange-800 text-sm font-medium">
+                  💡 Solução: Use o modo "Por Cobrança" para mover as cobranças individualmente.
+                </p>
+              </div>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setAba("individual");
+                  setShowMixedStatusWarning(false);
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Ir para Modo Individual
+              </button>
+              <button
+                onClick={() => setShowMixedStatusWarning(false)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Detalhes */}
+      {modalAberto === "detalhes" && (unitSelecionada || cobrancaSelecionada) && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold">
+                {unitSelecionada ? "Detalhes da Unidade" : "Detalhes da Cobrança"}
+              </h3>
+              <button
+                onClick={() => setModalAberto(null)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {unitSelecionada && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Nome da Unidade</label>
+                    <p className="text-gray-800">{unitSelecionada.nome_unidade}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">CNPJ</label>
+                    <p className="text-gray-800">{formatarCNPJCPF(unitSelecionada.cnpj)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Valor Total</label>
+                    <p className="text-red-600 font-semibold">{formatarMoeda(unitSelecionada.valor_total)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Quantidade de Cobranças</label>
+                    <p className="text-gray-800">{unitSelecionada.charges.length}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Cobranças da Unidade</label>
+                  <div className="mt-2 space-y-2">
+                    {unitSelecionada.charges.map((charge) => (
+                      <div key={charge.id} className="p-3 bg-gray-50 rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm">{charge.descricao_cobranca || "Cobrança"}</span>
+                          <span className="font-medium">{formatarMoeda(charge.valor_total)}</span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Vencimento: {formatarData(charge.data_vencimento_antiga)} • Status: {charge.status_atual}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => executarAcao(unitSelecionada.codigo_unidade, "whatsapp")}
+                    className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  >
+                    <MessageSquare className="w-4 h-4 mr-1" />
+                    WhatsApp
+                  </button>
+                  <button
+                    onClick={() => executarAcao(unitSelecionada.codigo_unidade, "reuniao")}
+                    className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                  >
+                    <Calendar className="w-4 h-4 mr-1" />
+                    Reunião
+                  </button>
+                  <button
+                    onClick={() => {
+                      setObservacaoEditando(unitSelecionada.observacoes || "");
+                      setModalAberto("observacao");
+                    }}
+                    className="flex items-center px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                  >
+                    <Edit className="w-4 h-4 mr-1" />
+                    Observação
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {cobrancaSelecionada && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Cliente</label>
+                    <p className="text-gray-800">{cobrancaSelecionada.nome_unidade}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">CNPJ</label>
+                    <p className="text-gray-800">{formatarCNPJCPF(cobrancaSelecionada.cnpj)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Valor</label>
+                    <p className="text-red-600 font-semibold">{formatarMoeda(cobrancaSelecionada.valor_total)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Vencimento</label>
+                    <p className="text-gray-800">{formatarData(cobrancaSelecionada.data_vencimento_antiga)}</p>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => executarAcao(cobrancaSelecionada.id, "whatsapp")}
+                    className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  >
+                    <MessageSquare className="w-4 h-4 mr-1" />
+                    WhatsApp
+                  </button>
+                  <button
+                    onClick={() => executarAcao(cobrancaSelecionada.id, "reuniao")}
+                    className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                  >
+                    <Calendar className="w-4 h-4 mr-1" />
+                    Reunião
+                  </button>
+                  <button
+                    onClick={() => {
+                      setObservacaoEditando(cobrancaSelecionada.observacoes || "");
+                      setModalAberto("observacao");
+                    }}
+                    className="flex items-center px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                  >
+                    <Edit className="w-4 h-4 mr-1" />
+                    Observação
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Observação */}
+      {modalAberto === "observacao" && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Adicionar Observação</h3>
+              <button
+                onClick={() => setModalAberto(null)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <textarea
+              value={observacaoEditando}
+              onChange={(e) => setObservacaoEditando(e.target.value)}
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              placeholder="Digite sua observação..."
+            />
+
+            <div className="flex space-x-3 mt-4">
+              <button
+                onClick={salvarObservacao}
+                disabled={processando || !observacaoEditando.trim()}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                <Save className="w-4 h-4 mr-2 inline" />
+                {processando ? "Salvando..." : "Salvar"}
+              </button>
+              <button
+                onClick={() => setModalAberto(null)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
