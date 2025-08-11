@@ -66,8 +66,10 @@ export function KanbanCobranca() {
       setColunas(colunasData);
       setCards(cardsData);
       setEstatisticas(statsData);
+      console.log(`Kanban carregado: ${cardsData.length} cards encontrados`);
     } catch (error) {
       console.error("Erro ao carregar dados do Kanban:", error);
+      alert("Erro ao carregar dados do Kanban. Verifique a conexão.");
     } finally {
       setCarregando(false);
     }
@@ -126,6 +128,8 @@ export function KanbanCobranca() {
     if (!movimentoPendente || !movimentoPendente.destination) return;
 
     const { source, destination, draggableId } = movimentoPendente;
+    console.log(`Movendo unidade: ${draggableId} de ${source.droppableId} para ${destination.droppableId}`);
+    
     setProcessando(true);
     setModalConfirmacaoAberto(false);
 
@@ -133,7 +137,10 @@ export function KanbanCobranca() {
       const unit = getUnitCardsByColuna(source.droppableId).find(
         (u) => u.codigo_unidade === draggableId
       );
+      
       if (unit) {
+        console.log(`Movendo ${unit.charges.length} cobranças da unidade ${unit.nome_unidade}`);
+        
         await Promise.all(
           unit.charges.map((card) =>
             kanbanService.moverCard(
@@ -144,11 +151,16 @@ export function KanbanCobranca() {
             )
           )
         );
-        await carregarDados(); // Garante que a UI está sincronizada
+        
+        console.log(`Todas as cobranças da unidade ${unit.nome_unidade} foram movidas`);
+        await carregarDados();
+      } else {
+        throw new Error(`Unidade ${draggableId} não encontrada`);
       }
     } catch (error) {
       console.error("Erro ao mover card da unidade:", error);
-      // Adicionar um feedback de erro para o usuário aqui seria uma boa prática
+      alert(`Erro ao mover unidade: ${error}`);
+      await carregarDados();
     } finally {
       setProcessando(false);
       setMovimentoPendente(null);
@@ -161,14 +173,7 @@ export function KanbanCobranca() {
     const { source, destination, draggableId } = result;
     if (source.droppableId === destination.droppableId) return;
 
-    // Atualização otimista da UI
-    const originalCards = cards;
-    const updatedCards = cards.map((card) =>
-      card.id === draggableId
-        ? { ...card, status_atual: destination.droppableId }
-        : card
-    );
-    setCards(updatedCards);
+    console.log(`Movendo card individual: ${draggableId} de ${source.droppableId} para ${destination.droppableId}`);
 
     setProcessando(true);
     try {
@@ -178,12 +183,15 @@ export function KanbanCobranca() {
         "usuario_atual",
         "Movimentação manual via Kanban"
       );
-      // A UI já foi atualizada otimisticamente. Não é necessário recarregar.
-      // Apenas em caso de erro, a UI será revertida.
+      
+      // Recarrega os dados para garantir sincronização
+      await carregarDados();
+      console.log(`Card ${draggableId} movido com sucesso`);
     } catch (error) {
       console.error("Erro ao mover cobrança, revertendo:", error);
-      // Se a chamada falhar, reverte a UI para o estado original
-      setCards(originalCards);
+      alert(`Erro ao mover cobrança: ${error}`);
+      // Recarrega para reverter qualquer mudança visual
+      await carregarDados();
     } finally {
       setProcessando(false);
     }
@@ -192,11 +200,14 @@ export function KanbanCobranca() {
   const executarAcao = async (cardId: string, acao: string) => {
     setProcessando(true);
     try {
+      console.log(`Executando ação '${acao}' no card ${cardId}`);
       await kanbanService.executarAcaoRapida(cardId, acao, "usuario_atual");
       carregarDados();
       setModalAberto(null);
+      console.log(`Ação '${acao}' executada com sucesso`);
     } catch (error) {
       console.error("Erro ao executar ação:", error);
+      alert(`Erro ao executar ação: ${error}`);
     } finally {
       setProcessando(false);
     }
