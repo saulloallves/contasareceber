@@ -285,8 +285,10 @@ export function KanbanCobranca() {
       setModalAberto(null);
       console.log(`Ação '${acao}' executada com sucesso`);
     } catch (error) {
-      console.error("Erro ao executar ação
-      )
+      console.error("Erro ao executar ação:", error);
+      alert(`Erro ao executar ação: ${error}`);
+    } finally {
+      setProcessando(false);
     }
   }
 }
