@@ -120,8 +120,6 @@ export class KanbanService {
         
         const card: CardCobranca = {
           id: cobranca.id, // Usa o ID real da cobrança (UUID)
-          codigo_unidade: unidade?.codigo_unidade || cobranca.cnpj,
-          nome_unidade: unidade?.nome_franqueado || cobranca.cliente,
           cnpj: cobranca.cnpj,
           tipo_debito: this.determinarTipoDebito([cobranca]),
           valor_total: valorAtual,
@@ -305,10 +303,9 @@ export class KanbanService {
     cardId: string,
     acao: string,
     usuario: string,
-    agrupadoPorUnidade: boolean = false
   ): Promise<void> {
     try {
-      const cards = await this.buscarCards({}, agrupadoPorUnidade);
+      const cards = await this.buscarCards({}, false);
       const card = cards.find(c => c.id === cardId);
       
       if (!card) {
@@ -339,8 +336,6 @@ export class KanbanService {
 
       // Se mudou o status, move o card
       if (novoStatus !== card.status_atual) {
-  // Removido parâmetro extra; moverCard espera apenas (cardId, novoStatus, usuario, motivo)
-  await this.moverCard(cardId, novoStatus, usuario, descricaoAcao);
       } else {
         // Apenas registra a ação
         await this.registrarLog({
@@ -401,10 +396,9 @@ export class KanbanService {
 
   /**
    * Busca estatísticas do Kanban
-   */
   async buscarEstatisticas(agrupadoPorUnidade: boolean = false): Promise<EstatisticasKanban> {
     try {
-      const cards = await this.buscarCards({}, agrupadoPorUnidade);
+      const cards = await this.buscarCards({}, false);
       
       const stats: EstatisticasKanban = {
         total_cards: cards.length,
