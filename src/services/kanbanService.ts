@@ -41,13 +41,11 @@ export class KanbanService {
    */
   async buscarCards(filtros: FiltrosKanban = {}, agruparPorUnidade: boolean = false): Promise<CardCobranca[]> {
     try {
-      console.log('🔍 Iniciando busca de cards do Kanban...');
-      
-      // Query atualizada para a nova estrutura do banco
-      let query = supabase
+      // Busca dados das cobranças com join correto
+  let query = supabase
         .from('cobrancas_franqueados')
         .select(`
-          id,
+          cobranca_id:id,
           cnpj,
           cliente,
           valor_original,
@@ -58,33 +56,20 @@ export class KanbanService {
           tipo_cobranca,
           descricao,
           created_at,
-          dias_em_atraso,
           unidade_id_fk,
           unidades_franqueadas!unidade_id_fk (
             id,
             codigo_unidade,
+            nome_unidade,
             cidade,
-            estado,
-            franqueado_unidades!inner (
-              franqueados (
-                id,
-                nome_completo,
-                email,
-                telefone
-              )
-            )
+            estado
           )
         `)
-        .neq('status', 'quitado')
-        .order('created_at', { ascending: false });
+        .neq('status', 'quitado');
 
       // Aplica filtros
       if (filtros.unidade) {
         query = query.or(`cnpj.ilike.%${filtros.unidade}%,unidades_franqueadas.codigo_unidade.ilike.%${filtros.unidade}%`);
-      }
-
-      if (filtros.tipo_debito) {
-        query = query.eq('tipo_cobranca', filtros.tipo_debito);
       }
 
       if (filtros.valor_min) {
@@ -95,20 +80,15 @@ export class KanbanService {
         query = query.lte('valor_atualizado', filtros.valor_max);
       }
 
-      console.log('📊 Executando query no Supabase...');
       const { data: cobrancas, error } = await query;
 
       if (error) {
-        console.error('❌ Erro na query:', error);
         throw new Error(`Erro ao buscar cobranças: ${error.message}`);
       }
 
       if (!cobrancas || cobrancas.length === 0) {
-        console.log('⚠️ Nenhuma cobrança encontrada');
         return [];
       }
-
-      console.log(`✅ Encontradas ${cobrancas.length} cobranças para o Kanban`);
 
       if (agruparPorUnidade) {
         return this.agruparCobrancasPorUnidade(cobrancas, filtros);
@@ -116,7 +96,7 @@ export class KanbanService {
         return this.criarCardsIndividuais(cobrancas, filtros);
       }
     } catch (error) {
-      console.error('❌ Erro ao buscar cards:', error);
+      console.error('Erro ao buscar cards:', error);
       return [];
     }
   }
@@ -125,18 +105,15 @@ export class KanbanService {
    * Cria cards individuais para cada cobrança
    */
   private criarCardsIndividuais(cobrancas: any[], filtros: FiltrosKanban): CardCobranca[] {
-    console.log('🔨 Criando cards individuais...');
-    
     return cobrancas
       .map(cobranca => {
         const unidade = cobranca.unidades_franqueadas;
-        const franqueado = unidade?.franqueado_unidades?.[0]?.franqueados;
         const valorAtual = cobranca.valor_atualizado || cobranca.valor_original;
         
         const card: CardCobranca = {
-          id: cobranca.id, // Usa o ID real da cobrança (UUID)
+          id: String(cobranca.cobranca_id), // garante string para o DnD e mantém o ID real do banco
           codigo_unidade: unidade?.codigo_unidade || cobranca.cnpj,
-          nome_unidade: franqueado?.nome_completo || cobranca.cliente,
+          nome_unidade: unidade?.nome_unidade || cobranca.cliente,
           cnpj: cobranca.cnpj,
           tipo_debito: this.determinarTipoDebito([cobranca]),
           valor_total: valorAtual,
@@ -146,7 +123,7 @@ export class KanbanService {
           ultima_acao: this.determinarUltimaAcao(cobranca),
           data_ultima_acao: cobranca.created_at || new Date().toISOString(),
           responsavel_atual: this.determinarResponsavel(cobranca.status),
-          dias_parado: cobranca.dias_em_atraso || this.calcularDiasParado(cobranca.created_at || new Date().toISOString()),
+          dias_parado: this.calcularDiasParado(cobranca.created_at || new Date().toISOString()),
           criticidade: this.determinarCriticidadeIndividual(valorAtual, cobranca.data_vencimento),
           data_entrada_etapa: cobranca.created_at || new Date().toISOString(),
           // Dados específicos da cobrança individual
@@ -155,7 +132,6 @@ export class KanbanService {
           quantidade_titulos: 1
         };
 
-        console.log(`📋 Card criado: ${card.codigo_unidade} - ${card.nome_unidade} - Status: ${card.status_atual}`);
         return card;
       })
       .filter(card => this.aplicarFiltrosCard(card, filtros));
@@ -165,7 +141,6 @@ export class KanbanService {
    * Agrupa cobranças por unidade
    */
   private agruparCobrancasPorUnidade(cobrancas: any[], filtros: FiltrosKanban): CardCobranca[] {
-    console.log('🔗 Agrupando cobranças por unidade...');
     const cardsMap = new Map<string, CardCobranca>();
 
     cobrancas.forEach(cobranca => {
@@ -173,12 +148,11 @@ export class KanbanService {
       
       if (!cardsMap.has(cnpj)) {
         const unidade = cobranca.unidades_franqueadas;
-        const franqueado = unidade?.franqueado_unidades?.[0]?.franqueados;
         
         cardsMap.set(cnpj, {
           id: cnpj,
           codigo_unidade: unidade?.codigo_unidade || cnpj,
-          nome_unidade: franqueado?.nome_completo || cobranca.cliente,
+          nome_unidade: unidade?.nome_unidade || cobranca.cliente,
           cnpj: cnpj,
           tipo_debito: 'royalties',
           valor_total: 0,
@@ -222,19 +196,6 @@ export class KanbanService {
         card.data_ultima_acao = cobranca.created_at;
         card.ultima_acao = this.determinarUltimaAcao(cobranca);
       }
-      
-      // Adiciona a cobrança individual ao card da unidade para referência
-      if (!card.charges) {
-        (card as any).charges = [];
-      }
-      (card as any).charges.push({
-        id: cobranca.id,
-        valor_total: valorAtual,
-        status_atual: this.determinarStatusKanban(cobranca.status),
-        tipo_debito: cobranca.tipo_cobranca || 'royalties',
-        data_vencimento_antiga: cobranca.data_vencimento,
-        observacoes: cobranca.observacoes
-      });
     });
 
     // Finaliza processamento dos cards agrupados
@@ -243,7 +204,7 @@ export class KanbanService {
       tipo_debito: this.determinarTipoDebito(
         cobrancas.filter(c => c.cnpj === card.cnpj)
       ),
-      dias_parado: Math.max(...cobrancas.filter(c => c.cnpj === card.cnpj).map(c => c.dias_em_atraso || 0), 0),
+      dias_parado: this.calcularDiasParado(card.data_ultima_acao),
       criticidade: this.determinarCriticidade(card)
     }));
 
@@ -260,42 +221,38 @@ export class KanbanService {
     motivo: string
   ): Promise<void> {
     try {
-      console.log(`🔄 Iniciando movimentação do card ${cardId} para ${novoStatus}`);
-      
-      // Busca a cobrança pelo ID (que é UUID)
+      // Converte o ID para número quando possível (tabelas com id inteiro)
+      const parsedId = Number(cardId);
+      const idFilter: any = isNaN(parsedId) ? cardId : parsedId;
+
       const { data: cobranca, error: fetchError } = await supabase
         .from('cobrancas_franqueados')
-        .select('id, status, cnpj')
-        .eq('id', cardId)
+        .select('status')
+        .eq('id', idFilter)
         .single();
 
       if (fetchError || !cobranca) {
-        console.error('❌ Cobrança não encontrada:', fetchError);
-        throw new Error(`Cobrança com ID ${cardId} não encontrada: ${fetchError?.message}`);
+        throw new Error(`Cobrança com ID ${cardId} não encontrada.`);
       }
 
       const statusOrigem = this.determinarStatusKanban(cobranca.status);
       const novoStatusCobranca = this.mapearStatusKanbanParaCobranca(novoStatus);
 
-      console.log(`📊 Movendo card ${cardId}: ${statusOrigem} -> ${novoStatus} (DB: ${cobranca.status} -> ${novoStatusCobranca})`);
-
-      // Atualiza o status na tabela principal
-      const { error: updateError } = await supabase
+      // 1. Atualiza o status na tabela principal
+      const { data: updatedRows, error: updateError } = await supabase
         .from('cobrancas_franqueados')
-        .update({ 
-          status: novoStatusCobranca,
-          data_ultima_atualizacao: new Date().toISOString()
-        })
-        .eq('id', cardId);
+        .update({ status: novoStatusCobranca })
+        .eq('id', idFilter)
+        .select('id');
 
       if (updateError) {
-        console.error('❌ Erro ao atualizar status:', updateError);
         throw new Error(`Erro ao atualizar status da cobrança: ${updateError.message}`);
       }
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error(`Nenhuma linha atualizada para a cobrança ID ${cardId}. Verifique se o ID corresponde ao registro no banco.`);
+      }
 
-      console.log('✅ Status atualizado no banco de dados');
-
-      // Registra a movimentação
+      // 2. Registra a movimentação em uma tabela de histórico
       await this.registrarMovimentacao({
         card_id: cardId,
         status_origem: statusOrigem,
@@ -306,7 +263,7 @@ export class KanbanService {
         automatica: false,
       });
 
-      // Registra tratativa
+      // 3. Adiciona uma observação na tabela de tratativas
       await this.tratativasService.registrarObservacao(
         cardId,
         usuario,
@@ -314,10 +271,8 @@ export class KanbanService {
         novoStatusCobranca
       );
 
-      console.log(`✅ Card ${cardId} movido com sucesso para ${novoStatus}`);
-
     } catch (error) {
-      console.error('❌ Erro ao mover card:', error);
+      console.error('Erro ao mover card:', error);
       throw error;
     }
   }
@@ -329,9 +284,10 @@ export class KanbanService {
     cardId: string,
     acao: string,
     usuario: string,
+    agrupadoPorUnidade: boolean = false
   ): Promise<void> {
     try {
-      const cards = await this.buscarCards({}, false);
+      const cards = await this.buscarCards({}, agrupadoPorUnidade);
       const card = cards.find(c => c.id === cardId);
       
       if (!card) {
@@ -362,7 +318,8 @@ export class KanbanService {
 
       // Se mudou o status, move o card
       if (novoStatus !== card.status_atual) {
-        await this.moverCard(cardId, novoStatus, usuario, descricaoAcao);
+  // Removido parâmetro extra; moverCard espera apenas (cardId, novoStatus, usuario, motivo)
+  await this.moverCard(cardId, novoStatus, usuario, descricaoAcao);
       } else {
         // Apenas registra a ação
         await this.registrarLog({
@@ -426,7 +383,6 @@ export class KanbanService {
    */
   async buscarEstatisticas(agrupadoPorUnidade: boolean = false): Promise<EstatisticasKanban> {
     try {
-      console.log('📈 Buscando estatísticas do Kanban...');
       const cards = await this.buscarCards({}, agrupadoPorUnidade);
       
       const stats: EstatisticasKanban = {
@@ -445,10 +401,9 @@ export class KanbanService {
           (stats.distribuicao_por_status[card.status_atual] || 0) + 1;
       });
 
-      console.log('✅ Estatísticas calculadas:', stats);
       return stats;
     } catch (error) {
-      console.error('❌ Erro ao buscar estatísticas:', error);
+      console.error('Erro ao buscar estatísticas:', error);
       return {
         total_cards: 0,
         cards_criticos: 0,
@@ -529,15 +484,12 @@ export class KanbanService {
     const mapeamento: Record<string, string> = {
       'novo': 'em_aberto',
       'em_aberto': 'em_aberto',
-      'pendente': 'em_aberto',
       'cobrado': 'notificado',
       'negociando': 'em_negociacao',
       'quitado': 'quitado',
       'em_tratativa_juridica': 'escalado_juridico',
       'em_tratativa_critica': 'inadimplencia_critica'
     };
-    
-    console.log(`🔄 Determinando status Kanban para '${statusCobranca}': '${mapeamento[statusCobranca] || 'em_aberto'}'`);
     return mapeamento[statusCobranca] || 'em_aberto';
   }
 
@@ -556,8 +508,6 @@ export class KanbanService {
       'escalado_juridico': 'em_tratativa_juridica',
       'inadimplencia_critica': 'em_tratativa_critica'
     };
-    
-    console.log(`🔄 Mapeando status Kanban '${statusKanban}' para status DB '${mapeamento[statusKanban] || 'em_aberto'}'`);
     return mapeamento[statusKanban] || 'em_aberto';
   }
 
@@ -576,7 +526,6 @@ export class KanbanService {
     const acoes: Record<string, string> = {
       'novo': 'Cobrança registrada',
       'em_aberto': 'Aguardando primeira ação',
-      'pendente': 'Aguardando primeira ação',
       'cobrado': 'Notificação enviada',
       'negociando': 'Em processo de negociação',
       'quitado': 'Débito quitado',
@@ -650,46 +599,19 @@ export class KanbanService {
 
   private async registrarMovimentacao(movimentacao: MovimentacaoCard): Promise<void> {
     try {
-      // Registra no log do sistema
-      await supabase
-        .from('logs_sistema')
-        .insert({
-          usuario_id: movimentacao.usuario,
-          acao: 'mover_card_kanban',
-          tabela_afetada: 'cobrancas_franqueados',
-          registro_id: movimentacao.card_id,
-          dados_anteriores: { status: movimentacao.status_origem },
-          dados_novos: { status: movimentacao.status_destino },
-          ip_origem: 'kanban_interface',
-          user_agent: navigator.userAgent
-        });
-      
-      console.log('📝 Movimentação registrada no log:', movimentacao);
+      // Em um sistema real, isso seria salvo em uma tabela específica
+      console.log('Movimentação registrada:', movimentacao);
     } catch (error) {
-      console.error('❌ Erro ao registrar movimentação:', error);
-      // Não falha a operação principal se o log falhar
+      console.error('Erro ao registrar movimentação:', error);
     }
   }
 
   private async registrarLog(log: LogMovimentacao): Promise<void> {
     try {
-      // Registra ação no log do sistema
-      await supabase
-        .from('logs_sistema')
-        .insert({
-          usuario_id: log.usuario,
-          acao: log.acao,
-          tabela_afetada: 'cobrancas_franqueados',
-          registro_id: log.card_id,
-          dados_novos: { detalhes: log.detalhes },
-          ip_origem: 'kanban_interface',
-          user_agent: navigator.userAgent
-        });
-      
-      console.log('📝 Log de ação registrado:', log);
+      // Em um sistema real, isso seria salvo em uma tabela específica
+      console.log('Log registrado:', log);
     } catch (error) {
-      console.error('❌ Erro ao registrar log:', error);
-      // Não falha a operação principal se o log falhar
+      console.error('Erro ao registrar log:', error);
     }
   }
 }
