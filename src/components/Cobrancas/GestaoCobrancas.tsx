@@ -35,7 +35,7 @@ import {
   formatarCNPJCPF,
   formatarMoeda,
   formatarData,
-} from "../../utils/formatters"; // Importando a função de formatação de CNPJ/CPF
+} from "../../utils/formatters";
 import { SimulacaoParcelamentoService } from "../../services/simulacaoParcelamentoService";
 import { UnidadesService } from "../../services/unidadesService";
 import type { UnidadeFranqueada } from "../../types/unidades";
@@ -402,7 +402,7 @@ Entre em contato: (11) 99999-9999`,
     }, 10000);
 
     // A URL do webhook n8n (idealmente vinda de uma variável de ambiente)
-    const n8nWebhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
+    const n8nWebhookUrl = import.meta.env.VITE_N8N_WEBHOOKPLANILHA_URL;
 
     try {
       // 1. Criar um objeto FormData para enviar o arquivo
@@ -415,8 +415,6 @@ Entre em contato: (11) 99999-9999`,
       const response = await fetch(n8nWebhookUrl, {
         method: "POST",
         body: formData,
-        // Não defina o 'Content-Type' header manualmente,
-        // o navegador fará isso corretamente para multipart/form-data.
       });
 
       // Se chegamos aqui, o n8n respondeu. Cancelamos o timeout.
@@ -432,7 +430,7 @@ Entre em contato: (11) 99999-9999`,
       fecharModal(); // Fecha o modal de upload
       mostrarMensagem(
         "sucesso",
-        "Planilha recebida! O processamento foi iniciado em segundo plano. Você será notificado aqui mesmo no sistema quando terminar."
+        "Planilha recebida! O processamento foi iniciado em segundo plano. Você será notificado pelo WhatsApp quando terminar."
       );
     } catch (error: any) {
       clearTimeout(timeoutId);

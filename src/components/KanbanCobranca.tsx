@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from "react";
 import {
   DragDropContext,
@@ -74,7 +75,6 @@ export function KanbanCobranca() {
 
   useEffect(() => {
     carregarDados();
-    // eslint-disable-next-line
   }, [filtros]);
 
   const carregarDados = async () => {

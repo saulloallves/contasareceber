@@ -116,7 +116,7 @@ export class EmailService {
     // Registra o log se o envio foi bem-sucedido
     if (resultado.sucesso && dadosCobranca.id) {
       try {
-        const { cobrancaService } = await import('./cobrancaService');
+        const { cobrancaService } = await import("./cobrancaService");
         await cobrancaService.registrarLogEnvioEmail({
           cobrancaId: dadosCobranca.id,
           tipo: "proposta_parcelamento",
@@ -128,11 +128,14 @@ export class EmailService {
             valor_original: simulacao.valor_original,
             valor_parcelamento: simulacao.valor_total_parcelamento,
             quantidade_parcelas: simulacao.quantidade_parcelas,
-            codigo_unidade: dadosUnidade.codigo_unidade
-          }
+            codigo_unidade: dadosUnidade.codigo_unidade,
+          },
         });
       } catch (logError) {
-        console.warn("Erro ao registrar log de proposta de parcelamento:", logError);
+        console.warn(
+          "Erro ao registrar log de proposta de parcelamento:",
+          logError
+        );
       }
     }
 
@@ -189,8 +192,11 @@ export class EmailService {
     // Registra o log se o envio foi bem-sucedido
     if (resultado.sucesso && dadosCobranca.id) {
       try {
-        const { cobrancaService } = await import('./cobrancaService');
-        const tipoEnvio = tipoTemplate === "personalizada" ? "cobranca_padrao" : `cobranca_${tipoTemplate}`;
+        const { cobrancaService } = await import("./cobrancaService");
+        const tipoEnvio =
+          tipoTemplate === "personalizada"
+            ? "cobranca_padrao"
+            : `cobranca_${tipoTemplate}`;
         await cobrancaService.registrarLogEnvioEmail({
           cobrancaId: dadosCobranca.id,
           tipo: tipoEnvio as any,
@@ -202,8 +208,8 @@ export class EmailService {
             valor_original: dadosCobranca.valor_original,
             valor_atualizado: dadosCobranca.valor_atualizado,
             dias_atraso: dadosCobranca.dias_em_atraso,
-            codigo_unidade: dadosUnidade.codigo_unidade
-          }
+            codigo_unidade: dadosUnidade.codigo_unidade,
+          },
         });
       } catch (logError) {
         console.warn("Erro ao registrar log de cobrança por email:", logError);
@@ -230,7 +236,7 @@ export class EmailService {
         nome_remetente: "Cresci e Perdi - Financeiro",
         email_padrao: "financeiro@crescieperdi.com",
         email_retorno: "financeiro@crescieperdi.com",
-        ativo: false, // Inativo até ser configurado
+        ativo: false,
       };
     }
 
@@ -607,29 +613,6 @@ Equipe Financeira - Cresci e Perdi
       </div>
     `;
   }
-
-  /**
-   * Registra log do envio
-   */
-  /*
-  private async registrarLogEnvio(
-    dados: DadosEmail,
-    resultado: ResultadoEnvio
-  ): Promise<void> {
-    try {
-      await supabase.from("logs_envio_email").insert({
-        destinatario: dados.destinatario,
-        assunto: dados.assunto,
-        sucesso: resultado.sucesso,
-        message_id: resultado.message_id,
-        erro_detalhes: resultado.erro,
-        data_envio: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error("Erro ao registrar log de envio:", error);
-    }
-  }
-  */
 
   /**
    * Métodos auxiliares de formatação

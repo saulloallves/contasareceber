@@ -1,25 +1,9 @@
 import { useState } from "react";
-import {
-  Home,
-  Building2,
-  DollarSign,
-  Calendar,
-  Scale,
-  BarChart3,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  Menu,
-  X,
-  FileText,
-  Shield,
-  Receipt,
-  CircleDollarSign,
-  Calculator,
-  Users,
+import { Home, Building2, Calendar, //Scale,
+  BarChart3, Settings, ChevronLeft, ChevronRight,
+  Menu, X, //FileText,
+  Shield, Receipt, CircleDollarSign, Calculator, Users,
 } from "lucide-react";
-// Substituir import local por link web
-// import logo from "../../assets/favicon.png";
 
 const FAVICON_URL =
   "https://raw.githubusercontent.com/saulloallves/contasareceber/refs/heads/main/src/assets/favicon.png";
@@ -33,99 +17,24 @@ interface SidebarProps {
 }
 
 export function Sidebar({
-  activeTab,
-  onTabChange,
+  activeTab, onTabChange,
   userPermissions = ["admin"],
-  collapsed,
-  setCollapsed,
+  collapsed, setCollapsed,
 }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const menuItems = [
-    {
-      id: "dashboard",
-      label: "Dashboard",
-      icon: Home,
-      permissions: ["admin", "financeiro", "cobranca", "juridico", "leitura"],
-      description: "Resumo geral e indicadores",
-    },
-    {
-      id: "cobrancas",
-      label: "Cobranças",
-      icon: CircleDollarSign,
-      permissions: ["admin", "financeiro", "cobranca"],
-      description: "Kanban visual de cobrança",
-    },
-    {
-      id: "cobrancas-lista",
-      label: "Lista de Cobranças",
-      icon: Receipt,
-      permissions: ["admin", "financeiro", "cobranca"],
-      description: "Gestão em lista de cobranças",
-    },
-    {
-      id: "operacional",
-      label: "Painel Operacional",
-      icon: DollarSign,
-      permissions: ["admin", "financeiro", "cobranca"],
-      description: "Operações diárias de cobrança",
-    },
-    {
-      id: "simulacao-parcelamento",
-      label: "Simulação Parcelamento",
-      icon: Calculator,
-      permissions: ["admin", "financeiro", "cobranca"],
-      description: "Propostas automáticas de parcelamento",
-    },
-    {
-      id: "unidades",
-      label: "Unidades",
-      icon: Building2,
-      permissions: ["admin", "financeiro"],
-      description: "Cadastro e gestão de unidades",
-    },
-    {
-      id: "franqueados",
-      label: "Franqueados",
-      icon: Users,
-      permissions: ["admin", "financeiro"],
-      description: "Cadastro e vínculos de franqueados",
-    },
-    {
-      id: "reunioes",
-      label: "Reuniões",
-      icon: Calendar,
-      permissions: ["admin", "financeiro", "cobranca"],
-      description: "Agenda e negociações",
-    },
-    {
-      id: "juridico",
-      label: "Jurídico",
-      icon: Scale,
-      permissions: ["admin", "juridico"],
-      description: "Escalonamentos e ações legais",
-    },
-    {
-      id: "templates-juridicos",
-      label: "Templates Jurídicos",
-      icon: FileText,
-      permissions: ["admin", "juridico"],
-      description: "Templates e gatilhos automáticos",
-    },
-    {
-      id: "relatorios",
-      label: "Relatórios",
-      icon: BarChart3,
-      permissions: ["admin", "financeiro", "juridico", "leitura"],
-      description: "Análises e indicadores",
-    },
-    {
-      id: "admin",
-      label: "Configurações",
-      icon: Settings,
-      permissions: ["admin"],
-      description: "Parâmetros do sistema",
-    },
+    { id: "dashboard", label: "Dashboard", icon: Home, permissions: ["admin", "financeiro", "cobranca", "juridico", "leitura"], description: "Resumo geral e indicadores", },
+    { id: "cobrancas", label: "Kanban Cobranças", icon: CircleDollarSign, permissions: ["admin", "financeiro", "cobranca"], description: "Kanban visual de cobrança", },
+    { id: "cobrancas-lista", label: "Gestão de Cobranças", icon: Receipt, permissions: ["admin", "financeiro", "cobranca"], description: "Gestão geral de cobranças", },
+    { id: "simulacao-parcelamento", label: "Simulação Parcelamento", icon: Calculator, permissions: ["admin", "financeiro", "cobranca"], description: "Propostas de parcelamento", },
+    { id: "unidades", label: "Unidades", icon: Building2, permissions: ["admin", "financeiro"], description: "Cadastro e gestão de unidades", },
+    { id: "franqueados", label: "Franqueados", icon: Users, permissions: ["admin", "financeiro"], description: "Cadastro e vínculos de franqueados", },
+    { id: "reunioes", label: "Reuniões", icon: Calendar, permissions: ["admin", "financeiro", "cobranca"], description: "Agenda e negociações", },
+ // { id: "juridico", label: "Jurídico", icon: Scale, permissions: ["admin", "juridico"], description: "Escalonamentos e ações legais", },
+ // { id: "templates-juridicos", label: "Templates Jurídicos", icon: FileText, permissions: ["admin", "juridico"], description: "Templates e gatilhos automáticos", },
+    { id: "relatorios", label: "Relatórios", icon: BarChart3, permissions: ["admin", "financeiro", "juridico", "leitura"], description: "Análises e indicadores", },
+    { id: "admin", label: "Configurações", icon: Settings, permissions: ["admin"], description: "Parâmetros do sistema", },
   ];
 
   const hasPermission = (itemPermissions: string[]) => {
@@ -153,10 +62,7 @@ export function Sidebar({
             </div>
           </div>
         )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-2 rounded-lg hover:bg-gray-700 transition-colors hidden lg:block"
-        >
+        <button onClick={() => setCollapsed(!collapsed)} className="p-2 rounded-lg hover:bg-gray-700 transition-colors hidden lg:block" >
           {collapsed ? (
             <ChevronRight className="w-5 h-5 text-gray-300" />
           ) : (
@@ -170,14 +76,10 @@ export function Sidebar({
         {filteredMenuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
-
           return (
             <div key={item.id} className="relative group">
               <button
-                onClick={() => {
-                  onTabChange(item.id);
-                  setMobileOpen(false);
-                }}
+                onClick={() => { onTabChange(item.id); setMobileOpen(false); }}
                 className={`w-full flex items-center px-3 py-3 rounded-xl text-left transition-all duration-200 ${
                   isActive
                     ? "bg-gradient-to-r from-[#FFC31A] to-[#eeb414] text-white shadow-lg shadow-yellow-500/25 transform scale-[1.02]"
@@ -246,7 +148,6 @@ export function Sidebar({
       </div>
     </div>
   );
-
   return (
     <>
       {/* Desktop Sidebar */}
@@ -257,7 +158,6 @@ export function Sidebar({
       >
         <SidebarContent />
       </div>
-
       {/* Mobile Menu Button */}
       <div className="lg:hidden fixed top-4 left-4 z-50">
         <button
@@ -267,7 +167,6 @@ export function Sidebar({
           <Menu className="w-6 h-6" />
         </button>
       </div>
-
       {/* Mobile Sidebar */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
@@ -279,11 +178,8 @@ export function Sidebar({
             <div className="bg-gray-900 text-white h-full">
               <div className="flex items-center justify-between p-4 border-b border-gray-700">
                 <div className="flex items-center">
-                  {/* <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
-                      <DollarSign className="w-6 h-6 text-white" />
-                  </div> */}
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shadow-lg">
-                    <img src={FAVICON_URL} alt="Logo" className="w-10 h-10" />
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+                    <img src={FAVICON_URL} alt="Logo" />
                   </div>
                   <div className="ml-3">
                     <h1 className="text-lg font-bold text-white">
@@ -303,14 +199,8 @@ export function Sidebar({
                 {filteredMenuItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
-
                   return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        onTabChange(item.id);
-                        setMobileOpen(false);
-                      }}
+                    <button key={item.id} onClick={() => { onTabChange(item.id); setMobileOpen(false); }}
                       className={`w-full flex items-center px-3 py-3 rounded-xl text-left transition-all duration-200 ${
                         isActive
                           ? "bg-gradient-to-r from-[#FFC31A] to-[#eeb414] text-white shadow-lg shadow-yellow-500/25 transform scale-[1.02]"
