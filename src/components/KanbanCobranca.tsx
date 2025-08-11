@@ -486,11 +486,6 @@ export function KanbanCobranca() {
                 <span className="text-gray-600">Tipo:</span>
                 <span className="font-medium">{card.tipo_debito}</span>
               </div>
-              {card.descricao_cobranca && (
-                <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                  {card.descricao_cobranca}
-                </div>
-              )}
             </div>
 
             <div className="mt-2 flex items-center justify-between">
