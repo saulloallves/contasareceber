@@ -1,11 +1,14 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { DragDropContext, Droppable, Draggable, DropResult, } from "react-beautiful-dnd";
 import { 
   MessageSquare, Calendar, Scale, Mail,
   Clock, DollarSign, AlertTriangle, CheckCircle, User,
   Filter, Download, RefreshCw, Edit, X,
   Save, CircleDollarSign,
+  Lock,
+  Unlock,
+  Info,
 } from "lucide-react";
 import { KanbanService } from "../services/kanbanService";
 import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban, } from "../types/kanban";
@@ -48,14 +51,13 @@ export function KanbanCobranca() {
   const [movimentoPendente, setMovimentoPendente] = useState<DropResult | null>(
     null
   );
+  const [movimentacaoIndividualFeita, setMovimentacaoIndividualFeita] = useState(false);
+  const [unidadesComStatusMisto, setUnidadesComStatusMisto] = useState<Set<string>>(new Set());
+  const [showMixedStatusWarning, setShowMixedStatusWarning] = useState(false);
 
   const kanbanService = new KanbanService();
 
-  useEffect(() => {
-    carregarDados();
-  }, [filtros]);
-
-  const carregarDados = async () => {
+  const carregarDados = useCallback(async () => {
     setCarregando(true);
     try {
       const [colunasData, cardsData, statsData] = await Promise.all([
@@ -66,11 +68,53 @@ export function KanbanCobranca() {
       setColunas(colunasData);
       setCards(cardsData);
       setEstatisticas(statsData);
+      
+      // Verifica unidades com status misto quando agrupado
+      if (aba === "unidade") {
+        const unidadesMistas = await verificarUnidadesComStatusMisto();
+        setUnidadesComStatusMisto(unidadesMistas);
+      }
     } catch (error) {
       console.error("❌ Erro ao carregar dados do Kanban:", error);
       alert("Erro ao carregar dados do Kanban. Verifique a conexão.");
     } finally {
       setCarregando(false);
+    }
+  }, [filtros, aba]);
+
+  useEffect(() => {
+    carregarDados();
+  }, [filtros]);
+
+  // Função para verificar unidades com status misto
+  const verificarUnidadesComStatusMisto = async (): Promise<Set<string>> => {
+    try {
+      const { data: cobrancas } = await supabase
+        .from("cobrancas_franqueados")
+        .select("cnpj, status");
+
+      if (!cobrancas) return new Set();
+
+      const unidadesStatus = new Map<string, Set<string>>();
+      
+      cobrancas.forEach(cobranca => {
+        if (!unidadesStatus.has(cobranca.cnpj)) {
+          unidadesStatus.set(cobranca.cnpj, new Set());
+        }
+        unidadesStatus.get(cobranca.cnpj)!.add(cobranca.status);
+      });
+
+      const unidadesMistas = new Set<string>();
+      unidadesStatus.forEach((statusSet, cnpj) => {
+        if (statusSet.size > 1) {
+          unidadesMistas.add(cnpj);
+        }
+      });
+
+      return unidadesMistas;
+    } catch (error) {
+      console.error("Erro ao verificar status misto:", error);
+      return new Set();
     }
   };
 
@@ -119,6 +163,23 @@ export function KanbanCobranca() {
     if (!result.destination || result.source.droppableId === result.destination.droppableId) {
       return;
     }
+
+    // Verifica se está tentando mover unidade com status misto
+    if (aba === "unidade" && unidadesComStatusMisto.has(result.draggableId)) {
+      setShowMixedStatusWarning(true);
+      return;
+    }
+
+    // Verifica se já houve movimentação individual e está tentando mover agrupado
+    if (aba === "unidade" && movimentacaoIndividualFeita) {
+      alert(
+        "⚠️ ATENÇÃO: Você já moveu cobranças individuais nesta sessão.\n\n" +
+        "Para evitar inconsistências, agora você deve trabalhar apenas no modo INDIVIDUAL.\n\n" +
+        "Clique em 'Cobranças Individuais' para continuar movendo as cobranças uma por uma."
+      );
+      return;
+    }
+
     setMovimentoPendente(result);
     setModalConfirmacaoAberto(true);
   };
@@ -173,6 +234,11 @@ export function KanbanCobranca() {
     if (source.droppableId === destination.droppableId) return;
 
     console.log(`Movendo card individual: ${draggableId} de ${source.droppableId} para ${destination.droppableId}`);
+
+    // Se está no modo individual, marca que houve movimentação individual
+    if (aba === "individual") {
+      setMovimentacaoIndividualFeita(true);
+    }
 
     // Atualização otimista da UI: primeiro atualiza a UI localmente
     const originalCards = [...cards];
@@ -281,6 +347,24 @@ export function KanbanCobranca() {
     }
   };
 
+  const alternarModoVisualizacao = () => {
+    // Verifica se pode alternar para agrupado
+    if (aba === "individual" && movimentacaoIndividualFeita) {
+      const confirmar = confirm(
+        "⚠️ ATENÇÃO: Você moveu cobranças individuais nesta sessão.\n\n" +
+        "Alternar para o modo agrupado pode causar inconsistências no sistema.\n\n" +
+        "Recomendamos recarregar a página antes de usar o modo agrupado.\n\n" +
+        "Deseja continuar mesmo assim?"
+      );
+      
+      if (!confirmar) {
+        return;
+      }
+    }
+
+    setAba(aba === "unidade" ? "individual" : "unidade");
+  };
+
   const getCorCard = (unit: UnitKanbanCard) => {
     if (unit.dias_parado > 7) return "border-red-500 bg-red-50";
     if (unit.valor_total > 5000) return "border-orange-500 bg-orange-50";
@@ -365,7 +449,16 @@ export function KanbanCobranca() {
                   : "text-gray-500 hover:text-blue-600"
               }`}
               onClick={() => setAba("unidade")}
+              disabled={aba === "individual" && movimentacaoIndividualFeita}
+              title={
+                aba === "individual" && movimentacaoIndividualFeita
+                  ? "Modo bloqueado - recarregue a página para usar modo agrupado"
+                  : "Agrupar cobranças por unidade"
+              }
             >
+              {aba === "individual" && movimentacaoIndividualFeita && (
+                <Lock className="w-4 h-4 mr-1" />
+              )}
               Por Unidade
             </button>
             <button
@@ -376,10 +469,43 @@ export function KanbanCobranca() {
               }`}
               onClick={() => setAba("individual")}
             >
+              {movimentacaoIndividualFeita && (
+                <Unlock className="w-4 h-4 mr-1" />
+              )}
               Cobranças Individuais
             </button>
           </div>
         </div>
+
+        {/* Aviso de movimentação individual */}
+        {movimentacaoIndividualFeita && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center mb-8">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
+            <div className="text-sm">
+              <span className="font-medium text-yellow-800">
+                Modo Individual Ativo:
+              </span>
+              <span className="text-yellow-700 ml-1">
+                Continue movendo cobranças uma por uma. Recarregue a página para usar o modo agrupado.
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Aviso de unidades com status misto */}
+        {aba === "unidade" && unidadesComStatusMisto.size > 0 && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-center mb-8">
+            <Info className="w-5 h-5 text-orange-600 mr-2" />
+            <div className="text-sm">
+              <span className="font-medium text-orange-800">
+                {unidadesComStatusMisto.size} unidade(s) com status misto:
+              </span>
+              <span className="text-orange-700 ml-1">
+                Essas unidades não podem ser movidas no modo agrupado. Use o modo individual.
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Estatísticas */}
         {estatisticas && (
@@ -528,12 +654,24 @@ export function KanbanCobranca() {
                                       snapshot.isDragging
                                         ? "shadow-lg rotate-2"
                                         : "hover:shadow-md"
-                                    } ${getCorCard(unit)}`}
+                                    } ${getCorCard(unit)} ${
+                                      aba === "unidade" && unidadesComStatusMisto.has(unit.codigo_unidade)
+                                        ? "opacity-50 cursor-not-allowed border-orange-300 bg-orange-50"
+                                        : ""
+                                    }`}
                                     onClick={() => {
                                       setUnitSelecionada(unit);
                                       setModalAberto("detalhes");
                                     }}
                                   >
+                                    {/* Indicador de status misto */}
+                                    {aba === "unidade" && unidadesComStatusMisto.has(unit.codigo_unidade) && (
+                                      <div className="flex items-center mb-2 text-orange-600">
+                                        <Lock className="w-4 h-4 mr-1" />
+                                        <span className="text-xs font-medium">Status Misto - Use modo individual</span>
+                                      </div>
+                                    )}
+
                                     {/* Header do Card */}
                                     <div className="flex items-center mb-3">
                                       <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
@@ -734,6 +872,51 @@ export function KanbanCobranca() {
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 {processando ? "Processando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de aviso de status misto */}
+      {showMixedStatusWarning && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center mb-4">
+              <AlertTriangle className="w-8 h-8 text-orange-600 mr-3" />
+              <h3 className="text-lg font-semibold text-gray-800">
+                Unidade com Status Misto
+              </h3>
+            </div>
+            
+            <div className="space-y-3 mb-6">
+              <p className="text-gray-700">
+                Esta unidade possui cobranças com status diferentes e não pode ser movida no modo agrupado.
+              </p>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-blue-800 text-sm">
+                  <strong>Solução:</strong> Alterne para o modo "Cobranças Individuais" 
+                  para mover cada cobrança separadamente.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setAba("individual");
+                  setShowMixedStatusWarning(false);
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Ir para Modo Individual
+              </button>
+              <button
+                onClick={() => setShowMixedStatusWarning(false)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Fechar
               </button>
             </div>
           </div>
