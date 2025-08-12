@@ -99,8 +99,9 @@ export class EmailService {
     );
 
     const destinatario =
-      dadosUnidade.email_franqueado ||
-      dadosCobranca.email_cliente ||
+      dadosUnidade?.email_franqueado ||
+      dadosCobranca?.email_cobranca ||
+      dadosCobranca?.email_cliente ||
       (await this.buscarConfiguracao()).email_padrao;
 
     const dadosEmail: DadosEmail = {
@@ -152,8 +153,9 @@ export class EmailService {
     dadosCobranca: any
   ): Promise<ResultadoEnvio> {
     const destinatario =
-      dadosUnidade.email_franqueado ||
-      dadosCobranca.email_cliente ||
+      dadosUnidade?.email_franqueado ||
+      dadosCobranca?.email_cobranca ||
+      dadosCobranca?.email_cliente ||
       (await this.buscarConfiguracao()).email_padrao;
 
     let template: EmailTemplate;

@@ -79,6 +79,46 @@ export class N8nService {
     throw new Error("Número de telefone inválido - formato não reconhecido");
   }
 
+  /**
+   * Valida um endereço de email.
+   * Verifica formato básico e casos especiais.
+   */
+  static validarEmail(email: string | null | undefined): string {
+    // Verificar se email é nulo, undefined ou string vazia
+    if (!email || email.trim() === "") {
+      throw new Error("Endereço de email não informado");
+    }
+
+    const emailStr = email.toString().toLowerCase().trim();
+    
+    // Verificar se é uma mensagem de "não possui"
+    if (
+      emailStr === "não possui" ||
+      emailStr === "nao possui" ||
+      emailStr === "sem email" ||
+      emailStr === "null"
+    ) {
+      throw new Error("Endereço de email não disponível");
+    }
+
+    // Regex básica para validação de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (!emailRegex.test(emailStr)) {
+      throw new Error("Formato de email inválido");
+    }
+
+    // Verificar domínios obviamente inválidos
+    const dominiosInvalidos = ['teste.com', 'example.com', 'test.com', 'fake.com'];
+    const dominio = emailStr.split('@')[1];
+    
+    if (dominiosInvalidos.includes(dominio)) {
+      throw new Error("Domínio de email inválido para envio real");
+    }
+
+    return emailStr;
+  }
+
   private async postJson<T>(
     url: string,
     body: any,
@@ -141,7 +181,9 @@ export class N8nService {
 
   /**
    * Envia e-mail via n8n.
+   * Automaticamente valida email e registra logs.
    * Espera: { destinatario, assunto, corpo_html, corpo_texto, nome_destinatario?, anexos?, remetente_*?, metadata? }
+   * Retorna objeto com success, messageId e dados brutos.
    */
   async enviarEmail(payload: {
     destinatario: string;
@@ -158,7 +200,34 @@ export class N8nService {
       | string
       | undefined;
     if (!url) throw new Error("VITE_N8N_EMAIL_WEBHOOK_URL não configurada");
-    const data = await this.postJson<any>(url, payload);
+    
+    // Validar e tratar o email antes do envio
+    const emailTratado = N8nService.validarEmail(payload.destinatario);
+    
+    // Validações adicionais
+    if (!payload.assunto || payload.assunto.trim() === '') {
+      throw new Error("Assunto do email é obrigatório");
+    }
+    
+    if (!payload.corpo_html && !payload.corpo_texto) {
+      throw new Error("Conteúdo do email (HTML ou texto) é obrigatório");
+    }
+    
+    console.log("Enviando email via n8n:", {
+      destinatario: emailTratado,
+      assunto: payload.assunto,
+      anexos: payload.anexos?.length || 0,
+    });
+    
+    const payloadTratado = {
+      ...payload,
+      destinatario: emailTratado,
+      // Adicionar valores padrão se não fornecidos
+      remetente_nome: payload.remetente_nome || "Sistema de Cobrança",
+      remetente_email: payload.remetente_email || "contato@girabot.com.br",
+    };
+    
+    const data = await this.postJson<any>(url, payloadTratado);
     return {
       success: Boolean(data?.success ?? true),
       messageId: data?.messageId || data?.id,

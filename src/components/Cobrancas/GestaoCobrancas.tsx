@@ -1,41 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  Plus,
-  Edit,
-  Eye,
-  Upload,
-  Receipt,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Filter,
-  RefreshCw,
-  FileText,
-  ArrowUp,
-  ArrowDown,
-  AlertTriangle,
-  Info,
-  // MessageCircle,
-  Calculator,
-  MessageSquare,
-  // Mail,
-  Scale,
+  Plus, Edit, Eye, Upload, Receipt, CheckCircle,
+  XCircle, Clock, Filter, RefreshCw, FileText,
+  ArrowUp, ArrowDown, AlertTriangle, Info,
+  Scale, Calculator, MessageSquare,
+  // MessageCircle, Mail,
 } from "lucide-react";
 import { CobrancaFranqueado } from "../../types/cobranca";
 import { cobrancaService } from "../../services/cobrancaService";
-import { evolutionApiService } from "../../services/evolutionApiService";
-import {
-  processarPlanilhaExcel,
-  processarPlanilhaXML,
-} from "../../utils/planilhaProcessor";
+import { n8nService, N8nService } from "../../services/n8nService";
+import { processarPlanilhaExcel, processarPlanilhaXML, } from "../../utils/planilhaProcessor";
 import type { ResultadoComparacao } from "../../services/comparacaoPlanilhaService";
 import { comparacaoPlanilhaService } from "../../services/comparacaoPlanilhaService";
-import {
-  formatarCNPJCPF,
-  formatarMoeda,
-  formatarData,
-} from "../../utils/formatters";
+import { formatarCNPJCPF, formatarMoeda, formatarData, } from "../../utils/formatters";
 import { SimulacaoParcelamentoService } from "../../services/simulacaoParcelamentoService";
 import { UnidadesService } from "../../services/unidadesService";
 import type { UnidadeFranqueada } from "../../types/unidades";
@@ -44,45 +22,22 @@ import { emailService } from "../../services/emailService";
 export function GestaoCobrancas() {
   const [cobrancas, setCobrancas] = useState<CobrancaFranqueado[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [modalAberto, setModalAberto] = useState<
-    "criar" | "editar" | "upload" | "status" | "quitacao" | "acoes" | null
-  >(null);
-  const [cobrancaSelecionada, setCobrancaSelecionada] =
-    useState<CobrancaFranqueado | null>(null);
-  const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(
-    null
-  ); //Linha adicionada para 'guardar' o arquivo selecionado
+  const [modalAberto, setModalAberto] = useState< "criar" | "editar" | "upload" | "status" | "quitacao" | "acoes" | null>(null);
+  const [cobrancaSelecionada, setCobrancaSelecionada] = useState<CobrancaFranqueado | null>(null);
+  const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null); //Linha adicionada para 'guardar' o arquivo selecionado
   const [processando, setProcessando] = useState(false); // Linha adicionada para controlar o estado de processamento do upload
-  // const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
-  const [resultadoComparacao, setResultadoComparacao] =
-    useState<ResultadoComparacao | null>(null);
+  const [resultadoComparacao, setResultadoComparacao] = useState<ResultadoComparacao | null>(null);
   const [modalComparacaoAberto, setModalComparacaoAberto] = useState(false);
   const [usuario] = useState("admin"); // Em produção, pegar do contexto de autenticação
   const [formData, setFormData] = useState<Partial<CobrancaFranqueado>>({});
-  const [formQuitacao, setFormQuitacao] = useState({
-    valorPago: 0,
-    formaPagamento: "",
-    observacoes: "",
-    dataRecebimento: new Date().toISOString().split("T")[0],
-  });
-  const [filtros, setFiltros] = useState({
-    status: "",
-    busca: "",
-    dataInicio: "",
-    dataFim: "",
-    valorMin: "",
-    valorMax: "",
-  });
+  const [formQuitacao, setFormQuitacao] = useState({valorPago: 0, formaPagamento: "", observacoes: "", dataRecebimento: new Date().toISOString().split("T")[0],});
+  const [filtros, setFiltros] = useState({status: "", busca: "", dataInicio: "", dataFim: "", valorMin: "", valorMax: "",});
   const [colunaOrdenacao, setColunaOrdenacao] = useState("data_vencimento"); // Coluna padrão
   const [direcaoOrdenacao, setDirecaoOrdenacao] = useState("desc"); // Ordenação 'asc' ou 'desc'
-  const [mostrarApenasInadimplentes, setMostrarApenasInadimplentes] =
-    useState(false); // Controlar a exibição de inadimplentes
+  const [mostrarApenasInadimplentes, setMostrarApenasInadimplentes] = useState(false); // Controlar a exibição de inadimplentes
   const [errosImportacao, setErrosImportacao] = useState<string[]>([]);
   const [modalErrosAberto, setModalErrosAberto] = useState(false);
-  const [mensagemFeedback, setMensagemFeedback] = useState<{
-    tipo: "sucesso" | "erro" | "info";
-    texto: string;
-  } | null>(null);
+  const [mensagemFeedback, setMensagemFeedback] = useState<{tipo: "sucesso" | "erro" | "info"; texto: string;} | null>(null);
   const [enviandoWhatsapp, setEnviandoWhatsapp] = useState<string | null>(null); // ID da cobrança sendo enviada
   const [modalHistoricoAberto, setModalHistoricoAberto] = useState(false);
   const [historicoEnvios, setHistoricoEnvios] = useState<any[]>([]);
@@ -96,27 +51,12 @@ export function GestaoCobrancas() {
   const cnpjKey = useCallback((cnpj: string) => (cnpj || "").replace(/\D/g, ""), []);
 
   // Estados do modal unificado
-  const [abaAcoes, setAbaAcoes] = useState<
-    "acoes_rapidas" | "simulacao" | "mensagem" | "detalhes"
-  >("acoes_rapidas");
-  const [unidadeSelecionada, setUnidadeSelecionada] = useState<any | null>(
-    null
-  );
+  const [abaAcoes, setAbaAcoes] = useState<"acoes_rapidas" | "simulacao" | "mensagem" | "detalhes">("acoes_rapidas");
+  const [unidadeSelecionada, setUnidadeSelecionada] = useState<any | null>(null);
   const [simulacaoAtual, setSimulacaoAtual] = useState<any>(null);
-  const [formSimulacao, setFormSimulacao] = useState({
-    quantidade_parcelas: 3,
-    data_primeira_parcela: "",
-    valor_entrada: 0,
-  });
-  const [formProposta, setFormProposta] = useState({
-    canais_envio: ["whatsapp"] as ("whatsapp" | "email")[],
-    observacoes: "",
-  });
-  const [formMensagem, setFormMensagem] = useState({
-    template: "padrao",
-    mensagem_personalizada: "",
-    canal: "whatsapp" as "whatsapp" | "email",
-  });
+  const [formSimulacao, setFormSimulacao] = useState({quantidade_parcelas: 3,data_primeira_parcela: "",valor_entrada: 0,});
+  const [formProposta, setFormProposta] = useState({canais_envio: ["whatsapp"] as ("whatsapp" | "email")[],observacoes: "",});
+  const [formMensagem, setFormMensagem] = useState({template: "padrao",mensagem_personalizada: "",canal: "whatsapp" as "whatsapp" | "email",});
 
   const templatesPadrao = {
     padrao: `Olá, {{cliente}}!
@@ -179,7 +119,9 @@ Entre em contato: (11) 99999-9999`,
       setCobrancas(dadosReaisDoBanco);
       // Precarrega nomes/códigos das unidades em lote
       try {
-  const cnpjs = dadosReaisDoBanco.map((c) => cnpjKey(c.cnpj)).filter(Boolean);
+        const cnpjs = dadosReaisDoBanco
+          .map((c) => cnpjKey(c.cnpj))
+          .filter(Boolean);
         const mapa = await unidadesService.buscarUnidadesPorCnpjs(cnpjs);
         setUnidadesPorCnpj(mapa);
       } catch (e) {
@@ -194,7 +136,7 @@ Entre em contato: (11) 99999-9999`,
     } finally {
       setCarregando(false);
     }
-  }, [filtros, colunaOrdenacao, direcaoOrdenacao, mostrarApenasInadimplentes, unidadesService, cnpjKey]);
+  }, [ filtros, colunaOrdenacao, direcaoOrdenacao, mostrarApenasInadimplentes, unidadesService, cnpjKey,]);
 
   // Função para abrir histórico de envios
   const abrirHistoricoEnvios = useCallback(async (cobrancaId: string) => {
@@ -285,7 +227,9 @@ Entre em contato: (11) 99999-9999`,
       setUnidadeSelecionada(cached);
     } else {
       try {
-        const unidade = await unidadesService.buscarUnidadePorCnpj(cobranca.cnpj);
+        const unidade = await unidadesService.buscarUnidadePorCnpj(
+          cobranca.cnpj
+        );
         setUnidadeSelecionada(unidade);
       } catch (e) {
         console.warn("Não foi possível carregar dados da unidade", e);
@@ -588,14 +532,41 @@ Entre em contato: (11) 99999-9999`,
         if (!telefone) {
           mostrarMensagem("erro", "Telefone não cadastrado para esta unidade.");
         } else {
-          await evolutionApiService.sendTextMessage({
-            instanceName: "automacoes_backup",
+          // Valida o telefone antes de enviar
+          try {
+            N8nService.tratarTelefone(telefone);
+          } catch (telefoneError) {
+            mostrarMensagem(
+              "erro",
+              `Telefone inválido: ${
+                telefoneError instanceof Error
+                  ? telefoneError.message
+                  : "Erro na validação"
+              }`
+            );
+            return;
+          }
+
+          const resultado = await n8nService.enviarWhatsApp({
             number: telefone,
             text: mensagemFinal,
+            instanceName: "automacoes_3",
+            metadata: {
+              tipo: "mensagem_personalizada",
+              cobrancaId: cobrancaSelecionada?.id,
+              cliente: cobrancaSelecionada?.cliente,
+              template: formMensagem.template,
+            },
           });
+
+          if (!resultado.success) {
+            throw new Error("Falha no envio da mensagem via n8n");
+          }
+
           mostrarMensagem("sucesso", "Mensagem enviada via WhatsApp!");
         }
       } else {
+        // Envio via email usando emailService
         const resultado = await emailService.enviarMensagemCobranca(
           formMensagem.template as
             | "padrao"
@@ -606,6 +577,7 @@ Entre em contato: (11) 99999-9999`,
           unidadeSelecionada,
           cobrancaSelecionada
         );
+
         if (resultado.sucesso) {
           mostrarMensagem("sucesso", "Email enviado com sucesso!");
         } else {
@@ -751,6 +723,21 @@ Entre em contato: (11) 99999-9999`,
         "info",
         `Enviando cobrança amigável para ${cobranca.cliente}...`
       );
+
+      // Valida o telefone antes de prosseguir
+      try {
+        N8nService.tratarTelefone(cobranca.telefone);
+      } catch (telefoneError) {
+        mostrarMensagem(
+          "erro",
+          `Telefone inválido para ${cobranca.cliente}: ${
+            telefoneError instanceof Error
+              ? telefoneError.message
+              : "Erro na validação"
+          }`
+        );
+        return;
+      }
       // Calcula dias de atraso
       const dataVencimento = new Date(cobranca.data_vencimento);
       const hoje = new Date();
@@ -797,25 +784,21 @@ Entre em contato: (11) 99999-9999`,
         valor: valorFormatado,
       });
 
-      // Envia a mensagem via Evolution API
-      await evolutionApiService.sendTextMessage({
-        instanceName: "automacoes_backup",
+      // Envia a mensagem via n8n webhook
+      const resultado = await n8nService.enviarWhatsApp({
         number: cobranca.telefone,
         text: mensagem,
+        instanceName: "automacoes_3",
+        metadata: {
+          tipo: "cobranca_amigavel",
+          cobrancaId: cobranca.id,
+          cliente: cobranca.cliente,
+          valor: valorFormatado,
+        },
       });
 
-      // Registra o log do envio no banco de dados
-      try {
-        await cobrancaService.registrarLogEnvioWhatsapp({
-          cobrancaId: cobranca.id!,
-          tipo: "amigavel",
-          numero: cobranca.telefone,
-          mensagem: mensagem,
-          usuario: usuario,
-        });
-      } catch (logError) {
-        console.error("Erro ao registrar log de envio:", logError);
-        // Não interrompe o fluxo principal mesmo se o log falhar
+      if (!resultado.success) {
+        throw new Error("Falha no envio da mensagem via n8n");
       }
 
       mostrarMensagem(
@@ -927,6 +910,54 @@ Entre em contato: (11) 99999-9999`,
 
       if (resultado.sucesso) {
         mostrarMensagem("sucesso", resultado.mensagem);
+
+        // Envia mensagem de confirmação via WhatsApp se houver telefone
+        if (cobrancaSelecionada.telefone && resultado.isQuitacaoTotal) {
+          try {
+            const valorFormatado = new Intl.NumberFormat("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            }).format(formQuitacao.valorPago);
+
+            const mensagemConfirmacao =
+              `✅ *CONFIRMAÇÃO DE QUITAÇÃO*\n\n` +
+              `Olá, ${cobrancaSelecionada.cliente}! 👋\n\n` +
+              `Recebemos o pagamento da sua cobrança:\n\n` +
+              `💰 *Valor Pago:* ${valorFormatado}\n` +
+              `💳 *Forma de Pagamento:* ${formQuitacao.formaPagamento}\n` +
+              `📅 *Data:* ${new Date(
+                formQuitacao.dataRecebimento
+              ).toLocaleDateString("pt-BR")}\n\n` +
+              `🎉 *Status:* QUITADO\n\n` +
+              `Obrigado pela regularização!\n\n` +
+              `Atenciosamente,\n` +
+              `Equipe Financeira`;
+
+            await n8nService.enviarWhatsApp({
+              number: cobrancaSelecionada.telefone,
+              text: mensagemConfirmacao,
+              instanceName: "automacoes_3",
+              metadata: {
+                tipo: "confirmacao_quitacao_detalhada",
+                cobrancaId: cobrancaSelecionada.id,
+                cliente: cobrancaSelecionada.cliente,
+                valorPago: formQuitacao.valorPago,
+                formaPagamento: formQuitacao.formaPagamento,
+              },
+            });
+
+            console.log(
+              "Mensagem de confirmação de quitação enviada via WhatsApp"
+            );
+          } catch (whatsappError) {
+            console.warn(
+              "Erro ao enviar confirmação via WhatsApp:",
+              whatsappError
+            );
+            // Não interrompe o fluxo principal se o WhatsApp falhar
+          }
+        }
+
         setModalAberto(null);
         carregarCobrancas();
       } else {
@@ -954,6 +985,51 @@ Entre em contato: (11) 99999-9999`,
 
       if (resultado.sucesso) {
         mostrarMensagem("sucesso", resultado.mensagem);
+
+        // Envia mensagem de confirmação via WhatsApp se houver telefone
+        if (cobranca.telefone && resultado.isQuitacaoTotal) {
+          try {
+            const valorFormatado = new Intl.NumberFormat("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            }).format(cobranca.valor_atualizado || cobranca.valor_original);
+
+            const mensagemConfirmacao =
+              `✅ *CONFIRMAÇÃO DE QUITAÇÃO*\n\n` +
+              `Olá, ${cobranca.cliente}! 👋\n\n` +
+              `Recebemos o pagamento da sua cobrança:\n\n` +
+              `💰 *Valor Pago:* ${valorFormatado}\n` +
+              `📅 *Data:* ${new Date().toLocaleDateString("pt-BR")}\n\n` +
+              `🎉 *Status:* QUITADO\n\n` +
+              `Obrigado pela regularização!\n\n` +
+              `Atenciosamente,\n` +
+              `Equipe Financeira`;
+
+            await n8nService.enviarWhatsApp({
+              number: cobranca.telefone,
+              text: mensagemConfirmacao,
+              instanceName: "automacoes_3",
+              metadata: {
+                tipo: "confirmacao_quitacao_rapida",
+                cobrancaId: cobranca.id,
+                cliente: cobranca.cliente,
+                valorPago: cobranca.valor_atualizado || cobranca.valor_original,
+                formaPagamento: "Não informado",
+              },
+            });
+
+            console.log(
+              "Mensagem de confirmação de quitação rápida enviada via WhatsApp"
+            );
+          } catch (whatsappError) {
+            console.warn(
+              "Erro ao enviar confirmação via WhatsApp:",
+              whatsappError
+            );
+            // Não interrompe o fluxo principal se o WhatsApp falhar
+          }
+        }
+
         carregarCobrancas();
       } else {
         mostrarMensagem("erro", resultado.mensagem);
@@ -1206,10 +1282,12 @@ Entre em contato: (11) 99999-9999`,
                         className="font-bold text-gray-800 text-sm truncate"
                         title={c.cliente}
                       >
-                        {unidadesPorCnpj[cnpjKey(c.cnpj)]?.nome_franqueado || c.cliente}
+                        {unidadesPorCnpj[cnpjKey(c.cnpj)]?.nome_franqueado ||
+                          c.cliente}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {unidadesPorCnpj[cnpjKey(c.cnpj)]?.codigo_unidade || formatarCNPJCPF(c.cnpj)}
+                        {unidadesPorCnpj[cnpjKey(c.cnpj)]?.codigo_unidade ||
+                          formatarCNPJCPF(c.cnpj)}
                       </div>
                     </div>
                   </div>
@@ -1356,10 +1434,13 @@ Entre em contato: (11) 99999-9999`,
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
                           <div className="text-sm font-medium text-gray-900">
-                            {unidadesPorCnpj[cnpjKey(cobranca.cnpj)]?.nome_franqueado || cobranca.cliente}
+                            {unidadesPorCnpj[cnpjKey(cobranca.cnpj)]
+                              ?.nome_franqueado || cobranca.cliente}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {unidadesPorCnpj[cnpjKey(cobranca.cnpj)]?.codigo_unidade || formatarCNPJCPF(cobranca.cnpj)}
+                            {unidadesPorCnpj[cnpjKey(cobranca.cnpj)]
+                              ?.codigo_unidade ||
+                              formatarCNPJCPF(cobranca.cnpj)}
                           </div>
                         </div>
                       </td>
@@ -2199,11 +2280,15 @@ Entre em contato: (11) 99999-9999`,
                 </div>
                 <div>
                   <div className="text-xl font-bold text-gray-800 leading-tight">
-                    {unidadesPorCnpj[cnpjKey(cobrancaSelecionada.cnpj)]?.nome_franqueado || cobrancaSelecionada.cliente}
+                    {unidadesPorCnpj[cnpjKey(cobrancaSelecionada.cnpj)]
+                      ?.nome_franqueado || cobrancaSelecionada.cliente}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {unidadesPorCnpj[cnpjKey(cobrancaSelecionada.cnpj)]?.codigo_unidade || formatarCNPJCPF(cobrancaSelecionada.cnpj)} • Venc.:{" "}
-                    {formatarData(cobrancaSelecionada.data_vencimento)} • Valor:{" "}
+                    {unidadesPorCnpj[cnpjKey(cobrancaSelecionada.cnpj)]
+                      ?.codigo_unidade ||
+                      formatarCNPJCPF(cobrancaSelecionada.cnpj)}{" "}
+                    • Venc.: {formatarData(cobrancaSelecionada.data_vencimento)}{" "}
+                    • Valor:{" "}
                     {formatarMoeda(
                       cobrancaSelecionada.valor_atualizado ||
                         cobrancaSelecionada.valor_original
