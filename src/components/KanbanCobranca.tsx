@@ -1121,8 +1121,7 @@ export function KanbanCobranca() {
                   )
                 ) : (
                   /* Detalhes da Cobrança Individual (apenas para modo individual) */
-                {/* Lista de Cobranças Agrupadas */}
-                            <div className="flex items-center justify-between">
+                         <div className="flex items-center justify-between">
                               <span className="font-medium text-gray-800">Cobrança #{index + 1}</span>
                               <span className="font-semibold text-red-600">{formatarMoeda(charge.valor_total)}</span>
                             </div>
