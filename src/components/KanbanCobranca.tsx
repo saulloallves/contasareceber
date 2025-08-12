@@ -46,6 +46,7 @@ export function KanbanCobranca() {
   const [movimentacaoIndividualFeita, setMovimentacaoIndividualFeita] = useState(false);
   const [unidadesComStatusMisto, setUnidadesComStatusMisto] = useState<Set<string>>(new Set());
   const [showMixedStatusWarning, setShowMixedStatusWarning] = useState(false);
+  const [todasCobrancasUnidade, setTodasCobrancasUnidade] = useState<CardCobranca[]>([]);
 
   const kanbanService = new KanbanService();
 
@@ -272,6 +273,18 @@ export function KanbanCobranca() {
     }
   };
 
+  // Função para buscar todas as cobranças de uma unidade específica
+  const buscarTodasCobrancasUnidade = async (cnpj: string) => {
+    try {
+      const todasCobrancas = await kanbanService.buscarCards({}, false); // Busca todas as cobranças individuais
+      const cobrancasUnidade = todasCobrancas.filter(card => card.cnpj === cnpj);
+      setTodasCobrancasUnidade(cobrancasUnidade);
+    } catch (error) {
+      console.error('Erro ao buscar todas as cobranças da unidade:', error);
+      setTodasCobrancasUnidade([]);
+    }
+  };
+
   const executarAcao = async (cardId: string, acao: string) => {
     setProcessando(true);
     try {
@@ -408,6 +421,8 @@ export function KanbanCobranca() {
             }`}
             onClick={() => {
               setUnitSelecionada(unit);
+              // Busca todas as cobranças da unidade, não apenas as da coluna atual
+              buscarTodasCobrancasUnidade(unit.cnpj);
               setModalAberto("detalhes");
             }}
           >
@@ -866,9 +881,9 @@ export function KanbanCobranca() {
 
                 {/* Lista de Cobranças Agrupadas */}
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-800 mb-3">Cobranças da Unidade ({unitSelecionada.charges.length})</h4>
+                  <h4 className="font-semibold text-gray-800 mb-3">Todas as Cobranças da Unidade ({todasCobrancasUnidade.length})</h4>
                   <div className="space-y-3 max-h-60 overflow-y-auto">
-                    {unitSelecionada.charges.map((charge, index) => (
+                    {todasCobrancasUnidade.map((charge, index) => (
                       <div key={charge.id} className="p-3 bg-white border border-gray-200 rounded-lg">
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex-1">
