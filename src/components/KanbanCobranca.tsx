@@ -8,6 +8,7 @@ import { KanbanService } from "../services/kanbanService";
 import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban, } from "../types/kanban";
 import { formatarCNPJCPF, formatarMoeda, formatarData, } from "../utils/formatters";
 import { supabase } from "../lib/supabaseClient";
+import { n8nService } from "../services/n8nService";
 
 type UnitKanbanCard = {
   codigo_unidade: string;
@@ -44,6 +45,8 @@ export function KanbanCobranca() {
   const [filtrosAvancados, setFiltrosAvancados] = useState({ nomeUnidade: "", cnpj: "", codigo: "", statusCobranca: "", valorMin: "", valorMax: "", tipoCobranca: "", });
   const [showFiltrosAvancados, setShowFiltrosAvancados] = useState(false);
   const [quantidadesTotaisPorUnidade, setQuantidadesTotaisPorUnidade] = useState<Record<string, number>>({});
+  const [modalConfirmacaoWhatsAppUnidade, setModalConfirmacaoWhatsAppUnidade] = useState(false);
+  const [unidadeParaWhatsApp, setUnidadeParaWhatsApp] = useState<UnitKanbanCard | null>(null);
   const kanbanService = new KanbanService();
 
   // Função para limpar estados do modal
@@ -53,6 +56,8 @@ export function KanbanCobranca() {
     setTodasCobrancasUnidade([]);
     setObservacaoEditando("");
     setModalAberto(null);
+    setModalConfirmacaoWhatsAppUnidade(false);
+    setUnidadeParaWhatsApp(null);
   };
 
   // Função para obter quantidade total de cobranças de uma unidade
@@ -160,14 +165,17 @@ export function KanbanCobranca() {
       // Calcula quantidades totais de cobranças por unidade
       if (aba === "unidade") {
         // Busca todas as cobranças (sem filtros) para calcular totais corretos
-        const todasCobrancasSemFiltro = await kanbanService.buscarCards({}, false);
+        const todasCobrancasSemFiltro = await kanbanService.buscarCards(
+          {},
+          false
+        );
         const quantidadesPorUnidade: Record<string, number> = {};
-        
-        todasCobrancasSemFiltro.forEach(card => {
+
+        todasCobrancasSemFiltro.forEach((card) => {
           const key = card.cnpj; // Usando CNPJ como chave única da unidade
           quantidadesPorUnidade[key] = (quantidadesPorUnidade[key] || 0) + 1;
         });
-        
+
         setQuantidadesTotaisPorUnidade(quantidadesPorUnidade);
       }
 
@@ -384,11 +392,11 @@ export function KanbanCobranca() {
         (card) => card.cnpj === cnpj
       );
       setTodasCobrancasUnidade(cobrancasUnidade);
-      
+
       // Atualiza o mapa de quantidades para garantir que esteja sincronizado
-      setQuantidadesTotaisPorUnidade(prev => ({
+      setQuantidadesTotaisPorUnidade((prev) => ({
         ...prev,
-        [cnpj]: cobrancasUnidade.length
+        [cnpj]: cobrancasUnidade.length,
       }));
     } catch (error) {
       console.error("Erro ao buscar todas as cobranças da unidade:", error);
@@ -438,6 +446,188 @@ export function KanbanCobranca() {
       alert(`Erro ao salvar observação: ${error}`);
     } finally {
       setProcessando(false);
+    }
+  };
+
+  const enviarWhatsAppCobranca = async (cobranca: CardCobranca) => {
+    setProcessando(true);
+    try {
+      // Buscar telefone da unidade franqueada
+      console.log(`Buscando telefone para CNPJ: ${cobranca.cnpj}`);
+
+      const { data: unidade, error } = await supabase
+        .from("unidades_franqueadas")
+        .select("telefone_unidade")
+        .eq("codigo_interno", cobranca.cnpj)
+        .single();
+
+      if (error) {
+        console.error("Erro ao buscar unidade:", error);
+        alert("Erro ao buscar informações da unidade para envio do WhatsApp.");
+        return;
+      }
+
+      const telefoneRaw = unidade?.telefone_unidade;
+      console.log(`Telefone bruto encontrado: ${telefoneRaw}`);
+
+      // Criar mensagem personalizada para a cobrança individual
+      const mensagem = `
+🔔 *Notificação de Cobrança* 🔔
+
+Prezado(a) ${cobranca.nome_unidade},
+
+Identificamos uma cobrança pendente em sua conta:
+
+💰 *Valor:* ${formatarMoeda(cobranca.valor_total)}
+📅 *Vencimento:* ${formatarData(cobranca.data_vencimento_antiga)}
+🏷️ *Tipo:* ${formatarTipoDebito(cobranca.tipo_debito)}
+📋 *Status:* ${formatarStatusCobranca(cobranca.status_atual)}
+
+Para regularizar sua situação, entre em contato conosco o mais breve possível.
+
+_Equipe de Cobrança_
+      `.trim();
+
+      console.log(`Enviando WhatsApp para cobrança ${cobranca.id}`);
+
+      // O n8nService agora valida e trata o telefone automaticamente
+      const resultado = await n8nService.enviarWhatsApp({
+        number: telefoneRaw,
+        text: mensagem,
+        instanceName: "automacoes_3",
+        metadata: {
+          cobrancaId: cobranca.id,
+          cnpj: cobranca.cnpj,
+          valor: cobranca.valor_total,
+          tipo: "cobranca_individual",
+          telefoneOriginal: telefoneRaw,
+        },
+      });
+
+      if (resultado.success) {
+        alert("✅ WhatsApp enviado com sucesso!");
+        console.log(
+          `WhatsApp enviado com sucesso. Message ID: ${resultado.messageId}`
+        );
+
+        // Opcional: registrar o envio no banco de dados
+        // await registrarEnvioWhatsApp(cobranca.id, resultado.messageId);
+      } else {
+        throw new Error("Falha no envio do WhatsApp");
+      }
+    } catch (error) {
+      console.error("Erro ao enviar WhatsApp:", error);
+      alert(`❌ Erro ao enviar WhatsApp: ${error}`);
+    } finally {
+      setProcessando(false);
+    }
+  };
+
+  const enviarWhatsAppUnidade = async (unidade: UnitKanbanCard) => {
+    setProcessando(true);
+    try {
+      // Buscar telefone da unidade franqueada
+      console.log(`Buscando telefone para CNPJ: ${unidade.cnpj}`);
+
+      const { data: unidadeData, error } = await supabase
+        .from("unidades_franqueadas")
+        .select("telefone_unidade")
+        .eq("codigo_interno", unidade.cnpj)
+        .single();
+
+      if (error) {
+        console.error("Erro ao buscar unidade:", error);
+        alert("Erro ao buscar informações da unidade para envio do WhatsApp.");
+        return;
+      }
+
+      const telefoneRaw = unidadeData?.telefone_unidade;
+      console.log(`Telefone bruto encontrado: ${telefoneRaw}`);
+
+      // Buscar todas as cobranças da unidade para a mensagem completa
+      const todasCobrancas = await kanbanService.buscarCards({}, false);
+      const cobrancasUnidade = todasCobrancas.filter(
+        (card) => card.cnpj === unidade.cnpj
+      );
+
+      const valorTotalGeral = cobrancasUnidade.reduce(
+        (total, cobranca) => total + cobranca.valor_total,
+        0
+      );
+      const vencimentoMaisAntigo = cobrancasUnidade
+        .map((c) => c.data_vencimento_antiga)
+        .sort()[0];
+
+      // Criar lista das cobranças para a mensagem
+      const listaCobrancas = cobrancasUnidade
+        .sort(
+          (a, b) =>
+            new Date(a.data_vencimento_antiga).getTime() -
+            new Date(b.data_vencimento_antiga).getTime()
+        )
+        .map(
+          (cobranca, index) =>
+            `${index + 1}. ${formatarTipoDebito(
+              cobranca.tipo_debito
+            )} - ${formatarMoeda(cobranca.valor_total)} (Venc: ${formatarData(
+              cobranca.data_vencimento_antiga
+            )})`
+        )
+        .join("\n");
+
+      // Criar mensagem personalizada para cobranças agrupadas
+      const mensagem = `
+🔔 *Notificação de Cobranças Pendentes* 🔔
+
+Prezado(a) ${unidade.nome_unidade},
+
+Identificamos ${cobrancasUnidade.length} cobrança(s) pendente(s) em sua conta:
+
+💰 *Valor Total:* ${formatarMoeda(valorTotalGeral)}
+📅 *Vencimento mais antigo:* ${formatarData(vencimentoMaisAntigo)}
+
+*📋 Detalhamento das Cobranças:*
+${listaCobrancas}
+
+Para regularizar sua situação, entre em contato conosco o mais breve possível.
+
+_Equipe de Cobrança_
+      `.trim();
+
+      console.log(
+        `Enviando WhatsApp agrupado para unidade ${unidade.codigo_unidade}`
+      );
+
+      // O n8nService agora valida e trata o telefone automaticamente
+      const resultado = await n8nService.enviarWhatsApp({
+        number: telefoneRaw,
+        text: mensagem,
+        instanceName: "automacoes_3",
+        metadata: {
+          unidadeCodigo: unidade.codigo_unidade,
+          cnpj: unidade.cnpj,
+          valorTotal: valorTotalGeral,
+          quantidadeCobrancas: cobrancasUnidade.length,
+          tipo: "cobranca_agrupada",
+          telefoneOriginal: telefoneRaw,
+        },
+      });
+
+      if (resultado.success) {
+        alert("✅ WhatsApp agrupado enviado com sucesso!");
+        console.log(
+          `WhatsApp agrupado enviado com sucesso. Message ID: ${resultado.messageId}`
+        );
+      } else {
+        throw new Error("Falha no envio do WhatsApp");
+      }
+    } catch (error) {
+      console.error("Erro ao enviar WhatsApp agrupado:", error);
+      alert(`❌ Erro ao enviar WhatsApp agrupado: ${error}`);
+    } finally {
+      setProcessando(false);
+      setModalConfirmacaoWhatsAppUnidade(false);
+      setUnidadeParaWhatsApp(null);
     }
   };
 
@@ -588,7 +778,9 @@ export function KanbanCobranca() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Cobranças:</span>
-                <span className="font-medium">{obterQuantidadeTotalCobrancas(unit.cnpj)}</span>
+                <span className="font-medium">
+                  {obterQuantidadeTotalCobrancas(unit.cnpj)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Vencimento:</span>
@@ -1327,9 +1519,10 @@ export function KanbanCobranca() {
                   </h4>
                   <div className="flex space-x-3">
                     <button
-                      onClick={() =>
-                        executarAcao(unitSelecionada.codigo_unidade, "whatsapp")
-                      }
+                      onClick={() => {
+                        setUnidadeParaWhatsApp(unitSelecionada);
+                        setModalConfirmacaoWhatsAppUnidade(true);
+                      }}
                       disabled={processando}
                       className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                     >
@@ -1440,7 +1633,7 @@ export function KanbanCobranca() {
                   <div className="flex space-x-3">
                     <button
                       onClick={() =>
-                        executarAcao(cobrancaSelecionada.id, "whatsapp")
+                        enviarWhatsAppCobranca(cobrancaSelecionada)
                       }
                       disabled={processando}
                       className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
@@ -1512,6 +1705,70 @@ export function KanbanCobranca() {
               </button>
               <button
                 onClick={limparEstadosModal}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação WhatsApp Unidade */}
+      {modalConfirmacaoWhatsAppUnidade && unidadeParaWhatsApp && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <div className="flex items-center mb-4">
+              <MessageSquare className="w-6 h-6 text-green-600 mr-3" />
+              <h3 className="text-lg font-semibold text-gray-800">
+                Confirmar Envio WhatsApp
+              </h3>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <p className="text-gray-700">
+                Esta ação irá enviar uma mensagem WhatsApp para a unidade{" "}
+                <strong>{unidadeParaWhatsApp.nome_unidade}</strong> informando
+                sobre <strong>todas as cobranças pendentes</strong>.
+              </p>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="text-sm">
+                  <p>
+                    <strong>Unidade:</strong> {unidadeParaWhatsApp.nome_unidade}
+                  </p>
+                  <p>
+                    <strong>Quantidade de cobranças:</strong>{" "}
+                    {obterQuantidadeTotalCobrancas(unidadeParaWhatsApp.cnpj)}
+                  </p>
+                  <p>
+                    <strong>Valor total aproximado:</strong>{" "}
+                    {formatarMoeda(unidadeParaWhatsApp.valor_total)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-yellow-800 text-sm font-medium">
+                  ⚠️ A mensagem incluirá o detalhamento de todas as cobranças
+                  pendentes da unidade.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                onClick={() => enviarWhatsAppUnidade(unidadeParaWhatsApp)}
+                disabled={processando}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+              >
+                {processando ? "Enviando..." : "Confirmar Envio"}
+              </button>
+              <button
+                onClick={() => {
+                  setModalConfirmacaoWhatsAppUnidade(false);
+                  setUnidadeParaWhatsApp(null);
+                }}
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
               >
                 Cancelar
