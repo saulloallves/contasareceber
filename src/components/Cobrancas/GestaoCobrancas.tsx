@@ -30,7 +30,9 @@ export function GestaoCobrancas() {
   const [usuario] = useState("admin"); // Em produção, pegar do contexto de autenticação
   const [formData, setFormData] = useState<Partial<CobrancaFranqueado>>({});
   const [formQuitacao, setFormQuitacao] = useState({valorPago: 0, formaPagamento: "", observacoes: "", dataRecebimento: new Date().toISOString().split("T")[0],});
-  const [filtros, setFiltros] = useState({status: "", busca: "", dataInicio: "", dataFim: "", valorMin: "", valorMax: "",});
+  const [filtros, setFiltros] = useState({status: "", busca: "", dataInicio: "", dataFim: "", valorMin: "", valorMax: "", tipoCobranca: "",});
+  const [filtrosAvancados, setFiltrosAvancados] = useState({ nomeUnidade: "", cnpj: "", codigo: "", statusCobranca: "", valorMin: "", valorMax: "", tipoCobranca: "", });
+  const [showFiltrosAvancados, setShowFiltrosAvancados] = useState(false);
   const [colunaOrdenacao, setColunaOrdenacao] = useState("data_vencimento"); // Coluna padrão
   const [direcaoOrdenacao, setDirecaoOrdenacao] = useState("desc"); // Ordenação 'asc' ou 'desc'
   const [mostrarApenasInadimplentes, setMostrarApenasInadimplentes] = useState(false); // Controlar a exibição de inadimplentes
@@ -109,16 +111,64 @@ Entre em contato: (11) 99999-9999`,
   const carregarCobrancas = useCallback(async () => {
     setCarregando(true);
     try {
+      // Converte filtros avançados para o formato esperado pelo serviço
+      const filtrosServico = { ...filtros };
+
+      if (filtrosAvancados.tipoCobranca) {
+        filtrosServico.tipoCobranca = filtrosAvancados.tipoCobranca;
+      }
+
+      if (filtrosAvancados.valorMin) {
+        filtrosServico.valorMin = filtrosAvancados.valorMin;
+      }
+
+      if (filtrosAvancados.valorMax) {
+        filtrosServico.valorMax = filtrosAvancados.valorMax;
+      }
+
       const dadosReaisDoBanco = await cobrancaService.buscarCobrancas({
-        ...filtros,
+        ...filtrosServico,
         colunaOrdenacao,
         direcaoOrdenacao,
         apenasInadimplentes: mostrarApenasInadimplentes, // Linha adicionada para filtrar apenas inadimplentes
       });
-      setCobrancas(dadosReaisDoBanco);
+
+      // Aplica filtros locais que não são suportados pelo serviço
+      let cobrancasFiltradas = dadosReaisDoBanco;
+
+      if (filtrosAvancados.nomeUnidade) {
+        cobrancasFiltradas = cobrancasFiltradas.filter((cobranca) =>
+          (cobranca.unidades_franqueadas?.nome_unidade || cobranca.cliente || '')
+            .toLowerCase()
+            .includes(filtrosAvancados.nomeUnidade.toLowerCase())
+        );
+      }
+
+      if (filtrosAvancados.cnpj) {
+        cobrancasFiltradas = cobrancasFiltradas.filter((cobranca) =>
+          cobranca.cnpj.includes(filtrosAvancados.cnpj)
+        );
+      }
+
+      if (filtrosAvancados.codigo) {
+        cobrancasFiltradas = cobrancasFiltradas.filter((cobranca) =>
+          (cobranca.unidades_franqueadas?.codigo_unidade || '')
+            .toLowerCase()
+            .includes(filtrosAvancados.codigo.toLowerCase())
+        );
+      }
+
+      if (filtrosAvancados.statusCobranca) {
+        cobrancasFiltradas = cobrancasFiltradas.filter(
+          (cobranca) => cobranca.status === filtrosAvancados.statusCobranca
+        );
+      }
+
+      setCobrancas(cobrancasFiltradas);
+      
       // Precarrega nomes/códigos das unidades em lote
       try {
-        const cnpjs = dadosReaisDoBanco
+        const cnpjs = cobrancasFiltradas
           .map((c) => cnpjKey(c.cnpj))
           .filter(Boolean);
         const mapa = await unidadesService.buscarUnidadesPorCnpjs(cnpjs);
@@ -135,7 +185,35 @@ Entre em contato: (11) 99999-9999`,
     } finally {
       setCarregando(false);
     }
-  }, [ filtros, colunaOrdenacao, direcaoOrdenacao, mostrarApenasInadimplentes, unidadesService, cnpjKey,]);
+  }, [ filtros, filtrosAvancados, colunaOrdenacao, direcaoOrdenacao, mostrarApenasInadimplentes, unidadesService, cnpjKey,]);
+
+  // Função para aplicar filtros
+  const aplicarFiltros = () => {
+    carregarCobrancas();
+  };
+
+  // Função para limpar filtros
+  const limparFiltros = () => {
+    setFiltrosAvancados({
+      nomeUnidade: "",
+      cnpj: "",
+      codigo: "",
+      statusCobranca: "",
+      valorMin: "",
+      valorMax: "",
+      tipoCobranca: "",
+    });
+    setFiltros({
+      status: "",
+      busca: "",
+      dataInicio: "",
+      dataFim: "",
+      valorMin: "",
+      valorMax: "",
+      tipoCobranca: "",
+    });
+    carregarCobrancas();
+  };
 
   // Função para abrir histórico de envios
   const abrirHistoricoEnvios = useCallback(async (cobrancaId: string) => {
@@ -1123,9 +1201,31 @@ Entre em contato: (11) 99999-9999`,
         </div>
         {/* Filtros */}
         <div className="bg-gray-50 rounded-lg p-6 mb-6">
-          <div className="flex items-center mb-4">
-            <Filter className="w-5 h-5 text-gray-600 mr-2" />
-            <h3 className="text-lg font-demibold text-gray-800">Filtros</h3>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center">
+              <Filter className="w-5 h-5 text-gray-600 mr-2" />
+              <h3 className="text-lg font-demibold text-gray-800">Filtros</h3>
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowFiltrosAvancados(!showFiltrosAvancados)}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                {showFiltrosAvancados ? 'Ocultar Filtros Avançados' : 'Mostrar Filtros Avançados'}
+              </button>
+              <button
+                onClick={aplicarFiltros}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              >
+                Aplicar
+              </button>
+              <button
+                onClick={limparFiltros}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 text-sm"
+              >
+                Limpar
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             <select
@@ -1137,8 +1237,16 @@ Entre em contato: (11) 99999-9999`,
             >
               <option value="">Todos os Status</option>
               <option value="em_aberto">Em Aberto</option>
-              <option value="negociando">Negociando</option>
+              <option value="notificado">Notificado</option>
+              <option value="em_negociacao">Em Negociação</option>
+              <option value="proposta_enviada">Proposta Enviada</option>
+              <option value="aguardando_pagamento">Aguardando Pagamento</option>
+              <option value="pagamento_parcial">Pagamento Parcial</option>
               <option value="quitado">Quitado</option>
+              <option value="ignorado">Ignorado</option>
+              <option value="notificacao_formal">Notificação Formal</option>
+              <option value="escalado_juridico">Escalado Jurídico</option>
+              <option value="inadimplencia_critica">Inadimplência Crítica</option>
             </select>
             <input
               type="text"
@@ -1184,6 +1292,96 @@ Entre em contato: (11) 99999-9999`,
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
+
+          {/* Filtros Avançados */}
+          {showFiltrosAvancados && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <h4 className="text-md font-medium text-gray-700 mb-3">Filtros Avançados</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <input
+                  type="text"
+                  value={filtrosAvancados.nomeUnidade}
+                  onChange={(e) =>
+                    setFiltrosAvancados({ ...filtrosAvancados, nomeUnidade: e.target.value })
+                  }
+                  placeholder="Nome da Unidade"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="text"
+                  value={filtrosAvancados.cnpj}
+                  onChange={(e) =>
+                    setFiltrosAvancados({ ...filtrosAvancados, cnpj: e.target.value })
+                  }
+                  placeholder="CNPJ"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="text"
+                  value={filtrosAvancados.codigo}
+                  onChange={(e) =>
+                    setFiltrosAvancados({ ...filtrosAvancados, codigo: e.target.value })
+                  }
+                  placeholder="Código da Unidade"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+                <select
+                  value={filtrosAvancados.statusCobranca}
+                  onChange={(e) =>
+                    setFiltrosAvancados({ ...filtrosAvancados, statusCobranca: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Status da Cobrança</option>
+                  <option value="em_aberto">Em Aberto</option>
+                  <option value="notificado">Notificado</option>
+                  <option value="em_negociacao">Em Negociação</option>
+                  <option value="proposta_enviada">Proposta Enviada</option>
+                  <option value="aguardando_pagamento">Aguardando Pagamento</option>
+                  <option value="pagamento_parcial">Pagamento Parcial</option>
+                  <option value="quitado">Quitado</option>
+                  <option value="ignorado">Ignorado</option>
+                  <option value="notificacao_formal">Notificação Formal</option>
+                  <option value="escalado_juridico">Escalado Jurídico</option>
+                  <option value="inadimplencia_critica">Inadimplência Crítica</option>
+                </select>
+                <input
+                  type="number"
+                  value={filtrosAvancados.valorMin}
+                  onChange={(e) =>
+                    setFiltrosAvancados({ ...filtrosAvancados, valorMin: e.target.value })
+                  }
+                  placeholder="Valor mínimo (avançado)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="number"
+                  value={filtrosAvancados.valorMax}
+                  onChange={(e) =>
+                    setFiltrosAvancados({ ...filtrosAvancados, valorMax: e.target.value })
+                  }
+                  placeholder="Valor máximo (avançado)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+                <select
+                  value={filtrosAvancados.tipoCobranca}
+                  onChange={(e) =>
+                    setFiltrosAvancados({ ...filtrosAvancados, tipoCobranca: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Tipo de Cobrança</option>
+                  <option value="royalties">Royalties</option>
+                  <option value="insumos">Insumos</option>
+                  <option value="aluguel">Aluguel</option>
+                  <option value="multa">Multa</option>
+                  <option value="taxa">Taxa</option>
+                  <option value="outros">Outros</option>
+                </select>
+              </div>
+            </div>
+          )}
+
           <div className="mt-4 ml-1 flex items-center">
             <input
               type="checkbox"

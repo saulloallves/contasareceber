@@ -19,6 +19,13 @@ export interface CobrancaFranqueado {
   telefone?: string;
   created_at?: string;
   nivel_criticidade?: string;
+  unidades_franqueadas?: {
+    id: string;
+    codigo_unidade: string;
+    nome_unidade: string;
+    cidade: string;
+    estado: string;
+  };
 }
 
 export interface DadosPlanilha {

@@ -260,8 +260,18 @@ export class CobrancaService {
   async buscarCobrancas(
     filtros: Record<string, unknown> = {}
   ): Promise<CobrancaFranqueado[]> {
-    let query = supabase.from("cobrancas_franqueados").select("*");
+    let query = supabase.from("cobrancas_franqueados").select(`
+      *,
+      unidades_franqueadas!unidade_id_fk (
+        id,
+        codigo_unidade,
+        nome_unidade,
+        cidade,
+        estado
+      )
+    `);
 
+    // Filtros básicos
     if (filtros.status) {
       query = query.eq("status", filtros.status);
     }
@@ -278,13 +288,71 @@ export class CobrancaService {
       query = query.eq("cnpj", filtros.cnpj);
     }
 
+    // Filtros de valor
+    if (filtros.valorMin) {
+      const valorMin = typeof filtros.valorMin === 'string' 
+        ? parseFloat(filtros.valorMin) 
+        : filtros.valorMin;
+      if (!isNaN(valorMin as number)) {
+        query = query.gte("valor_atualizado", valorMin);
+      }
+    }
+
+    if (filtros.valorMax) {
+      const valorMax = typeof filtros.valorMax === 'string' 
+        ? parseFloat(filtros.valorMax) 
+        : filtros.valorMax;
+      if (!isNaN(valorMax as number)) {
+        query = query.lte("valor_atualizado", valorMax);
+      }
+    }
+
+    // Filtro por tipo de cobrança
+    if (filtros.tipoCobranca || filtros.tipo_debito) {
+      const tipo = filtros.tipoCobranca || filtros.tipo_debito;
+      query = query.eq("tipo_cobranca", tipo);
+    }
+
+    // Filtro apenas inadimplentes
+    if (filtros.apenasInadimplentes) {
+      query = query.neq("status", "quitado");
+    }
+
+    // Ordenação
+    const colunaOrdenacao = filtros.colunaOrdenacao as string || "data_vencimento";
+    const direcaoOrdenacao = filtros.direcaoOrdenacao as string || "desc";
+    
+    query = query.order(colunaOrdenacao, { ascending: direcaoOrdenacao === "asc" });
+
     const { data, error } = await query;
 
     if (error) {
       throw new Error(`Erro ao buscar cobranças: ${error.message}`);
     }
 
-    return data || [];
+    if (!data) {
+      return [];
+    }
+
+    // Aplica filtros locais que não podem ser feitos no banco
+    let resultados = data;
+
+    // Filtro por busca (nome da unidade, código, CNPJ)
+    if (filtros.busca) {
+      const termoBusca = (filtros.busca as string).toLowerCase();
+      resultados = resultados.filter((cobranca) => {
+        const nomeUnidade = cobranca.unidades_franqueadas?.nome_unidade?.toLowerCase() || 
+                            cobranca.cliente?.toLowerCase() || '';
+        const codigoUnidade = cobranca.unidades_franqueadas?.codigo_unidade?.toLowerCase() || '';
+        const cnpj = cobranca.cnpj?.replace(/\D/g, '') || '';
+        
+        return nomeUnidade.includes(termoBusca) ||
+               codigoUnidade.includes(termoBusca) ||
+               cnpj.includes(termoBusca.replace(/\D/g, ''));
+      });
+    }
+
+    return resultados;
   }
 
   async quitarCobranca(dados: QuitacaoCobranca): Promise<ResultadoQuitacao> {
