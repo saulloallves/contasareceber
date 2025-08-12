@@ -167,6 +167,8 @@ export function KanbanCobranca() {
   }, [filtros, aba, filtrosAvancados]);
 
   useEffect(() => {
+    carregarDados();
+  }, [carregarDados]);
 
   // Agrupa cards por unidade
   const getUnitCardsByColuna = (colunaId: string): UnitKanbanCard[] => {
@@ -670,7 +672,7 @@ export function KanbanCobranca() {
         )}
 
         {/* Seletor de Modo */}
-        <div className="space-y-4 mb-6">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-4">
             <div className="flex bg-gray-100 rounded-lg p-1">
               <button
@@ -733,163 +735,23 @@ export function KanbanCobranca() {
               </div>
             )}
           </div>
-          
-          {/* Botão de Filtros */}
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setShowFiltrosAvancados(!showFiltrosAvancados)}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+
+          {/* Filtros */}
+          <div className="flex items-center space-x-3">
+            <Filter className="w-5 h-5 text-gray-600" />
+            <select
+              value={filtros.tipo_debito || ""}
+              onChange={(e) => setFiltros({ ...filtros, tipo_debito: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
-              <Filter className="w-4 h-4 mr-2" />
-              {showFiltrosAvancados ? 'Ocultar Filtros' : 'Mostrar Filtros'}
-            </button>
-            
-            {(Object.values(filtrosAvancados).some(v => v !== '') || Object.values(filtros).some(v => v !== '')) && (
-              <button
-                onClick={limparFiltros}
-                className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-              >
-                Limpar Filtros
-              </button>
-            )}
+              <option value="">Todos os Tipos</option>
+              <option value="royalties">Royalties</option>
+              <option value="insumos">Insumos</option>
+              <option value="aluguel">Aluguel</option>
+              <option value="multa">Multa</option>
+            </select>
           </div>
         </div>
-        
-        {/* Filtros Avançados */}
-        {showFiltrosAvancados && (
-          <div className="bg-gray-50 rounded-lg p-6 mb-6">
-            <div className="flex items-center mb-4">
-              <Filter className="w-5 h-5 text-gray-600 mr-2" />
-              <h3 className="text-lg font-semibold text-gray-800">Filtros Avançados</h3>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Unidade</label>
-                <input
-                  type="text"
-                  value={filtrosAvancados.nomeUnidade}
-                  onChange={(e) => setFiltrosAvancados({...filtrosAvancados, nomeUnidade: e.target.value})}
-                  placeholder="Buscar por nome..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ</label>
-                <input
-                  type="text"
-                  value={filtrosAvancados.cnpj}
-                  onChange={(e) => setFiltrosAvancados({...filtrosAvancados, cnpj: e.target.value})}
-                  placeholder="00.000.000/0000-00"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Código da Unidade</label>
-                <input
-                  type="text"
-                  value={filtrosAvancados.codigo}
-                  onChange={(e) => setFiltrosAvancados({...filtrosAvancados, codigo: e.target.value})}
-                  placeholder="Código..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status da Cobrança</label>
-                <select
-                  value={filtrosAvancados.statusCobranca}
-                  onChange={(e) => setFiltrosAvancados({...filtrosAvancados, statusCobranca: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Todos os Status</option>
-                  <option value="em_aberto">Em Aberto</option>
-                  <option value="notificado">Notificado</option>
-                  <option value="reuniao_agendada">Reunião Agendada</option>
-                  <option value="em_negociacao">Em Negociação</option>
-                  <option value="proposta_enviada">Proposta Enviada</option>
-                  <option value="aguardando_pagamento">Aguardando Pagamento</option>
-                  <option value="pagamento_parcial">Pagamento Parcial</option>
-                  <option value="quitado">Quitado</option>
-                  <option value="ignorado">Ignorado</option>
-                  <option value="notificacao_formal">Notificação Formal</option>
-                  <option value="escalado_juridico">Escalado Jurídico</option>
-                  <option value="inadimplencia_critica">Inadimplência Crítica</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Valor Mínimo (R$)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={filtrosAvancados.valorMin}
-                  onChange={(e) => setFiltrosAvancados({...filtrosAvancados, valorMin: e.target.value})}
-                  placeholder="0,00"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Valor Máximo (R$)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={filtrosAvancados.valorMax}
-                  onChange={(e) => setFiltrosAvancados({...filtrosAvancados, valorMax: e.target.value})}
-                  placeholder="999.999,99"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Cobrança</label>
-                <select
-                  value={filtrosAvancados.tipoCobranca}
-                  onChange={(e) => setFiltrosAvancados({...filtrosAvancados, tipoCobranca: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Todos os Tipos</option>
-                  <option value="royalties">Royalties</option>
-                  <option value="insumos">Insumos</option>
-                  <option value="aluguel">Aluguel</option>
-                  <option value="multa">Multa</option>
-                  <option value="taxa">Taxa</option>
-                  <option value="outros">Outros</option>
-                </select>
-              </div>
-              
-              <div className="flex items-end">
-                <button
-                  onClick={aplicarFiltros}
-                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  Aplicar Filtros
-                </button>
-              </div>
-            </div>
-            
-            {/* Indicador de filtros ativos */}
-            {Object.values(filtrosAvancados).some(v => v !== '') && (
-              <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-center">
-                  <Filter className="w-4 h-4 text-blue-600 mr-2" />
-                  <span className="text-sm font-medium text-blue-800">
-                    Filtros ativos: {Object.values(filtrosAvancados).filter(v => v !== '').length}
-                  </span>
-                </div>
-                <button
-                  onClick={limparFiltros}
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  Limpar todos
-                </button>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Avisos */}
         {aba === "unidade" && unidadesMistasCount > 0 && (
@@ -1187,7 +1049,7 @@ export function KanbanCobranca() {
                 {/* Botões de Ação */}
                 <div className="bg-white border-t border-gray-200 pt-4">
                   <h4 className="font-semibold text-gray-800 mb-3">Ações para Esta Cobrança</h4>
-                  <div>
+                  <div className="flex space-x-3">
                     <button
                       onClick={() => executarAcao(cobrancaSelecionada.id, "whatsapp")}
                       disabled={processando}
@@ -1266,4 +1128,4 @@ export function KanbanCobranca() {
       )}
     </div>
   );
-},
+}
