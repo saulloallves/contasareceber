@@ -2,17 +2,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useCallback } from "react";
-import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
-import { 
-  MessageSquare, Calendar, 
-  DollarSign, AlertTriangle, 
-  Filter, Download, RefreshCw, Edit, X,
-  Save, CircleDollarSign,
-  Lock,
-} from "lucide-react";
+import { DragDropContext, Droppable, Draggable, DropResult, } from "react-beautiful-dnd";
+import { MessageSquare, Calendar, DollarSign, AlertTriangle, Filter, Download, RefreshCw, Edit, X, Save, CircleDollarSign, Lock, } from "lucide-react";
 import { KanbanService } from "../services/kanbanService";
-import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban } from "../types/kanban";
-import { formatarCNPJCPF, formatarMoeda, formatarData } from "../utils/formatters";
+import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban, } from "../types/kanban";
+import { formatarCNPJCPF, formatarMoeda, formatarData, } from "../utils/formatters";
 import { supabase } from "../lib/supabaseClient";
 
 type UnitKanbanCard = {
@@ -44,32 +38,38 @@ export function KanbanCobranca() {
   const [modalConfirmacaoAberto, setModalConfirmacaoAberto] = useState(false);
   const [movimentoPendente, setMovimentoPendente] = useState<DropResult | null>(null);
   const [movimentacaoIndividualFeita, setMovimentacaoIndividualFeita] = useState(false);
-  const [unidadesComStatusMisto, setUnidadesComStatusMisto] = useState<Set<string>>(new Set());
+  const [unidadesComStatusMisto, setUnidadesComStatusMisto] = useState< Set<string> >(new Set());
   const [showMixedStatusWarning, setShowMixedStatusWarning] = useState(false);
-  const [todasCobrancasUnidade, setTodasCobrancasUnidade] = useState<CardCobranca[]>([]);
-  const [filtrosAvancados, setFiltrosAvancados] = useState({
-    nomeUnidade: '',
-    cnpj: '',
-    codigo: '',
-    statusCobranca: '',
-    valorMin: '',
-    valorMax: '',
-    tipoCobranca: ''
-  });
+  const [todasCobrancasUnidade, setTodasCobrancasUnidade] = useState< CardCobranca[] >([]);
+  const [filtrosAvancados, setFiltrosAvancados] = useState({ nomeUnidade: "", cnpj: "", codigo: "", statusCobranca: "", valorMin: "", valorMax: "", tipoCobranca: "", });
   const [showFiltrosAvancados, setShowFiltrosAvancados] = useState(false);
-
+  const [quantidadesTotaisPorUnidade, setQuantidadesTotaisPorUnidade] = useState<Record<string, number>>({});
   const kanbanService = new KanbanService();
+
+  // Função para limpar estados do modal
+  const limparEstadosModal = () => {
+    setUnitSelecionada(null);
+    setCobrancaSelecionada(null);
+    setTodasCobrancasUnidade([]);
+    setObservacaoEditando("");
+    setModalAberto(null);
+  };
+
+  // Função para obter quantidade total de cobranças de uma unidade
+  const obterQuantidadeTotalCobrancas = (cnpj: string): number => {
+    return quantidadesTotaisPorUnidade[cnpj] || 0;
+  };
 
   // Função para detectar unidades com status misto
   const detectarUnidadesComStatusMisto = async (): Promise<Set<string>> => {
     try {
       const { data: cobrancas, error } = await supabase
-        .from('cobrancas_franqueados')
-        .select('cnpj, status')
-        .neq('status', 'quitado'); // Ignora quitados para análise
+        .from("cobrancas_franqueados")
+        .select("cnpj, status")
+        .neq("status", "quitado"); // Ignora quitados para análise
 
       if (error) {
-        console.error('Erro ao detectar status misto:', error);
+        console.error("Erro ao detectar status misto:", error);
         return new Set();
       }
 
@@ -77,7 +77,7 @@ export function KanbanCobranca() {
       const statusPorUnidade = new Map<string, Set<string>>();
 
       // Agrupa status por unidade
-      cobrancas?.forEach(cobranca => {
+      cobrancas?.forEach((cobranca) => {
         if (!statusPorUnidade.has(cobranca.cnpj)) {
           statusPorUnidade.set(cobranca.cnpj, new Set());
         }
@@ -93,7 +93,7 @@ export function KanbanCobranca() {
 
       return unidadesMistas;
     } catch (error) {
-      console.error('Erro ao detectar unidades com status misto:', error);
+      console.error("Erro ao detectar unidades com status misto:", error);
       return new Set();
     }
   };
@@ -103,56 +103,74 @@ export function KanbanCobranca() {
     try {
       // Converte filtros avançados para o formato esperado pelo serviço
       const filtrosServico: FiltrosKanban = {};
-      
+
       if (filtrosAvancados.tipoCobranca) {
         filtrosServico.tipo_debito = filtrosAvancados.tipoCobranca as any;
       }
-      
+
       if (filtrosAvancados.valorMin) {
         filtrosServico.valor_min = parseFloat(filtrosAvancados.valorMin);
       }
-      
+
       if (filtrosAvancados.valorMax) {
         filtrosServico.valor_max = parseFloat(filtrosAvancados.valorMax);
       }
-      
+
       const [colunasData, cardsData, statsData] = await Promise.all([
         kanbanService.buscarColunas(),
         kanbanService.buscarCards(filtrosServico, aba === "unidade"),
         kanbanService.buscarEstatisticas(aba === "unidade"),
       ]);
       setColunas(colunasData);
-      
+
       // Aplica filtros locais que não são suportados pelo serviço
       let cardsFiltrados = cardsData;
-      
+
       if (filtrosAvancados.nomeUnidade) {
-        cardsFiltrados = cardsFiltrados.filter(card => 
-          card.nome_unidade.toLowerCase().includes(filtrosAvancados.nomeUnidade.toLowerCase())
+        cardsFiltrados = cardsFiltrados.filter((card) =>
+          card.nome_unidade
+            .toLowerCase()
+            .includes(filtrosAvancados.nomeUnidade.toLowerCase())
         );
       }
-      
+
       if (filtrosAvancados.cnpj) {
-        cardsFiltrados = cardsFiltrados.filter(card => 
+        cardsFiltrados = cardsFiltrados.filter((card) =>
           card.cnpj.includes(filtrosAvancados.cnpj)
         );
       }
-      
+
       if (filtrosAvancados.codigo) {
-        cardsFiltrados = cardsFiltrados.filter(card => 
-          card.codigo_unidade.toLowerCase().includes(filtrosAvancados.codigo.toLowerCase())
+        cardsFiltrados = cardsFiltrados.filter((card) =>
+          card.codigo_unidade
+            .toLowerCase()
+            .includes(filtrosAvancados.codigo.toLowerCase())
         );
       }
-      
+
       if (filtrosAvancados.statusCobranca) {
-        cardsFiltrados = cardsFiltrados.filter(card => 
-          card.status_atual === filtrosAvancados.statusCobranca
+        cardsFiltrados = cardsFiltrados.filter(
+          (card) => card.status_atual === filtrosAvancados.statusCobranca
         );
       }
-      
+
       setCards(cardsFiltrados);
       setEstatisticas(statsData);
-      
+
+      // Calcula quantidades totais de cobranças por unidade
+      if (aba === "unidade") {
+        // Busca todas as cobranças (sem filtros) para calcular totais corretos
+        const todasCobrancasSemFiltro = await kanbanService.buscarCards({}, false);
+        const quantidadesPorUnidade: Record<string, number> = {};
+        
+        todasCobrancasSemFiltro.forEach(card => {
+          const key = card.cnpj; // Usando CNPJ como chave única da unidade
+          quantidadesPorUnidade[key] = (quantidadesPorUnidade[key] || 0) + 1;
+        });
+        
+        setQuantidadesTotaisPorUnidade(quantidadesPorUnidade);
+      }
+
       // Detecta unidades com status misto automaticamente
       if (aba === "unidade") {
         const unidadesMistas = await detectarUnidadesComStatusMisto();
@@ -178,13 +196,13 @@ export function KanbanCobranca() {
   // Função para limpar filtros
   const limparFiltros = () => {
     setFiltrosAvancados({
-      nomeUnidade: '',
-      cnpj: '',
-      codigo: '',
-      statusCobranca: '',
-      valorMin: '',
-      valorMax: '',
-      tipoCobranca: ''
+      nomeUnidade: "",
+      cnpj: "",
+      codigo: "",
+      statusCobranca: "",
+      valorMin: "",
+      valorMax: "",
+      tipoCobranca: "",
     });
     setFiltros({});
     carregarDados();
@@ -194,7 +212,7 @@ export function KanbanCobranca() {
   const getUnitCardsByColuna = (colunaId: string): UnitKanbanCard[] => {
     const filtered = cards.filter((card) => card.status_atual === colunaId);
     const unitMap: Record<string, UnitKanbanCard> = {};
-    
+
     filtered.forEach((card) => {
       if (!unitMap[card.codigo_unidade]) {
         unitMap[card.codigo_unidade] = {
@@ -213,30 +231,34 @@ export function KanbanCobranca() {
       }
       unitMap[card.codigo_unidade].charges.push(card);
       unitMap[card.codigo_unidade].valor_total += card.valor_total;
-      
+
       if (
         !unitMap[card.codigo_unidade].data_vencimento_antiga ||
         new Date(card.data_vencimento_antiga) <
           new Date(unitMap[card.codigo_unidade].data_vencimento_antiga)
       ) {
-        unitMap[card.codigo_unidade].data_vencimento_antiga = card.data_vencimento_antiga;
+        unitMap[card.codigo_unidade].data_vencimento_antiga =
+          card.data_vencimento_antiga;
       }
-      
+
       if (card.dias_parado > unitMap[card.codigo_unidade].dias_parado) {
         unitMap[card.codigo_unidade].dias_parado = card.dias_parado;
       }
-      
+
       if (card.observacoes) {
         unitMap[card.codigo_unidade].observacoes = card.observacoes;
       }
     });
-    
+
     return Object.values(unitMap);
   };
 
   // Handler para drag-and-drop agrupado por unidade
   const onDragEndUnidade = (result: DropResult) => {
-    if (!result.destination || result.source.droppableId === result.destination.droppableId) {
+    if (
+      !result.destination ||
+      result.source.droppableId === result.destination.droppableId
+    ) {
       return;
     }
 
@@ -250,8 +272,8 @@ export function KanbanCobranca() {
     if (aba === "unidade" && movimentacaoIndividualFeita) {
       alert(
         "⚠️ ATENÇÃO: Você já moveu cobranças individuais nesta sessão.\n\n" +
-        "Para evitar inconsistências, agora você deve trabalhar apenas no modo INDIVIDUAL.\n\n" +
-        "Clique em 'Cobranças Individuais' para continuar movendo as cobranças uma por uma."
+          "Para evitar inconsistências, agora você deve trabalhar apenas no modo INDIVIDUAL.\n\n" +
+          "Clique em 'Cobranças Individuais' para continuar movendo as cobranças uma por uma."
       );
       return;
     }
@@ -264,8 +286,10 @@ export function KanbanCobranca() {
     if (!movimentoPendente || !movimentoPendente.destination) return;
 
     const { source, destination, draggableId } = movimentoPendente;
-    console.log(`Movendo unidade: ${draggableId} de ${source.droppableId} para ${destination.droppableId}`);
-    
+    console.log(
+      `Movendo unidade: ${draggableId} de ${source.droppableId} para ${destination.droppableId}`
+    );
+
     setProcessando(true);
     setModalConfirmacaoAberto(false);
 
@@ -273,10 +297,12 @@ export function KanbanCobranca() {
       const unit = getUnitCardsByColuna(source.droppableId).find(
         (u) => u.codigo_unidade === draggableId
       );
-      
+
       if (unit) {
-        console.log(`Movendo ${unit.charges.length} cobranças da unidade ${unit.nome_unidade}`);
-        
+        console.log(
+          `Movendo ${unit.charges.length} cobranças da unidade ${unit.nome_unidade}`
+        );
+
         await Promise.all(
           unit.charges.map((card) =>
             kanbanService.moverCard(
@@ -287,8 +313,10 @@ export function KanbanCobranca() {
             )
           )
         );
-        
-        console.log(`Todas as cobranças da unidade ${unit.nome_unidade} foram movidas`);
+
+        console.log(
+          `Todas as cobranças da unidade ${unit.nome_unidade} foram movidas`
+        );
         await carregarDados();
       } else {
         throw new Error(`Unidade ${draggableId} não encontrada`);
@@ -309,7 +337,9 @@ export function KanbanCobranca() {
     const { source, destination, draggableId } = result;
     if (source.droppableId === destination.droppableId) return;
 
-    console.log(`Movendo card individual: ${draggableId} de ${source.droppableId} para ${destination.droppableId}`);
+    console.log(
+      `Movendo card individual: ${draggableId} de ${source.droppableId} para ${destination.droppableId}`
+    );
 
     // Se está no modo individual, marca que houve movimentação individual
     if (aba === "individual") {
@@ -333,7 +363,7 @@ export function KanbanCobranca() {
         "usuario_atual",
         "Movimentação manual via Kanban"
       );
-      
+
       console.log(`Card ${draggableId} movido com sucesso`);
       // Não recarrega os dados imediatamente - mantém a atualização otimista
     } catch (error) {
@@ -350,10 +380,18 @@ export function KanbanCobranca() {
   const buscarTodasCobrancasUnidade = async (cnpj: string) => {
     try {
       const todasCobrancas = await kanbanService.buscarCards({}, false); // Busca todas as cobranças individuais
-      const cobrancasUnidade = todasCobrancas.filter(card => card.cnpj === cnpj);
+      const cobrancasUnidade = todasCobrancas.filter(
+        (card) => card.cnpj === cnpj
+      );
       setTodasCobrancasUnidade(cobrancasUnidade);
+      
+      // Atualiza o mapa de quantidades para garantir que esteja sincronizado
+      setQuantidadesTotaisPorUnidade(prev => ({
+        ...prev,
+        [cnpj]: cobrancasUnidade.length
+      }));
     } catch (error) {
-      console.error('Erro ao buscar todas as cobranças da unidade:', error);
+      console.error("Erro ao buscar todas as cobranças da unidade:", error);
       setTodasCobrancasUnidade([]);
     }
   };
@@ -362,9 +400,14 @@ export function KanbanCobranca() {
     setProcessando(true);
     try {
       console.log(`Executando ação '${acao}' no card ${cardId}`);
-      await kanbanService.executarAcaoRapida(cardId, acao, "usuario_atual", aba === "unidade");
+      await kanbanService.executarAcaoRapida(
+        cardId,
+        acao,
+        "usuario_atual",
+        aba === "unidade"
+      );
       carregarDados();
-      setModalAberto(null);
+      limparEstadosModal();
       console.log(`Ação '${acao}' executada com sucesso`);
     } catch (error) {
       console.error("Erro ao executar ação:", error);
@@ -388,8 +431,7 @@ export function KanbanCobranca() {
           aba === "unidade"
         );
         carregarDados();
-        setModalAberto(null);
-        setObservacaoEditando("");
+        limparEstadosModal();
       }
     } catch (error) {
       console.error("Erro ao salvar observação:", error);
@@ -401,12 +443,17 @@ export function KanbanCobranca() {
 
   const exportarDados = async () => {
     try {
-      const csv = await kanbanService.exportarKanban(filtros, aba === "unidade");
+      const csv = await kanbanService.exportarKanban(
+        filtros,
+        aba === "unidade"
+      );
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `kanban-cobrancas-${aba}-${new Date().toISOString().split("T")[0]}.csv`;
+      a.download = `kanban-cobrancas-${aba}-${
+        new Date().toISOString().split("T")[0]
+      }.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -440,41 +487,44 @@ export function KanbanCobranca() {
 
   const formatarStatusCobranca = (status: string) => {
     const statusMap: Record<string, string> = {
-      'em_aberto': 'Em Aberto',
-      'notificado': 'Notificado',
-      'reuniao_agendada': 'Reunião Agendada',
-      'em_negociacao': 'Em Negociação',
-      'proposta_enviada': 'Proposta Enviada',
-      'aguardando_pagamento': 'Aguardando Pagamento',
-      'pagamento_parcial': 'Pagamento Parcial',
-      'quitado': 'Quitado',
-      'ignorado': 'Ignorado',
-      'notificacao_formal': 'Notificação Formal',
-      'escalado_juridico': 'Escalado Jurídico',
-      'inadimplencia_critica': 'Inadimplência Crítica',
-      'cobrado': 'Cobrado',
-      'negociando': 'Negociando',
-      'em_tratativa_juridica': 'Em Tratativa Jurídica',
-      'em_tratativa_critica': 'Em Tratativa Crítica'
+      em_aberto: "Em Aberto",
+      notificado: "Notificado",
+      reuniao_agendada: "Reunião Agendada",
+      em_negociacao: "Em Negociação",
+      proposta_enviada: "Proposta Enviada",
+      aguardando_pagamento: "Aguardando Pagamento",
+      pagamento_parcial: "Pagamento Parcial",
+      quitado: "Quitado",
+      ignorado: "Ignorado",
+      notificacao_formal: "Notificação Formal",
+      escalado_juridico: "Escalado Jurídico",
+      inadimplencia_critica: "Inadimplência Crítica",
+      cobrado: "Cobrado",
+      negociando: "Negociando",
+      em_tratativa_juridica: "Em Tratativa Jurídica",
+      em_tratativa_critica: "Em Tratativa Crítica",
     };
-    return statusMap[status] || status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return (
+      statusMap[status] ||
+      status.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
+    );
   };
 
   const formatarTipoDebito = (tipo: string) => {
     const tipoMap: Record<string, string> = {
-      'royalties': 'Royalties',
-      'insumos': 'Insumos',
-      'aluguel': 'Aluguel',
-      'multa': 'Multa',
-      'taxa': 'Taxa',
-      'outros': 'Outros'
+      royalties: "Royalties",
+      insumos: "Insumos",
+      aluguel: "Aluguel",
+      multa: "Multa",
+      taxa: "Taxa",
+      outros: "Outros",
     };
-    return tipoMap[tipo] || tipo.replace(/\b\w/g, l => l.toUpperCase());
+    return tipoMap[tipo] || tipo.replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
   const renderCardUnidade = (unit: UnitKanbanCard, index: number) => {
     const temStatusMisto = unidadesComStatusMisto.has(unit.cnpj);
-    
+
     return (
       <Draggable
         key={unit.codigo_unidade}
@@ -489,10 +539,12 @@ export function KanbanCobranca() {
             {...provided.dragHandleProps}
             className={`p-4 mb-3 rounded-lg border-2 cursor-pointer transition-all ${
               snapshot.isDragging ? "shadow-lg rotate-2" : "hover:shadow-md"
-            } ${getCriticidadeColor(unit.charges[0]?.criticidade || "normal")} ${
-              temStatusMisto ? "opacity-60" : ""
-            }`}
+            } ${getCriticidadeColor(
+              unit.charges[0]?.criticidade || "normal"
+            )} ${temStatusMisto ? "opacity-60" : ""}`}
             onClick={() => {
+              // Limpa o estado da cobrança individual antes de abrir modal da unidade
+              setCobrancaSelecionada(null);
               setUnitSelecionada(unit);
               // Busca todas as cobranças da unidade, não apenas as da coluna atual
               buscarTodasCobrancasUnidade(unit.cnpj);
@@ -512,7 +564,10 @@ export function KanbanCobranca() {
                 </div>
               </div>
               {temStatusMisto && (
-                <div className="flex items-center text-orange-600" title="Unidade com status misto - bloqueada">
+                <div
+                  className="flex items-center text-orange-600"
+                  title="Unidade com status misto - bloqueada"
+                >
                   <Lock className="w-4 h-4" />
                 </div>
               )}
@@ -533,7 +588,7 @@ export function KanbanCobranca() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Cobranças:</span>
-                <span className="font-medium">{unit.charges.length}</span>
+                <span className="font-medium">{obterQuantidadeTotalCobrancas(unit.cnpj)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Vencimento:</span>
@@ -543,17 +598,27 @@ export function KanbanCobranca() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Parado há:</span>
-                <span className={`font-medium ${unit.dias_parado > 7 ? "text-red-600" : "text-gray-800"}`}>
+                <span
+                  className={`font-medium ${
+                    unit.dias_parado > 7 ? "text-red-600" : "text-gray-800"
+                  }`}
+                >
                   {unit.dias_parado} dias
                 </span>
               </div>
             </div>
 
             <div className="mt-2 flex items-center justify-between">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCriticidadeBadge(unit.charges[0]?.criticidade || "normal")}`}>
+              <span
+                className={`px-2 py-1 rounded-full text-xs font-medium ${getCriticidadeBadge(
+                  unit.charges[0]?.criticidade || "normal"
+                )}`}
+              >
                 {unit.charges[0]?.criticidade?.toUpperCase() || "NORMAL"}
               </span>
-              <span className="text-xs text-gray-500">{unit.responsavel_atual}</span>
+              <span className="text-xs text-gray-500">
+                {unit.responsavel_atual}
+              </span>
             </div>
           </div>
         )}
@@ -573,6 +638,9 @@ export function KanbanCobranca() {
               snapshot.isDragging ? "shadow-lg rotate-2" : "hover:shadow-md"
             } ${getCriticidadeColor(card.criticidade)}`}
             onClick={() => {
+              // Limpa o estado da unidade antes de abrir modal da cobrança individual
+              setUnitSelecionada(null);
+              setTodasCobrancasUnidade([]);
               setCobrancaSelecionada(card);
               setModalAberto("detalhes");
             }}
@@ -611,10 +679,16 @@ export function KanbanCobranca() {
             </div>
 
             <div className="mt-2 flex items-center justify-between">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCriticidadeBadge(card.criticidade)}`}>
+              <span
+                className={`px-2 py-1 rounded-full text-xs font-medium ${getCriticidadeBadge(
+                  card.criticidade
+                )}`}
+              >
                 {card.criticidade.toUpperCase()}
               </span>
-              <span className="text-xs text-gray-500">{card.responsavel_atual}</span>
+              <span className="text-xs text-gray-500">
+                {card.responsavel_atual}
+              </span>
             </div>
           </div>
         )}
@@ -655,7 +729,9 @@ export function KanbanCobranca() {
               disabled={carregando}
               className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${carregando ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${carregando ? "animate-spin" : ""}`}
+              />
               Atualizar
             </button>
           </div>
@@ -698,12 +774,14 @@ export function KanbanCobranca() {
               <button
                 onClick={() => {
                   if (movimentacaoIndividualFeita) {
-                    if (confirm(
-                      "⚠️ ATENÇÃO: Você moveu cobranças individuais nesta sessão.\n\n" +
-                      "Alternar para modo agrupado pode causar inconsistências.\n\n" +
-                      "Recomendamos recarregar a página antes de usar o modo agrupado.\n\n" +
-                      "Deseja continuar mesmo assim?"
-                    )) {
+                    if (
+                      confirm(
+                        "⚠️ ATENÇÃO: Você moveu cobranças individuais nesta sessão.\n\n" +
+                          "Alternar para modo agrupado pode causar inconsistências.\n\n" +
+                          "Recomendamos recarregar a página antes de usar o modo agrupado.\n\n" +
+                          "Deseja continuar mesmo assim?"
+                      )
+                    ) {
                       setAba("unidade");
                       setMovimentacaoIndividualFeita(false);
                     }
@@ -717,7 +795,11 @@ export function KanbanCobranca() {
                     : "text-gray-600 hover:text-gray-800"
                 } ${movimentacaoIndividualFeita ? "opacity-50" : ""}`}
                 disabled={movimentacaoIndividualFeita}
-                title={movimentacaoIndividualFeita ? "Modo bloqueado - houve movimentação individual" : ""}
+                title={
+                  movimentacaoIndividualFeita
+                    ? "Modo bloqueado - houve movimentação individual"
+                    : ""
+                }
               >
                 Por Unidade
                 {unidadesMistasCount > 0 && (
@@ -755,7 +837,7 @@ export function KanbanCobranca() {
               </div>
             )}
           </div>
-          
+
           {/* Botão de Filtros */}
           <div className="flex items-center justify-between">
             <button
@@ -763,10 +845,11 @@ export function KanbanCobranca() {
               className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               <Filter className="w-4 h-4 mr-2" />
-              {showFiltrosAvancados ? 'Ocultar Filtros' : 'Mostrar Filtros'}
+              {showFiltrosAvancados ? "Ocultar Filtros" : "Mostrar Filtros"}
             </button>
-            
-            {(Object.values(filtrosAvancados).some(v => v !== '') || Object.values(filtros).some(v => v !== '')) && (
+
+            {(Object.values(filtrosAvancados).some((v) => v !== "") ||
+              Object.values(filtros).some((v) => v !== "")) && (
               <button
                 onClick={limparFiltros}
                 className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
@@ -776,54 +859,84 @@ export function KanbanCobranca() {
             )}
           </div>
         </div>
-        
+
         {/* Filtros Avançados */}
         {showFiltrosAvancados && (
           <div className="bg-gray-50 rounded-lg p-6 mb-6">
             <div className="flex items-center mb-4">
               <Filter className="w-5 h-5 text-gray-600 mr-2" />
-              <h3 className="text-lg font-semibold text-gray-800">Filtros Avançados</h3>
+              <h3 className="text-lg font-semibold text-gray-800">
+                Filtros Avançados
+              </h3>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Unidade</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nome da Unidade
+                </label>
                 <input
                   type="text"
                   value={filtrosAvancados.nomeUnidade}
-                  onChange={(e) => setFiltrosAvancados({...filtrosAvancados, nomeUnidade: e.target.value})}
+                  onChange={(e) =>
+                    setFiltrosAvancados({
+                      ...filtrosAvancados,
+                      nomeUnidade: e.target.value,
+                    })
+                  }
                   placeholder="Buscar por nome..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  CNPJ
+                </label>
                 <input
                   type="text"
                   value={filtrosAvancados.cnpj}
-                  onChange={(e) => setFiltrosAvancados({...filtrosAvancados, cnpj: e.target.value})}
+                  onChange={(e) =>
+                    setFiltrosAvancados({
+                      ...filtrosAvancados,
+                      cnpj: e.target.value,
+                    })
+                  }
                   placeholder="00.000.000/0000-00"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Código da Unidade</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Código da Unidade
+                </label>
                 <input
                   type="text"
                   value={filtrosAvancados.codigo}
-                  onChange={(e) => setFiltrosAvancados({...filtrosAvancados, codigo: e.target.value})}
+                  onChange={(e) =>
+                    setFiltrosAvancados({
+                      ...filtrosAvancados,
+                      codigo: e.target.value,
+                    })
+                  }
                   placeholder="Código..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status da Cobrança</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status da Cobrança
+                </label>
                 <select
                   value={filtrosAvancados.statusCobranca}
-                  onChange={(e) => setFiltrosAvancados({...filtrosAvancados, statusCobranca: e.target.value})}
+                  onChange={(e) =>
+                    setFiltrosAvancados({
+                      ...filtrosAvancados,
+                      statusCobranca: e.target.value,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Todos os Status</option>
@@ -832,45 +945,70 @@ export function KanbanCobranca() {
                   <option value="reuniao_agendada">Reunião Agendada</option>
                   <option value="em_negociacao">Em Negociação</option>
                   <option value="proposta_enviada">Proposta Enviada</option>
-                  <option value="aguardando_pagamento">Aguardando Pagamento</option>
+                  <option value="aguardando_pagamento">
+                    Aguardando Pagamento
+                  </option>
                   <option value="pagamento_parcial">Pagamento Parcial</option>
                   <option value="quitado">Quitado</option>
                   <option value="ignorado">Ignorado</option>
                   <option value="notificacao_formal">Notificação Formal</option>
                   <option value="escalado_juridico">Escalado Jurídico</option>
-                  <option value="inadimplencia_critica">Inadimplência Crítica</option>
+                  <option value="inadimplencia_critica">
+                    Inadimplência Crítica
+                  </option>
                 </select>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Valor Mínimo (R$)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Valor Mínimo (R$)
+                </label>
                 <input
                   type="number"
                   step="0.01"
                   value={filtrosAvancados.valorMin}
-                  onChange={(e) => setFiltrosAvancados({...filtrosAvancados, valorMin: e.target.value})}
+                  onChange={(e) =>
+                    setFiltrosAvancados({
+                      ...filtrosAvancados,
+                      valorMin: e.target.value,
+                    })
+                  }
                   placeholder="0,00"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Valor Máximo (R$)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Valor Máximo (R$)
+                </label>
                 <input
                   type="number"
                   step="0.01"
                   value={filtrosAvancados.valorMax}
-                  onChange={(e) => setFiltrosAvancados({...filtrosAvancados, valorMax: e.target.value})}
+                  onChange={(e) =>
+                    setFiltrosAvancados({
+                      ...filtrosAvancados,
+                      valorMax: e.target.value,
+                    })
+                  }
                   placeholder="999.999,99"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Cobrança</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tipo de Cobrança
+                </label>
                 <select
                   value={filtrosAvancados.tipoCobranca}
-                  onChange={(e) => setFiltrosAvancados({...filtrosAvancados, tipoCobranca: e.target.value})}
+                  onChange={(e) =>
+                    setFiltrosAvancados({
+                      ...filtrosAvancados,
+                      tipoCobranca: e.target.value,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Todos os Tipos</option>
@@ -882,7 +1020,7 @@ export function KanbanCobranca() {
                   <option value="outros">Outros</option>
                 </select>
               </div>
-              
+
               <div className="flex items-end">
                 <button
                   onClick={aplicarFiltros}
@@ -892,14 +1030,18 @@ export function KanbanCobranca() {
                 </button>
               </div>
             </div>
-            
+
             {/* Indicador de filtros ativos */}
-            {Object.values(filtrosAvancados).some(v => v !== '') && (
+            {Object.values(filtrosAvancados).some((v) => v !== "") && (
               <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <div className="flex items-center">
                   <Filter className="w-4 h-4 text-blue-600 mr-2" />
                   <span className="text-sm font-medium text-blue-800">
-                    Filtros ativos: {Object.values(filtrosAvancados).filter(v => v !== '').length}
+                    Filtros ativos:{" "}
+                    {
+                      Object.values(filtrosAvancados).filter((v) => v !== "")
+                        .length
+                    }
                   </span>
                 </div>
                 <button
@@ -923,7 +1065,8 @@ export function KanbanCobranca() {
                   {unidadesMistasCount} unidade(s) com status misto detectada(s)
                 </p>
                 <p className="text-orange-700 text-sm">
-                  Essas unidades estão bloqueadas no modo agrupado. Use o modo "Por Cobrança" para movê-las individualmente.
+                  Essas unidades estão bloqueadas no modo agrupado. Use o modo
+                  "Por Cobrança" para movê-las individualmente.
                 </p>
               </div>
             </div>
@@ -964,7 +1107,9 @@ export function KanbanCobranca() {
                             )
                           : cards
                               .filter((card) => card.status_atual === coluna.id)
-                              .map((card, index) => renderCardIndividual(card, index))}
+                              .map((card, index) =>
+                                renderCardIndividual(card, index)
+                              )}
                         {provided.placeholder}
                       </div>
                     )}
@@ -986,7 +1131,9 @@ export function KanbanCobranca() {
       {modalConfirmacaoAberto && movimentoPendente && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4">Confirmar Movimentação</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              Confirmar Movimentação
+            </h3>
             <p className="text-gray-700 mb-6">
               Deseja mover todas as cobranças desta unidade para a nova coluna?
             </p>
@@ -1018,15 +1165,19 @@ export function KanbanCobranca() {
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <div className="flex items-center mb-4">
               <Lock className="w-6 h-6 text-orange-600 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-800">Unidade Bloqueada</h3>
+              <h3 className="text-lg font-semibold text-gray-800">
+                Unidade Bloqueada
+              </h3>
             </div>
             <div className="space-y-3 mb-6">
               <p className="text-gray-700">
-                Esta unidade possui cobranças com status diferentes e não pode ser movida no modo agrupado.
+                Esta unidade possui cobranças com status diferentes e não pode
+                ser movida no modo agrupado.
               </p>
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
                 <p className="text-orange-800 text-sm font-medium">
-                  💡 Solução: Use o modo "Por Cobrança" para mover as cobranças individualmente.
+                  💡 Solução: Use o modo "Por Cobrança" para mover as cobranças
+                  individualmente.
                 </p>
               </div>
             </div>
@@ -1056,38 +1207,71 @@ export function KanbanCobranca() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold">
-                {unitSelecionada ? "Detalhes da Unidade" : "Detalhes da Cobrança"}
-              </h3>
+              <div className="flex items-center">
+                {unitSelecionada ? (
+                  <>
+                    <CircleDollarSign className="w-6 h-6 text-blue-600 mr-2" />
+                    <h3 className="text-lg font-semibold text-blue-800">
+                      Detalhes da Unidade
+                    </h3>
+                  </>
+                ) : (
+                  <>
+                    <DollarSign className="w-6 h-6 text-green-600 mr-2" />
+                    <h3 className="text-lg font-semibold text-green-800">
+                      Detalhes da Cobrança
+                    </h3>
+                  </>
+                )}
+              </div>
               <button
-                onClick={() => setModalAberto(null)}
+                onClick={limparEstadosModal}
                 className="text-gray-500 hover:text-gray-700"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            {unitSelecionada && (
+            {/* Modal de Unidade */}
+            {unitSelecionada && !cobrancaSelecionada && (
               <div className="space-y-4">
                 {/* Informações da Unidade */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-blue-800 mb-3">Informações da Unidade</h4>
+                  <h4 className="font-semibold text-blue-800 mb-3">
+                    Informações da Unidade
+                  </h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Nome da Unidade</label>
-                      <p className="text-gray-800">{unitSelecionada.nome_unidade}</p>
+                      <label className="text-sm font-medium text-gray-600">
+                        Nome da Unidade
+                      </label>
+                      <p className="text-gray-800">
+                        {unitSelecionada.nome_unidade}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-600">CNPJ</label>
-                      <p className="text-gray-800">{formatarCNPJCPF(unitSelecionada.cnpj)}</p>
+                      <label className="text-sm font-medium text-gray-600">
+                        CNPJ
+                      </label>
+                      <p className="text-gray-800">
+                        {formatarCNPJCPF(unitSelecionada.cnpj)}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Valor Total</label>
-                      <p className="text-red-600 font-semibold">{formatarMoeda(unitSelecionada.valor_total)}</p>
+                      <label className="text-sm font-medium text-gray-600">
+                        Valor Total
+                      </label>
+                      <p className="text-red-600 font-semibold">
+                        {formatarMoeda(unitSelecionada.valor_total)}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Quantidade de Cobranças</label>
-                      <p className="text-gray-800">{unitSelecionada.charges.length}</p>
+                      <label className="text-sm font-medium text-gray-600">
+                        Quantidade de Cobranças
+                      </label>
+                      <p className="text-gray-800">
+                        {obterQuantidadeTotalCobrancas(unitSelecionada.cnpj)}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1100,19 +1284,32 @@ export function KanbanCobranca() {
                     </h4>
                     <div className="space-y-3 max-h-60 overflow-y-auto">
                       {todasCobrancasUnidade.map((cobranca, index) => (
-                        <div key={cobranca.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div
+                          key={cobranca.id}
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                        >
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-sm font-medium text-gray-800">
-                                #{index + 1} - {formatarMoeda(cobranca.valor_total)}
+                                #{index + 1} -{" "}
+                                {formatarMoeda(cobranca.valor_total)}
                               </span>
-                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${getCriticidadeBadge(cobranca.criticidade)}`}>
+                              <span
+                                className={`px-2 py-1 text-xs font-medium rounded-full ${getCriticidadeBadge(
+                                  cobranca.criticidade
+                                )}`}
+                              >
                                 {formatarStatusCobranca(cobranca.status_atual)}
                               </span>
                             </div>
                             <div className="flex items-center justify-between text-xs text-gray-600">
-                              <span>Venc: {formatarData(cobranca.data_vencimento_antiga)}</span>
-                              <span>{formatarTipoDebito(cobranca.tipo_debito)}</span>
+                              <span>
+                                Venc:{" "}
+                                {formatarData(cobranca.data_vencimento_antiga)}
+                              </span>
+                              <span>
+                                {formatarTipoDebito(cobranca.tipo_debito)}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -1124,17 +1321,25 @@ export function KanbanCobranca() {
                 {/* Observações da Unidade */}
                 {unitSelecionada.observacoes && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-yellow-800 mb-2">Observações</h4>
-                    <p className="text-yellow-700 text-sm">{unitSelecionada.observacoes}</p>
+                    <h4 className="font-semibold text-yellow-800 mb-2">
+                      Observações
+                    </h4>
+                    <p className="text-yellow-700 text-sm">
+                      {unitSelecionada.observacoes}
+                    </p>
                   </div>
                 )}
 
                 {/* Botões de Ação */}
                 <div className="bg-white border-t border-gray-200 pt-4">
-                  <h4 className="font-semibold text-gray-800 mb-3">Ações para Toda a Unidade</h4>
+                  <h4 className="font-semibold text-gray-800 mb-3">
+                    Ações para Toda a Unidade
+                  </h4>
                   <div className="flex space-x-3">
                     <button
-                      onClick={() => executarAcao(unitSelecionada.codigo_unidade, "whatsapp")}
+                      onClick={() =>
+                        executarAcao(unitSelecionada.codigo_unidade, "whatsapp")
+                      }
                       disabled={processando}
                       className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                     >
@@ -1142,7 +1347,9 @@ export function KanbanCobranca() {
                       WhatsApp
                     </button>
                     <button
-                      onClick={() => executarAcao(unitSelecionada.codigo_unidade, "reuniao")}
+                      onClick={() =>
+                        executarAcao(unitSelecionada.codigo_unidade, "reuniao")
+                      }
                       disabled={processando}
                       className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
                     >
@@ -1151,7 +1358,9 @@ export function KanbanCobranca() {
                     </button>
                     <button
                       onClick={() => {
-                        setObservacaoEditando(unitSelecionada.observacoes || "");
+                        setObservacaoEditando(
+                          unitSelecionada.observacoes || ""
+                        );
                         setModalAberto("observacao");
                       }}
                       disabled={processando}
@@ -1165,47 +1374,84 @@ export function KanbanCobranca() {
               </div>
             )}
 
-            {cobrancaSelecionada && (
+            {/* Modal de Cobrança Individual */}
+            {cobrancaSelecionada && !unitSelecionada && (
               <div className="space-y-4">
                 {/* Informações da Cobrança Individual */}
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-green-800 mb-3">Detalhes da Cobrança</h4>
+                  <h4 className="font-semibold text-green-800 mb-3">
+                    Detalhes da Cobrança
+                  </h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Cliente</label>
-                      <p className="text-gray-800">{cobrancaSelecionada.nome_unidade}</p>
+                      <label className="text-sm font-medium text-gray-600">
+                        Cliente
+                      </label>
+                      <p className="text-gray-800">
+                        {cobrancaSelecionada.nome_unidade}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-600">CNPJ</label>
-                      <p className="text-gray-800">{formatarCNPJCPF(cobrancaSelecionada.cnpj)}</p>
+                      <label className="text-sm font-medium text-gray-600">
+                        CNPJ
+                      </label>
+                      <p className="text-gray-800">
+                        {formatarCNPJCPF(cobrancaSelecionada.cnpj)}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Valor</label>
-                      <p className="text-red-600 font-semibold">{formatarMoeda(cobrancaSelecionada.valor_total)}</p>
+                      <label className="text-sm font-medium text-gray-600">
+                        Valor
+                      </label>
+                      <p className="text-red-600 font-semibold">
+                        {formatarMoeda(cobrancaSelecionada.valor_total)}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Vencimento</label>
-                      <p className="text-gray-800">{formatarData(cobrancaSelecionada.data_vencimento_antiga)}</p>
+                      <label className="text-sm font-medium text-gray-600">
+                        Vencimento
+                      </label>
+                      <p className="text-gray-800">
+                        {formatarData(
+                          cobrancaSelecionada.data_vencimento_antiga
+                        )}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Status</label>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getCriticidadeBadge(cobrancaSelecionada.criticidade)}`}>
-                        {formatarStatusCobranca(cobrancaSelecionada.status_atual)}
+                      <label className="text-sm font-medium text-gray-600">
+                        Status
+                      </label>
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${getCriticidadeBadge(
+                          cobrancaSelecionada.criticidade
+                        )}`}
+                      >
+                        {formatarStatusCobranca(
+                          cobrancaSelecionada.status_atual
+                        )}
                       </span>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Tipo</label>
-                      <p className="text-gray-800">{formatarTipoDebito(cobrancaSelecionada.tipo_debito)}</p>
+                      <label className="text-sm font-medium text-gray-600">
+                        Tipo
+                      </label>
+                      <p className="text-gray-800">
+                        {formatarTipoDebito(cobrancaSelecionada.tipo_debito)}
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 {/* Botões de Ação */}
                 <div className="bg-white border-t border-gray-200 pt-4">
-                  <h4 className="font-semibold text-gray-800 mb-3">Ações para Esta Cobrança</h4>
+                  <h4 className="font-semibold text-gray-800 mb-3">
+                    Ações para Esta Cobrança
+                  </h4>
                   <div className="flex space-x-3">
                     <button
-                      onClick={() => executarAcao(cobrancaSelecionada.id, "whatsapp")}
+                      onClick={() =>
+                        executarAcao(cobrancaSelecionada.id, "whatsapp")
+                      }
                       disabled={processando}
                       className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                     >
@@ -1213,7 +1459,9 @@ export function KanbanCobranca() {
                       WhatsApp
                     </button>
                     <button
-                      onClick={() => executarAcao(cobrancaSelecionada.id, "reuniao")}
+                      onClick={() =>
+                        executarAcao(cobrancaSelecionada.id, "reuniao")
+                      }
                       disabled={processando}
                       className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
                     >
@@ -1222,7 +1470,9 @@ export function KanbanCobranca() {
                     </button>
                     <button
                       onClick={() => {
-                        setObservacaoEditando(cobrancaSelecionada.observacoes || "");
+                        setObservacaoEditando(
+                          cobrancaSelecionada.observacoes || ""
+                        );
                         setModalAberto("observacao");
                       }}
                       disabled={processando}
@@ -1246,7 +1496,7 @@ export function KanbanCobranca() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Adicionar Observação</h3>
               <button
-                onClick={() => setModalAberto(null)}
+                onClick={limparEstadosModal}
                 className="text-gray-500 hover:text-gray-700"
               >
                 <X className="w-6 h-6" />
@@ -1271,7 +1521,7 @@ export function KanbanCobranca() {
                 {processando ? "Salvando..." : "Salvar"}
               </button>
               <button
-                onClick={() => setModalAberto(null)}
+                onClick={limparEstadosModal}
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
               >
                 Cancelar
