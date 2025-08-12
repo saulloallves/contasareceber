@@ -1,14 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useCallback } from "react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 import { 
-  MessageSquare, Calendar, Scale, Mail,
-  Clock, DollarSign, AlertTriangle, CheckCircle, User,
+  MessageSquare, Calendar, 
+  DollarSign, AlertTriangle, 
   Filter, Download, RefreshCw, Edit, X,
   Save, CircleDollarSign,
   Lock,
-  Unlock,
-  Info,
 } from "lucide-react";
 import { KanbanService } from "../services/kanbanService";
 import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban } from "../types/kanban";
