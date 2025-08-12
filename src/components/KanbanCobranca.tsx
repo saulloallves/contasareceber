@@ -1266,4 +1266,4 @@ export function KanbanCobranca() {
       )}
     </div>
   );
-}
+},
