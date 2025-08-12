@@ -47,6 +47,16 @@ export function KanbanCobranca() {
   const [unidadesComStatusMisto, setUnidadesComStatusMisto] = useState<Set<string>>(new Set());
   const [showMixedStatusWarning, setShowMixedStatusWarning] = useState(false);
   const [todasCobrancasUnidade, setTodasCobrancasUnidade] = useState<CardCobranca[]>([]);
+  const [filtrosAvancados, setFiltrosAvancados] = useState({
+    nomeUnidade: '',
+    cnpj: '',
+    codigo: '',
+    statusCobranca: '',
+    valorMin: '',
+    valorMax: '',
+    tipoCobranca: ''
+  });
+  const [showFiltrosAvancados, setShowFiltrosAvancados] = useState(false);
 
   const kanbanService = new KanbanService();
 
@@ -91,13 +101,56 @@ export function KanbanCobranca() {
   const carregarDados = useCallback(async () => {
     setCarregando(true);
     try {
+      // Converte filtros avançados para o formato esperado pelo serviço
+      const filtrosServico: FiltrosKanban = {};
+      
+      if (filtrosAvancados.tipoCobranca) {
+        filtrosServico.tipo_debito = filtrosAvancados.tipoCobranca as any;
+      }
+      
+      if (filtrosAvancados.valorMin) {
+        filtrosServico.valor_min = parseFloat(filtrosAvancados.valorMin);
+      }
+      
+      if (filtrosAvancados.valorMax) {
+        filtrosServico.valor_max = parseFloat(filtrosAvancados.valorMax);
+      }
+      
       const [colunasData, cardsData, statsData] = await Promise.all([
         kanbanService.buscarColunas(),
-        kanbanService.buscarCards(filtros, aba === "unidade"),
+        kanbanService.buscarCards(filtrosServico, aba === "unidade"),
         kanbanService.buscarEstatisticas(aba === "unidade"),
       ]);
       setColunas(colunasData);
-      setCards(cardsData);
+      
+      // Aplica filtros locais que não são suportados pelo serviço
+      let cardsFiltrados = cardsData;
+      
+      if (filtrosAvancados.nomeUnidade) {
+        cardsFiltrados = cardsFiltrados.filter(card => 
+          card.nome_unidade.toLowerCase().includes(filtrosAvancados.nomeUnidade.toLowerCase())
+        );
+      }
+      
+      if (filtrosAvancados.cnpj) {
+        cardsFiltrados = cardsFiltrados.filter(card => 
+          card.cnpj.includes(filtrosAvancados.cnpj)
+        );
+      }
+      
+      if (filtrosAvancados.codigo) {
+        cardsFiltrados = cardsFiltrados.filter(card => 
+          card.codigo_unidade.toLowerCase().includes(filtrosAvancados.codigo.toLowerCase())
+        );
+      }
+      
+      if (filtrosAvancados.statusCobranca) {
+        cardsFiltrados = cardsFiltrados.filter(card => 
+          card.status_atual === filtrosAvancados.statusCobranca
+        );
+      }
+      
+      setCards(cardsFiltrados);
       setEstatisticas(statsData);
       
       // Detecta unidades com status misto automaticamente
@@ -111,11 +164,9 @@ export function KanbanCobranca() {
     } finally {
       setCarregando(false);
     }
-  }, [filtros, aba]);
+  }, [filtros, aba, filtrosAvancados]);
 
   useEffect(() => {
-    carregarDados();
-  }, [filtros, aba]);
 
   // Agrupa cards por unidade
   const getUnitCardsByColuna = (colunaId: string): UnitKanbanCard[] => {
