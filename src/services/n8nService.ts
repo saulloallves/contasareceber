@@ -47,13 +47,17 @@ export class N8nService {
 
       // Validar se tem 10 ou 11 dígitos após o código do país
       if (semCodigoPais.length === 10 || semCodigoPais.length === 11) {
-        // Se tem 11 dígitos, deve começar com 9 (celular)
-        if (semCodigoPais.length === 11 && !semCodigoPais.startsWith("9")) {
-          throw new Error("Número de celular inválido - deve começar com 9");
-        }
-        // Se tem 10 dígitos, é telefone fixo - não pode enviar WhatsApp
+        // Se tem 10 dígitos, assumir como telefone fixo mas permitir WhatsApp
         if (semCodigoPais.length === 10) {
-          throw new Error("Não é possível enviar WhatsApp para telefone fixo");
+          console.warn("Enviando WhatsApp para número que parece ser fixo:", numeroLimpo);
+        }
+        // Se tem 11 dígitos, validar se é um número de celular válido
+        if (semCodigoPais.length === 11) {
+          // Permitir números que começam com 6, 7, 8, 9 (celulares válidos no Brasil)
+          const primeiroDigito = semCodigoPais.charAt(0);
+          if (!["6", "7", "8", "9"].includes(primeiroDigito)) {
+            console.warn("Número de celular com formato incomum:", numeroLimpo);
+          }
         }
         return numeroLimpo;
       } else {
@@ -65,13 +69,17 @@ export class N8nService {
 
     // Se não tem código do país, adicionar 55  
     if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
-      // Se tem 11 dígitos, o terceiro dígito deve ser 9 (celular)
-      if (numeroLimpo.length === 11 && numeroLimpo.charAt(2) !== "9") {
-        throw new Error("Número de celular inválido - deve começar com 9");
-      }
-      // Se tem 10 dígitos, é telefone fixo - não pode enviar WhatsApp
+      // Se tem 10 dígitos, assumir como telefone fixo mas permitir WhatsApp
       if (numeroLimpo.length === 10) {
-        throw new Error("Não é possível enviar WhatsApp para telefone fixo");
+        console.warn("Enviando WhatsApp para número que parece ser fixo:", "55" + numeroLimpo);
+      }
+      // Se tem 11 dígitos, validar se é um número de celular válido
+      if (numeroLimpo.length === 11) {
+        // Permitir números que começam com 6, 7, 8, 9 no terceiro dígito (celulares válidos no Brasil)
+        const terceiroDigito = numeroLimpo.charAt(2);
+        if (!["6", "7", "8", "9"].includes(terceiroDigito)) {
+          console.warn("Número de celular com formato incomum:", "55" + numeroLimpo);
+        }
       }
       return "55" + numeroLimpo;
     }

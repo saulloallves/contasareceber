@@ -17,6 +17,7 @@ import { SimulacaoParcelamentoService } from "../../services/simulacaoParcelamen
 import { UnidadesService } from "../../services/unidadesService";
 import type { UnidadeFranqueada } from "../../types/unidades";
 import { emailService } from "../../services/emailService";
+import { supabase } from "../../services/databaseService";
 
 export function GestaoCobrancas() {
   const [cobrancas, setCobrancas] = useState<CobrancaFranqueado[]>([]);
@@ -50,6 +51,47 @@ export function GestaoCobrancas() {
   const unidadesService = React.useMemo(() => new UnidadesService(), []);
   const [unidadesPorCnpj, setUnidadesPorCnpj] = useState<Record<string, UnidadeFranqueada>>({});
   const cnpjKey = useCallback((cnpj: string) => (cnpj || "").replace(/\D/g, ""), []);
+
+  /**
+   * Função auxiliar para buscar o nome do franqueado baseado no CNPJ da cobrança
+   */
+  const buscarNomeFranqueado = useCallback(async (cnpj: string): Promise<string> => {
+    try {
+      // Busca dados completos da unidade via Supabase com relacionamentos
+      const { data: unidade, error } = await supabase
+        .from("unidades_franqueadas")
+        .select(`
+          nome_unidade,
+          franqueado_unidades!left (
+            franqueados!left (
+              nome_completo
+            )
+          )
+        `)
+        .eq("codigo_interno", cnpj)
+        .single();
+
+      if (error) {
+        console.warn("Erro ao buscar unidade por CNPJ:", error);
+        return "Cliente";
+      }
+
+      // Prioriza APENAS nome do franqueado - nunca usar nome da unidade
+      const nomeFranqueado = (unidade as any)?.franqueado_unidades?.[0]?.franqueados?.nome_completo;
+      
+      // Se tem franqueado vinculado e o nome não é "Sem nome cadastrado"
+      if (nomeFranqueado && nomeFranqueado !== "Sem nome cadastrado") {
+        return nomeFranqueado;
+      }
+      
+      // Para TODOS os outros casos (sem franqueado, franqueado com "Sem nome cadastrado", etc.)
+      // SEMPRE retorna "Franqueado(a)" - nunca o nome da unidade
+      return "Franqueado(a)";
+    } catch (error) {
+      console.warn("Erro ao buscar nome do franqueado:", error);
+      return "Franqueado(a)";
+    }
+  }, []);
 
   // Estados do modal unificado
   const [abaAcoes, setAbaAcoes] = useState<"acoes_rapidas" | "simulacao" | "mensagem" | "detalhes">("acoes_rapidas");
@@ -552,11 +594,14 @@ Entre em contato: (11) 99999-9999`,
   //   }
   // };
 
-  const aplicarVariaveis = (template: string) => {
+  const aplicarVariaveis = async (template: string) => {
     if (!cobrancaSelecionada) return template;
 
+    // Busca nome do franqueado para personalização
+    const nomeFranqueado = await buscarNomeFranqueado(cobrancaSelecionada.cnpj);
+
     const variaveis: Record<string, string> = {
-      "{{cliente}}": cobrancaSelecionada.cliente,
+      "{{cliente}}": nomeFranqueado,
       "{{codigo_unidade}}":
         (unidadeSelecionada as any)?.codigo_unidade || cobrancaSelecionada.cnpj,
       "{{valor_original}}": formatarMoeda(cobrancaSelecionada.valor_original),
@@ -582,9 +627,25 @@ Entre em contato: (11) 99999-9999`,
     if (formMensagem.template === "personalizada") {
       return formMensagem.mensagem_personalizada;
     }
-    return aplicarVariaveis(
-      templatesPadrao[formMensagem.template as keyof typeof templatesPadrao]
-    );
+    // Para preview, usa o nome do cliente como fallback (não pode ser async em preview)
+    const template = templatesPadrao[formMensagem.template as keyof typeof templatesPadrao];
+    const variaveis: Record<string, string> = {
+      "{{cliente}}": cobrancaSelecionada?.cliente || "Cliente",
+      "{{codigo_unidade}}": (unidadeSelecionada as any)?.codigo_unidade || cobrancaSelecionada?.cnpj || "Código",
+      "{{valor_original}}": formatarMoeda(cobrancaSelecionada?.valor_original || 0),
+      "{{valor_atualizado}}": formatarMoeda(cobrancaSelecionada?.valor_atualizado || cobrancaSelecionada?.valor_original || 0),
+      "{{data_vencimento}}": formatarData(cobrancaSelecionada?.data_vencimento || new Date().toISOString()),
+      "{{dias_atraso}}": (cobrancaSelecionada?.dias_em_atraso || 0).toString(),
+    };
+
+    let mensagemProcessada: string = template;
+    Object.entries(variaveis).forEach(([chave, valor]) => {
+      mensagemProcessada = mensagemProcessada.replace(
+        new RegExp(chave.replace(/[{}]/g, "\\$&"), "g"),
+        valor
+      );
+    });
+    return mensagemProcessada;
   };
 
   const enviarMensagemPersonalizada = async () => {
@@ -593,7 +654,7 @@ Entre em contato: (11) 99999-9999`,
     const mensagemFinal =
       formMensagem.template === "personalizada"
         ? formMensagem.mensagem_personalizada
-        : aplicarVariaveis(
+        : await aplicarVariaveis(
             templatesPadrao[
               formMensagem.template as keyof typeof templatesPadrao
             ]
@@ -832,8 +893,11 @@ Entre em contato: (11) 99999-9999`,
         dataVencimento
       );
 
+      // Busca nome do franqueado para personalização
+      const nomeFranqueado = await buscarNomeFranqueado(cobranca.cnpj);
+
       // Monta a mensagem personalizada
-      let mensagem = `Olá, ${cobranca.cliente}! 👋\n\n`;
+      let mensagem = `Olá, ${nomeFranqueado}! 👋\n\n`;
       mensagem += `Este é um lembrete amigável sobre uma cobrança pendente:\n\n`;
       mensagem += `📋 *Detalhes da Cobrança:*\n`;
       mensagem += `• Valor: ${valorFormatado}\n`;
@@ -869,7 +933,7 @@ Entre em contato: (11) 99999-9999`,
         metadata: {
           tipo: "cobranca_amigavel",
           cobrancaId: cobranca.id,
-          cliente: cobranca.cliente,
+          cliente: nomeFranqueado,
           valor: valorFormatado,
         },
       });
@@ -880,7 +944,7 @@ Entre em contato: (11) 99999-9999`,
 
       mostrarMensagem(
         "sucesso",
-        `Cobrança amigável enviada com sucesso para ${cobranca.cliente}!`
+        `Cobrança amigável enviada com sucesso para ${nomeFranqueado}!`
       );
     } catch (error) {
       console.error("Erro ao enviar cobrança:", error);
@@ -991,6 +1055,9 @@ Entre em contato: (11) 99999-9999`,
         // Envia mensagem de confirmação via WhatsApp se houver telefone
         if (cobrancaSelecionada.telefone && resultado.isQuitacaoTotal) {
           try {
+            // Busca nome do franqueado para personalização
+            const nomeFranqueado = await buscarNomeFranqueado(cobrancaSelecionada.cnpj);
+            
             const valorFormatado = new Intl.NumberFormat("pt-BR", {
               style: "currency",
               currency: "BRL",
@@ -998,7 +1065,7 @@ Entre em contato: (11) 99999-9999`,
 
             const mensagemConfirmacao =
               `✅ *CONFIRMAÇÃO DE QUITAÇÃO*\n\n` +
-              `Olá, ${cobrancaSelecionada.cliente}! 👋\n\n` +
+              `Olá, ${nomeFranqueado}! 👋\n\n` +
               `Recebemos o pagamento da sua cobrança:\n\n` +
               `💰 *Valor Pago:* ${valorFormatado}\n` +
               `💳 *Forma de Pagamento:* ${formQuitacao.formaPagamento}\n` +
@@ -1017,7 +1084,7 @@ Entre em contato: (11) 99999-9999`,
               metadata: {
                 tipo: "confirmacao_quitacao_detalhada",
                 cobrancaId: cobrancaSelecionada.id,
-                cliente: cobrancaSelecionada.cliente,
+                cliente: nomeFranqueado,
                 valorPago: formQuitacao.valorPago,
                 formaPagamento: formQuitacao.formaPagamento,
               },
@@ -1066,6 +1133,9 @@ Entre em contato: (11) 99999-9999`,
         // Envia mensagem de confirmação via WhatsApp se houver telefone
         if (cobranca.telefone && resultado.isQuitacaoTotal) {
           try {
+            // Busca nome do franqueado para personalização
+            const nomeFranqueado = await buscarNomeFranqueado(cobranca.cnpj);
+            
             const valorFormatado = new Intl.NumberFormat("pt-BR", {
               style: "currency",
               currency: "BRL",
@@ -1073,7 +1143,7 @@ Entre em contato: (11) 99999-9999`,
 
             const mensagemConfirmacao =
               `✅ *CONFIRMAÇÃO DE QUITAÇÃO*\n\n` +
-              `Olá, ${cobranca.cliente}! 👋\n\n` +
+              `Olá, ${nomeFranqueado}! 👋\n\n` +
               `Recebemos o pagamento da sua cobrança:\n\n` +
               `💰 *Valor Pago:* ${valorFormatado}\n` +
               `📅 *Data:* ${new Date().toLocaleDateString("pt-BR")}\n\n` +
@@ -1089,7 +1159,7 @@ Entre em contato: (11) 99999-9999`,
               metadata: {
                 tipo: "confirmacao_quitacao_rapida",
                 cobrancaId: cobranca.id,
-                cliente: cobranca.cliente,
+                cliente: nomeFranqueado,
                 valorPago: cobranca.valor_atualizado || cobranca.valor_original,
                 formaPagamento: "Não informado",
               },

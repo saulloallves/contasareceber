@@ -360,7 +360,6 @@ export class CobrancaService {
       cobrancaId,
       valorPago,
       formaPagamento,
-      dataRecebimento,
       observacoes,
       usuario,
     } = dados;
@@ -378,12 +377,18 @@ export class CobrancaService {
     const valorRestante = cobranca.valor_original - valorPago;
     const novoStatus = valorRestante <= 0 ? "quitado" : "parcialmente_pago";
 
+    // Monta as observações consolidadas
+    let observacoesConsolidadas = cobranca.observacoes || "";
+    const novaObservacao = `\n[${new Date().toLocaleString("pt-BR")}] Pagamento registrado: ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valorPago)} via ${formaPagamento}${observacoes ? ` - ${observacoes}` : ""}. Usuário: ${usuario}`;
+    observacoesConsolidadas += novaObservacao;
+
     const { error: updateError } = await supabase
       .from("cobrancas_franqueados")
       .update({
         valor_recebido: (cobranca.valor_recebido || 0) + valorPago,
         status: novoStatus,
         data_ultima_atualizacao: new Date().toISOString(),
+        observacoes: observacoesConsolidadas,
       })
       .eq("id", cobrancaId);
 
@@ -391,18 +396,8 @@ export class CobrancaService {
       throw new Error(`Erro ao atualizar cobrança: ${updateError.message}`);
     }
 
-    const { error: pagamentoError } = await supabase.from("pagamentos").insert({
-      cobranca_id: cobrancaId,
-      valor_pago: valorPago,
-      forma_pagamento: formaPagamento,
-      data_recebimento: dataRecebimento,
-      observacoes: observacoes,
-      usuario: usuario,
-    });
-
-    if (pagamentoError) {
-      throw new Error(`Erro ao registrar pagamento: ${pagamentoError.message}`);
-    }
+    // Log da operação para auditoria
+    console.log(`Quitação processada - Cobrança ID: ${cobrancaId}, Valor: ${valorPago}, Status: ${novoStatus}, Usuário: ${usuario}`);
 
     return {
       sucesso: true,
@@ -515,12 +510,71 @@ export class CobrancaService {
 
   /**
    * Busca histórico de envios (WhatsApp/Email) vinculados a uma cobrança
-   * Consolida dados de diferentes fontes quando disponíveis
+   * Utiliza o campo cobranca_id nas tabelas de logs para vincular mensagens
    */
   async buscarHistoricoEnvios(cobrancaId: string): Promise<HistoricoEnvio[]> {
     const historico: HistoricoEnvio[] = [];
 
-    // 1) Mensagens via WhatsApp registradas em 'mensagens_enviadas'
+    // 1) Logs de WhatsApp via n8n em 'logs_envio_whatsapp'
+    try {
+      const { data, error } = await supabase
+        .from("logs_envio_whatsapp")
+        .select("id, destinatario, mensagem_enviada, instancia_evolution, sucesso, evolution_message_id, erro_detalhes, data_envio, created_at, cobranca_id")
+        .eq("cobranca_id", cobrancaId)
+        .order("data_envio", { ascending: false });
+
+      if (!error && data) {
+        historico.push(
+          ...data.map((row: any): HistoricoEnvio => ({
+            id: row.id,
+            canal: "whatsapp",
+            tipo: "whatsapp_n8n",
+            numero_telefone: row.destinatario,
+            mensagem_enviada: row.mensagem_enviada || "Mensagem não capturada",
+            status_envio: row.sucesso ? "sucesso" : "falha",
+            erro_detalhes: row.erro_detalhes,
+            data_envio: row.data_envio || row.created_at,
+            metadados: {
+              evolution_message_id: row.evolution_message_id,
+              instancia_evolution: row.instancia_evolution,
+            },
+          }))
+        );
+      }
+    } catch (e) {
+      console.warn("Falha ao buscar logs_envio_whatsapp:", e);
+    }
+
+    // 2) Logs de e-mail via n8n em 'logs_envio_email'
+    try {
+      const { data, error } = await supabase
+        .from("logs_envio_email")
+        .select("id, destinatario, mensagem, sucesso, message_id, erro_detalhes, data_envio, created_at, cobranca_id")
+        .eq("cobranca_id", cobrancaId)
+        .order("data_envio", { ascending: false });
+
+      if (!error && data) {
+        historico.push(
+          ...data.map((row: any): HistoricoEnvio => ({
+            id: row.id,
+            canal: "email",
+            tipo: "email_n8n",
+            destinatario: row.destinatario,
+            mensagem: row.mensagem || "Conteúdo do email não capturado",
+            status_envio: row.sucesso ? "sucesso" : "falha",
+            erro_detalhes: row.erro_detalhes,
+            data_envio: row.data_envio || row.created_at,
+            metadados: {
+              message_id: row.message_id,
+            },
+          }))
+        );
+      }
+    } catch (e) {
+      console.warn("Falha ao buscar logs_envio_email:", e);
+    }
+
+    // 3) [OPCIONAL] Mantém compatibilidade com mensagens antigas se existirem
     try {
       const { data, error } = await supabase
         .from("mensagens_enviadas")
@@ -533,7 +587,7 @@ export class CobrancaService {
           ...data.map((row: any): HistoricoEnvio => ({
             id: row.id,
             canal: "whatsapp",
-            tipo: "amigavel",
+            tipo: "whatsapp_legado",
             cliente: row.cliente,
             cnpj: row.cnpj,
             numero_telefone: row.telefone,
@@ -544,38 +598,8 @@ export class CobrancaService {
           }))
         );
       }
-  } catch (e) {
-      console.warn("Falha ao buscar mensagens_enviadas:", e);
-    }
-
-    // 2) Logs de e-mail (se existirem) em 'logs_envio_email'
-    try {
-      const { data, error } = await supabase
-        .from("logs_envio_email")
-        .select("id, cobranca_id, destinatario, assunto, mensagem, usuario, sucesso, erro_detalhes, created_at, tipo, metadados")
-        .eq("cobranca_id", cobrancaId)
-        .order("created_at", { ascending: false });
-
-      if (!error && data) {
-        historico.push(
-          ...data.map((row: any): HistoricoEnvio => ({
-            id: row.id,
-            canal: "email",
-            tipo: row.tipo || "email_cobranca_padrao",
-            destinatario: row.destinatario,
-            assunto: row.assunto,
-            mensagem: row.mensagem,
-            usuario: row.usuario || "Sistema",
-            status_envio: row.sucesso ? "sucesso" : "falha",
-            erro_detalhes: row.erro_detalhes,
-            data_envio: row.created_at,
-            metadados: row.metadados || {},
-          }))
-        );
-      }
-  } catch (e) {
-      // Tabela pode não existir em alguns ambientes; apenas loga o aviso
-      console.warn("Tabela logs_envio_email indisponível:", e);
+    } catch (e) {
+      console.warn("Falha ao buscar mensagens_enviadas (legado):", e);
     }
 
     // Ordena por data desc como fallback

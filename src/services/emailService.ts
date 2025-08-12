@@ -32,6 +32,7 @@ export interface DadosEmail {
   remetente_nome?: string;
   remetente_email?: string;
   anexos?: { nome: string; conteudo: string; tipo: string }[];
+  metadata?: Record<string, any>; // Adiciona metadados customizados
 }
 
 export interface ResultadoEnvio {
@@ -60,6 +61,13 @@ export class EmailService {
         remetente_email: config.email_retorno,
       };
 
+      // Combina metadados padrão com metadados customizados
+      const metadados = {
+        origem: "frontend",
+        via: "n8n",
+        ...dados.metadata // Metadados customizados sobrescrevem os padrão
+      };
+
       // Delegar ao n8n via webhook
       const resposta = await n8nService.enviarEmail({
         destinatario: dadosCompletos.destinatario,
@@ -70,7 +78,7 @@ export class EmailService {
         remetente_nome: dadosCompletos.remetente_nome,
         remetente_email: dadosCompletos.remetente_email,
         anexos: dadosCompletos.anexos,
-        metadata: { origem: "frontend", via: "n8n" },
+        metadata: metadados,
       });
 
       if (!resposta.success) {
@@ -104,9 +112,21 @@ export class EmailService {
       dadosCobranca?.email_cliente ||
       (await this.buscarConfiguracao()).email_padrao;
 
+    // Aplica tratamento de nome também aqui  
+    const nomeFranqueado = dadosUnidade.nome_franqueado;
+    let nomeDestinatario;
+    
+    if (nomeFranqueado && nomeFranqueado !== "Sem nome cadastrado") {
+      nomeDestinatario = nomeFranqueado;
+    } else if (nomeFranqueado === "Sem nome cadastrado") {
+      nomeDestinatario = "Franqueado(a)";
+    } else {
+      nomeDestinatario = dadosCobranca.cliente || "Franqueado(a)";
+    }
+
     const dadosEmail: DadosEmail = {
       destinatario: destinatario,
-      nome_destinatario: dadosUnidade.nome_franqueado || dadosCobranca.cliente,
+      nome_destinatario: nomeDestinatario,
       assunto: template.assunto,
       corpo_html: template.corpo_html,
       corpo_texto: template.corpo_texto,
@@ -181,12 +201,31 @@ export class EmailService {
       );
     }
 
+    // Aplica tratamento de nome também aqui
+    const nomeFranqueado = dadosUnidade.nome_franqueado;
+    let nomeDestinatario;
+    
+    if (nomeFranqueado && nomeFranqueado !== "Sem nome cadastrado") {
+      nomeDestinatario = nomeFranqueado;
+    } else {
+      // Para TODOS os outros casos, sempre usa "Franqueado(a)"
+      nomeDestinatario = "Franqueado(a)";
+    }
+
     const dadosEmail: DadosEmail = {
       destinatario: destinatario,
-      nome_destinatario: dadosUnidade.nome_franqueado || dadosCobranca.cliente,
+      nome_destinatario: nomeDestinatario,
       assunto: template.assunto,
       corpo_html: template.corpo_html,
       corpo_texto: template.corpo_texto,
+      metadata: {
+        origem: "frontend",
+        via: "n8n",
+        tipo: "email_cobranca",
+        cobrancaId: dadosCobranca?.id,
+        template: tipoTemplate,
+        cliente: nomeDestinatario,
+      },
     };
 
     const resultado = await this.enviarEmail(dadosEmail);
@@ -283,14 +322,23 @@ export class EmailService {
   }
 
   /**
-   * Gera template para proposta de parcelamento (TORNADO PÚBLICO)
+   * Gera template para proposta de parcelamento
    */
   public gerarTemplatePropostaParcelamento(
     simulacao: any,
     dadosUnidade: any,
     dadosCobranca: any
   ): EmailTemplate {
-    const nomeCliente = dadosUnidade.nome_franqueado || dadosCobranca.cliente;
+    // Prioriza APENAS o nome do franqueado - nunca usar nome da unidade
+    const nomeFranqueado = dadosUnidade.franqueado_unidades?.[0]?.franqueados?.nome_completo;
+    
+    let nomeCliente;
+    if (nomeFranqueado && nomeFranqueado !== "Sem nome cadastrado") {
+      nomeCliente = nomeFranqueado;
+    } else {
+      // Para TODOS os outros casos, sempre usa "Franqueado(a)"
+      nomeCliente = "Franqueado(a)";
+    }
     const codigoUnidade = dadosUnidade.codigo_unidade || dadosCobranca.cnpj;
 
     const assunto = `Proposta de Parcelamento - ${codigoUnidade}`;
@@ -496,7 +544,16 @@ Equipe Financeira - Cresci e Perdi
     dadosUnidade: any,
     dadosCobranca: any
   ): EmailTemplate {
-    const nomeCliente = dadosUnidade.nome_franqueado || dadosCobranca.cliente;
+    // Aplica a mesma lógica de tratamento de nome para cobranças
+    const nomeFranqueado = dadosUnidade.nome_franqueado;
+    let nomeCliente;
+    
+    if (nomeFranqueado && nomeFranqueado !== "Sem nome cadastrado") {
+      nomeCliente = nomeFranqueado;
+    } else {
+      // Para TODOS os outros casos, sempre usa "Franqueado(a)"
+      nomeCliente = "Franqueado(a)";
+    }
     const codigoUnidade = dadosUnidade.codigo_unidade || dadosCobranca.cnpj;
     const valorAtualizado =
       dadosCobranca.valor_atualizado || dadosCobranca.valor_original;

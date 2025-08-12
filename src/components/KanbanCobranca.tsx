@@ -49,6 +49,47 @@ export function KanbanCobranca() {
   const [unidadeParaWhatsApp, setUnidadeParaWhatsApp] = useState<UnitKanbanCard | null>(null);
   const kanbanService = new KanbanService();
 
+  /**
+   * Função auxiliar para buscar o nome do franqueado baseado no CNPJ
+   */
+  const buscarNomeFranqueado = useCallback(async (cnpj: string): Promise<string> => {
+    try {
+      // Busca dados completos da unidade via Supabase com relacionamentos
+      const { data: unidade, error } = await supabase
+        .from("unidades_franqueadas")
+        .select(`
+          nome_unidade,
+          franqueado_unidades!left (
+            franqueados!left (
+              nome_completo
+            )
+          )
+        `)
+        .eq("codigo_interno", cnpj)
+        .single();
+
+      if (error) {
+        console.warn("Erro ao buscar unidade por CNPJ:", error);
+        return "Cliente";
+      }
+
+      // Prioriza APENAS nome do franqueado - nunca usar nome da unidade
+      const nomeFranqueado = (unidade as any)?.franqueado_unidades?.[0]?.franqueados?.nome_completo;
+      
+      // Se tem franqueado vinculado e o nome não é "Sem nome cadastrado"
+      if (nomeFranqueado && nomeFranqueado !== "Sem nome cadastrado") {
+        return nomeFranqueado;
+      }
+      
+      // Para TODOS os outros casos (sem franqueado, franqueado com "Sem nome cadastrado", etc.)
+      // SEMPRE retorna "Franqueado(a)" - nunca o nome da unidade
+      return "Franqueado(a)";
+    } catch (error) {
+      console.warn("Erro ao buscar nome do franqueado:", error);
+      return "Franqueado(a)";
+    }
+  }, []);
+
   // Função para limpar estados do modal
   const limparEstadosModal = () => {
     setUnitSelecionada(null);
@@ -500,11 +541,14 @@ export function KanbanCobranca() {
       const telefoneRaw = unidade?.telefone_unidade;
       console.log(`Telefone bruto encontrado: ${telefoneRaw}`);
 
+      // Busca nome do franqueado para personalização
+      const nomeFranqueado = await buscarNomeFranqueado(cobranca.cnpj);
+
       // Criar mensagem personalizada para a cobrança individual
       const mensagem = `
 🔔 *Notificação de Cobrança* 🔔
 
-Prezado(a) ${cobranca.nome_unidade},
+Prezado(a) ${nomeFranqueado},
 
 Identificamos uma cobrança pendente em sua conta:
 
@@ -605,11 +649,14 @@ _Equipe de Cobrança_
         )
         .join("\n");
 
+      // Busca nome do franqueado para personalização
+      const nomeFranqueado = await buscarNomeFranqueado(unidade.cnpj);
+
       // Criar mensagem personalizada para cobranças agrupadas
       const mensagem = `
 🔔 *Notificação de Cobranças Pendentes* 🔔
 
-Prezado(a) ${unidade.nome_unidade},
+Prezado(a) ${nomeFranqueado},
 
 Identificamos ${cobrancasUnidade.length} cobrança(s) pendente(s) em sua conta:
 

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "./databaseService";
 import {
@@ -11,10 +10,7 @@ import {
   EstatisticasParcelamento,
 } from "../types/simulacaoParcelamento";
 import { TrativativasService } from "./tratativasService";
-import {
-  evolutionApiService,
-  SendTextMessagePayload,
-} from "./evolutionApiService";
+import { n8nService } from "./n8nService";
 import { emailService } from "./emailService";
 
 export class SimulacaoParcelamentoService {
@@ -313,22 +309,13 @@ export class SimulacaoParcelamentoService {
         throw new Error("Telefone não cadastrado para esta unidade.");
       }
 
-      const telefoneFormatado = telefone.replace(/\D/g, "");
-      const instanceName = "automacoes_backup";
-
-      const payload: SendTextMessagePayload = {
-        instanceName,
-        number: telefoneFormatado,
-        text: proposta.mensagem_proposta,
-      };
-
       // Pré-registra a tentativa de envio no log
       const { data: logData, error: logError } = await supabase
         .from("logs_envio_whatsapp")
         .insert({
-          destinatario: telefoneFormatado,
+          destinatario: telefone,
           mensagem_enviada: proposta.mensagem_proposta,
-          instancia_evolution: instanceName,
+          instancia_evolution: "automacoes_3", // Instância padrão n8n
           sucesso: false, // Começa como falha
         })
         .select("id")
@@ -340,7 +327,22 @@ export class SimulacaoParcelamentoService {
         logId = logData.id;
       }
 
-  const evolutionResponse = await evolutionApiService.sendTextMessage(payload);
+      // Envia mensagem via n8nService
+      const resultado = await n8nService.enviarWhatsApp({
+        number: telefone,
+        text: proposta.mensagem_proposta,
+        instanceName: "automacoes_3",
+        metadata: {
+          tipo: "proposta_parcelamento",
+          cobrancaId: proposta.titulo_id, // Usar titulo_id que é o ID da cobrança
+          propostaId: propostaId,
+          origem: "simulacao_parcelamento",
+        },
+      });
+
+      if (!resultado.success) {
+        throw new Error("Falha no envio da mensagem via n8n");
+      }
 
       // Atualiza o log com sucesso
       if (logId) {
@@ -348,7 +350,7 @@ export class SimulacaoParcelamentoService {
           .from("logs_envio_whatsapp")
           .update({
             sucesso: true,
-            evolution_message_id: (evolutionResponse as any)?.messageId || (evolutionResponse as any)?.key?.id || "N/A",
+            evolution_message_id: resultado.messageId || "N/A",
           })
           .eq("id", logId);
       }
@@ -431,8 +433,6 @@ export class SimulacaoParcelamentoService {
         throw new Error("Email não cadastrado para a unidade.");
       }
 
-      const config = await this.buscarConfiguracao();
-
       // Usa o método do emailService para gerar o corpo do e-mail
       const template = emailService.gerarTemplatePropostaParcelamento(
         (proposta as any).simulacoes_parcelamento,
@@ -442,11 +442,19 @@ export class SimulacaoParcelamentoService {
 
       const dadosEmail = {
         destinatario: email,
-        nome_destinatario: unidade.nome_unidade || 
-                          unidade.franqueado_unidades?.[0]?.franqueados?.nome_completo,
+        nome_destinatario: unidade.franqueado_unidades?.[0]?.franqueados?.nome_completo || 
+                          unidade.nome_unidade,
         assunto: template.assunto,
         corpo_html: template.corpo_html,
         corpo_texto: template.corpo_texto,
+        metadata: {
+          origem: "frontend",
+          via: "n8n",
+          tipo: "proposta_parcelamento",
+          cobrancaId: (proposta as any).cobrancas_franqueados?.id,
+          propostaId: propostaId,
+          cliente: unidade.franqueado_unidades?.[0]?.franqueados?.nome_completo || "Franqueado(a)",
+        },
       };
 
       // Envia o e-mail
@@ -718,7 +726,7 @@ Equipe Financeira`,
    */
   private gerarMensagemProposta(
     simulacao: any,
-    cobranca: any,
+    _cobranca: any,
     unidade: any,
     franqueado: any,
     config: ConfiguracaoParcelamento
@@ -726,7 +734,9 @@ Equipe Financeira`,
     const template = config.template_whatsapp;
 
     const variaveis = {
-      "{{cliente}}": franqueado?.nome_completo || unidade?.nome_unidade || cobranca?.cliente || "Cliente",
+      "{{cliente}}": franqueado?.nome_completo && franqueado.nome_completo !== "Sem nome cadastrado" 
+        ? franqueado.nome_completo 
+        : "Franqueado(a)", // SEMPRE usar "Franqueado(a)" quando não há franqueado válido
       "{{codigo_unidade}}": unidade?.codigo_unidade || "N/A",
       "{{valor_original}}": this.formatarMoeda(simulacao.valor_original),
       "{{valor_atualizado}}": this.formatarMoeda(simulacao.valor_atualizado),
