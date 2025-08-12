@@ -3,9 +3,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Plus, Edit, Eye, Upload, Receipt, CheckCircle,
   XCircle, Clock, Filter, RefreshCw, FileText,
-  ArrowUp, ArrowDown, AlertTriangle, Info,
-  Scale, Calculator, MessageSquare,
-  // MessageCircle, Mail,
+  ArrowUp, ArrowDown, AlertTriangle, Info, Calculator, MessageSquare,
+  //Scale, MessageCircle, Mail,
 } from "lucide-react";
 import { CobrancaFranqueado } from "../../types/cobranca";
 import { cobrancaService } from "../../services/cobrancaService";
@@ -410,70 +409,70 @@ Entre em contato: (11) 99999-9999`,
     return c.status !== "quitado" && valorAtualizado >= 500;
   };
 
-  const podeAcionarJuridico = (c: CobrancaFranqueado) => {
-    const valorAtualizado = c.valor_atualizado || c.valor_original;
-    const diasAtraso = c.dias_em_atraso || 0;
-    return (
-      c.status === "em_aberto" && valorAtualizado > 5000 && diasAtraso >= 91
-    );
-  };
+  // const podeAcionarJuridico = (c: CobrancaFranqueado) => {
+  //   const valorAtualizado = c.valor_atualizado || c.valor_original;
+  //   const diasAtraso = c.dias_em_atraso || 0;
+  //   return (
+  //     c.status === "em_aberto" && valorAtualizado > 5000 && diasAtraso >= 91
+  //   );
+  // };
 
-  const acionarJuridico = async (cobranca: CobrancaFranqueado) => {
-    const valorAtualizado =
-      cobranca.valor_atualizado || cobranca.valor_original;
+  // const acionarJuridico = async (cobranca: CobrancaFranqueado) => {
+  //   const valorAtualizado =
+  //     cobranca.valor_atualizado || cobranca.valor_original;
 
-    if (
-      !confirm(
-        `🚨 ACIONAMENTO JURÍDICO - ${
-          cobranca.cliente
-        }\n\nCRITÉRIOS VALIDADOS:\n✓ Valor: ${formatarMoeda(
-          valorAtualizado
-        )} (superior a R$ 5.000,00)\n✓ Status: Em aberto há ${
-          cobranca.dias_em_atraso || 0
-        } dias (≥91 dias)  \n✓ Aviso de débito enviado: Sim\n✓ Sem resposta do cliente\n\nCRITÉRIOS QUE SERÃO VALIDADOS NO SISTEMA:\n• Score de risco deve ser igual a zero\n• 3+ cobranças ignoradas nos últimos 15 dias  \n• Acordo descumprido OU reincidência nos últimos 6 meses\n\n⚠️ Esta ação enviará notificação extrajudicial via e-mail e WhatsApp.\n\nConfirma o acionamento jurídico?`
-      )
-    ) {
-      return;
-    }
+  //   if (
+  //     !confirm(
+  //       `🚨 ACIONAMENTO JURÍDICO - ${
+  //         cobranca.cliente
+  //       }\n\nCRITÉRIOS VALIDADOS:\n✓ Valor: ${formatarMoeda(
+  //         valorAtualizado
+  //       )} (superior a R$ 5.000,00)\n✓ Status: Em aberto há ${
+  //         cobranca.dias_em_atraso || 0
+  //       } dias (≥91 dias)  \n✓ Aviso de débito enviado: Sim\n✓ Sem resposta do cliente\n\nCRITÉRIOS QUE SERÃO VALIDADOS NO SISTEMA:\n• Score de risco deve ser igual a zero\n• 3+ cobranças ignoradas nos últimos 15 dias  \n• Acordo descumprido OU reincidência nos últimos 6 meses\n\n⚠️ Esta ação enviará notificação extrajudicial via e-mail e WhatsApp.\n\nConfirma o acionamento jurídico?`
+  //     )
+  //   ) {
+  //     return;
+  //   }
 
-    setProcessando(true);
-    try {
-      const response = await fetch(
-        "https://uveugjjntywsfbcjrpgu.supabase.co/functions/v1/acionar-juridico-cobranca",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({ cobrancaId: cobranca.id }),
-        }
-      );
+  //   setProcessando(true);
+  //   try {
+  //     const response = await fetch(
+  //       "https://uveugjjntywsfbcjrpgu.supabase.co/functions/v1/acionar-juridico-cobranca",
+  //       {
+  //         method: "POST",
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+  //         },
+  //         body: JSON.stringify({ cobrancaId: cobranca.id }),
+  //       }
+  //     );
 
-      const resultado = await response.json();
+  //     const resultado = await response.json();
 
-      if (resultado.sucesso) {
-        mostrarMensagem(
-          "sucesso",
-          "Cobrança acionada no jurídico com sucesso! Notificações enviadas."
-        );
-        await carregarCobrancas();
-      } else {
-        mostrarMensagem(
-          "erro",
-          `Erro ao acionar jurídico: ${resultado.mensagem}`
-        );
-      }
-    } catch (error) {
-      console.error("Erro ao acionar jurídico:", error);
-      mostrarMensagem(
-        "erro",
-        "Erro ao comunicar com o servidor. Tente novamente."
-      );
-    } finally {
-      setProcessando(false);
-    }
-  };
+  //     if (resultado.sucesso) {
+  //       mostrarMensagem(
+  //         "sucesso",
+  //         "Cobrança acionada no jurídico com sucesso! Notificações enviadas."
+  //       );
+  //       await carregarCobrancas();
+  //     } else {
+  //       mostrarMensagem(
+  //         "erro",
+  //         `Erro ao acionar jurídico: ${resultado.mensagem}`
+  //       );
+  //     }
+  //   } catch (error) {
+  //     console.error("Erro ao acionar jurídico:", error);
+  //     mostrarMensagem(
+  //       "erro",
+  //       "Erro ao comunicar com o servidor. Tente novamente."
+  //     );
+  //   } finally {
+  //     setProcessando(false);
+  //   }
+  // };
 
   const aplicarVariaveis = (template: string) => {
     if (!cobrancaSelecionada) return template;
@@ -2395,7 +2394,7 @@ Entre em contato: (11) 99999-9999`,
                         Simular parcelamento
                       </button>
                     )}
-                    {podeAcionarJuridico(cobrancaSelecionada) && (
+                    {/* {podeAcionarJuridico(cobrancaSelecionada) && (
                       <button
                         onClick={() => acionarJuridico(cobrancaSelecionada)}
                         className="flex items-center justify-center gap-2 px-4 py-3 border rounded-lg hover:bg-gray-50"
@@ -2403,7 +2402,7 @@ Entre em contato: (11) 99999-9999`,
                         <Scale className="w-4 h-4 text-red-600" /> Acionar
                         jurídico
                       </button>
-                    )}
+                    )} */}
                   </div>
                 </div>
               )}

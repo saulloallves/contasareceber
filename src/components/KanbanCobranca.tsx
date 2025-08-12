@@ -302,36 +302,66 @@ export function KanbanCobranca() {
     setModalConfirmacaoAberto(false);
 
     try {
+      // Busca a unidade pelo codigo_unidade na coluna de origem
       const unit = getUnitCardsByColuna(source.droppableId).find(
         (u) => u.codigo_unidade === draggableId
       );
 
-      if (unit) {
-        console.log(
-          `Movendo ${unit.charges.length} cobranças da unidade ${unit.nome_unidade}`
-        );
-
-        await Promise.all(
-          unit.charges.map((card) =>
-            kanbanService.moverCard(
-              card.id,
-              destination!.droppableId,
-              "usuario_atual",
-              "Movimentação manual via Kanban (em massa)"
-            )
-          )
-        );
-
-        console.log(
-          `Todas as cobranças da unidade ${unit.nome_unidade} foram movidas`
-        );
-        await carregarDados();
-      } else {
-        throw new Error(`Unidade ${draggableId} não encontrada`);
+      if (!unit) {
+        throw new Error(`Unidade ${draggableId} não encontrada na coluna ${source.droppableId}`);
       }
+
+      console.log(
+        `Movendo ${unit.charges.length} cobranças da unidade ${unit.nome_unidade}`
+      );
+
+      // CORREÇÃO: Buscar cobranças individuais usando KanbanService com modo individual
+      // Em vez de usar cards do estado (que pode ter dados agrupados), busca diretamente do banco
+      console.log(`Buscando cobranças individuais da unidade CNPJ: ${unit.cnpj}`);
+      
+      const todasCobrancasIndividuais = await kanbanService.buscarCards({}, false); // false = modo individual
+      const cobrancasUnidade = todasCobrancasIndividuais.filter(card => card.cnpj === unit.cnpj);
+      
+      console.log(`Total de cobranças individuais encontradas para a unidade: ${cobrancasUnidade.length}`);
+      
+      if (cobrancasUnidade.length === 0) {
+        throw new Error(`Nenhuma cobrança individual encontrada para a unidade ${unit.nome_unidade}`);
+      }
+
+      // Valida que todas as cobranças têm UUIDs válidos
+      const cobrancasComUUIDInvalido = cobrancasUnidade.filter(card => 
+        !card.id || card.id.length !== 36 || !card.id.includes('-')
+      );
+      
+      if (cobrancasComUUIDInvalido.length > 0) {
+        console.error('Cobranças com UUID inválido:', cobrancasComUUIDInvalido);
+        throw new Error(`Encontradas ${cobrancasComUUIDInvalido.length} cobranças com UUID inválido`);
+      }
+
+      // Move todas as cobranças da unidade para o status de destino
+      await Promise.all(
+        cobrancasUnidade.map(async (card) => {
+          console.log(`Movendo cobrança UUID: ${card.id} de ${card.status_atual} para ${destination!.droppableId}`);
+          return kanbanService.moverCard(
+            card.id, // UUID correto da cobrança individual
+            destination!.droppableId,
+            "usuario_atual",
+            `Movimentação manual via Kanban (em massa) - Unidade: ${unit.nome_unidade}`
+          );
+        })
+      );
+
+      console.log(
+        `Todas as ${cobrancasUnidade.length} cobranças da unidade ${unit.nome_unidade} foram movidas com sucesso`
+      );
+
+      // Recarrega os dados para refletir as mudanças
+      await carregarDados();
+      
     } catch (error) {
-      console.error("Erro ao mover card da unidade:", error);
+      console.error("Erro ao mover cobranças da unidade:", error);
       alert(`Erro ao mover unidade: ${error}`);
+      // Recarrega os dados mesmo em caso de erro para garantir consistência
       await carregarDados();
     } finally {
       setProcessando(false);
