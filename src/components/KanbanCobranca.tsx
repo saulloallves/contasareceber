@@ -596,16 +596,6 @@ export function KanbanCobranca() {
                   {formatarData(unit.data_vencimento_antiga)}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Parado há:</span>
-                <span
-                  className={`font-medium ${
-                    unit.dias_parado > 7 ? "text-red-600" : "text-gray-800"
-                  }`}
-                >
-                  {unit.dias_parado} dias
-                </span>
-              </div>
             </div>
 
             <div className="mt-2 flex items-center justify-between">
