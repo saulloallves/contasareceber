@@ -841,125 +841,175 @@ export function KanbanCobranca() {
 
             {unitSelecionada && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Nome da Unidade</label>
-                    <p className="text-gray-800">{unitSelecionada.nome_unidade}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">CNPJ</label>
-                    <p className="text-gray-800">{formatarCNPJCPF(unitSelecionada.cnpj)}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Valor Total</label>
-                    <p className="text-red-600 font-semibold">{formatarMoeda(unitSelecionada.valor_total)}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Quantidade de Cobranças</label>
-                    <p className="text-gray-800">{unitSelecionada.charges.length}</p>
+                {/* Informações da Unidade */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-800 mb-3">Informações da Unidade</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Nome da Unidade</label>
+                      <p className="text-gray-800">{unitSelecionada.nome_unidade}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">CNPJ</label>
+                      <p className="text-gray-800">{formatarCNPJCPF(unitSelecionada.cnpj)}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Valor Total</label>
+                      <p className="text-red-600 font-semibold">{formatarMoeda(unitSelecionada.valor_total)}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Quantidade de Cobranças</label>
+                      <p className="text-gray-800">{unitSelecionada.charges.length}</p>
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Cobranças da Unidade</label>
-                  <div className="mt-2 space-y-2">
-                    {unitSelecionada.charges.map((charge) => (
-                      <div key={charge.id} className="p-3 bg-gray-50 rounded-lg">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm">{charge.descricao_cobranca || "Cobrança"}</span>
-                          <span className="font-medium">{formatarMoeda(charge.valor_total)}</span>
+                {/* Lista de Cobranças Agrupadas */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-800 mb-3">Cobranças da Unidade ({unitSelecionada.charges.length})</h4>
+                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                    {unitSelecionada.charges.map((charge, index) => (
+                      <div key={charge.id} className="p-3 bg-white border border-gray-200 rounded-lg">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-gray-800">Cobrança #{index + 1}</span>
+                              <span className="font-semibold text-red-600">{formatarMoeda(charge.valor_total)}</span>
+                            </div>
+                            <div className="text-sm text-gray-600 mt-1">
+                              <div className="grid grid-cols-2 gap-2">
+                                <span>Vencimento: {formatarData(charge.data_vencimento_antiga)}</span>
+                                <span>Tipo: {formatarTipoDebito(charge.tipo_debito)}</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          Vencimento: {formatarData(charge.data_vencimento_antiga)} • Status: {charge.status_atual}
+                        <div className="flex items-center justify-between">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            charge.status_atual === 'quitado' ? 'bg-green-100 text-green-800' :
+                            charge.status_atual === 'negociando' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {formatarStatusCobranca(charge.status_atual)}
+                          </span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCriticidadeBadge(charge.criticidade)}`}>
+                            {charge.criticidade.toUpperCase()}
+                          </span>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => executarAcao(unitSelecionada.codigo_unidade, "whatsapp")}
-                    className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                  >
-                    <MessageSquare className="w-4 h-4 mr-1" />
-                    WhatsApp
-                  </button>
-                  <button
-                    onClick={() => executarAcao(unitSelecionada.codigo_unidade, "reuniao")}
-                    className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                  >
-                    <Calendar className="w-4 h-4 mr-1" />
-                    Reunião
-                  </button>
-                  <button
-                    onClick={() => {
-                      setObservacaoEditando(unitSelecionada.observacoes || "");
-                      setModalAberto("observacao");
-                    }}
-                    className="flex items-center px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-                  >
-                    <Edit className="w-4 h-4 mr-1" />
-                    Observação
-                  </button>
+                {/* Observações da Unidade */}
+                {unitSelecionada.observacoes && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-yellow-800 mb-2">Observações</h4>
+                    <p className="text-yellow-700 text-sm">{unitSelecionada.observacoes}</p>
+                  </div>
+                )}
+
+                {/* Botões de Ação */}
+                <div className="bg-white border-t border-gray-200 pt-4">
+                  <h4 className="font-semibold text-gray-800 mb-3">Ações para Toda a Unidade</h4>
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => executarAcao(unitSelecionada.codigo_unidade, "whatsapp")}
+                      disabled={processando}
+                      className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                    >
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      WhatsApp
+                    </button>
+                    <button
+                      onClick={() => executarAcao(unitSelecionada.codigo_unidade, "reuniao")}
+                      disabled={processando}
+                      className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                    >
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Reunião
+                    </button>
+                    <button
+                      onClick={() => {
+                        setObservacaoEditando(unitSelecionada.observacoes || "");
+                        setModalAberto("observacao");
+                      }}
+                      disabled={processando}
+                      className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Observação
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
             {cobrancaSelecionada && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Cliente</label>
-                    <p className="text-gray-800">{cobrancaSelecionada.nome_unidade}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">CNPJ</label>
-                    <p className="text-gray-800">{formatarCNPJCPF(cobrancaSelecionada.cnpj)}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Valor</label>
-                    <p className="text-red-600 font-semibold">{formatarMoeda(cobrancaSelecionada.valor_total)}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Vencimento</label>
-                    <p className="text-gray-800">{formatarData(cobrancaSelecionada.data_vencimento_antiga)}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Status</label>
-                    <p className="text-gray-800">{formatarStatusCobranca(cobrancaSelecionada.status_atual)}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Tipo</label>
-                    <p className="text-gray-800">{formatarTipoDebito(cobrancaSelecionada.tipo_debito)}</p>
+                {/* Informações da Cobrança Individual */}
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-green-800 mb-3">Detalhes da Cobrança</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Cliente</label>
+                      <p className="text-gray-800">{cobrancaSelecionada.nome_unidade}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">CNPJ</label>
+                      <p className="text-gray-800">{formatarCNPJCPF(cobrancaSelecionada.cnpj)}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Valor</label>
+                      <p className="text-red-600 font-semibold">{formatarMoeda(cobrancaSelecionada.valor_total)}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Vencimento</label>
+                      <p className="text-gray-800">{formatarData(cobrancaSelecionada.data_vencimento_antiga)}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Status</label>
+                      <p className="text-gray-800">{formatarStatusCobranca(cobrancaSelecionada.status_atual)}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Tipo</label>
+                      <p className="text-gray-800">{formatarTipoDebito(cobrancaSelecionada.tipo_debito)}</p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => executarAcao(cobrancaSelecionada.id, "whatsapp")}
-                    className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                  >
-                    <MessageSquare className="w-4 h-4 mr-1" />
-                    WhatsApp
-                  </button>
-                  <button
-                    onClick={() => executarAcao(cobrancaSelecionada.id, "reuniao")}
-                    className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                  >
-                    <Calendar className="w-4 h-4 mr-1" />
-                    Reunião
-                  </button>
-                  <button
-                    onClick={() => {
-                      setObservacaoEditando(cobrancaSelecionada.observacoes || "");
-                      setModalAberto("observacao");
-                    }}
-                    className="flex items-center px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-                  >
-                    <Edit className="w-4 h-4 mr-1" />
-                    Observação
-                  </button>
+                {/* Botões de Ação */}
+                <div className="bg-white border-t border-gray-200 pt-4">
+                  <h4 className="font-semibold text-gray-800 mb-3">Ações para Esta Cobrança</h4>
+                  <div>
+                    <button
+                      onClick={() => executarAcao(cobrancaSelecionada.id, "whatsapp")}
+                      disabled={processando}
+                      className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                    >
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      WhatsApp
+                    </button>
+                    <button
+                      onClick={() => executarAcao(cobrancaSelecionada.id, "reuniao")}
+                      disabled={processando}
+                      className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                    >
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Reunião
+                    </button>
+                    <button
+                      onClick={() => {
+                        setObservacaoEditando(cobrancaSelecionada.observacoes || "");
+                        setModalAberto("observacao");
+                      }}
+                      disabled={processando}
+                      className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Observação
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
