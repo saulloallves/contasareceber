@@ -1052,7 +1052,7 @@ export function KanbanCobranca() {
       )}
 
       {/* Modal de Detalhes */}
-                  {agrupadoPorUnidade ? 'Ações para Toda a Unidade' : 'Ações para Esta Cobrança'}
+      {modalAberto === "detalhes" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
@@ -1090,65 +1090,36 @@ export function KanbanCobranca() {
                       <p className="text-gray-800">{unitSelecionada.charges.length}</p>
                     </div>
                   </div>
-                {agrupadoPorUnidade ? (
-                  /* Lista de Cobranças da Unidade (apenas para modo agrupado) */
-                  todasCobrancasUnidade.length > 0 && (
-                    <div>
-                      <h4 className="text-lg font-semibold text-gray-800 mb-4">
-                        Cobranças desta Unidade ({todasCobrancasUnidade.length})
-                      </h4>
-                      <div className="space-y-3 max-h-60 overflow-y-auto">
-                        {todasCobrancasUnidade.map((cobranca, index) => (
-                          <div key={cobranca.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-sm font-medium text-gray-800">
-                                  #{index + 1} - {formatarMoeda(cobranca.valor_atualizado || cobranca.valor_original)}
-                                </span>
-                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(cobranca.status)}`}>
-                                  {formatarStatus(cobranca.status)}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between text-xs text-gray-600">
-                                <span>Venc: {formatarData(cobranca.data_vencimento)}</span>
-                                <span>{formatarTipoCobranca(cobranca.tipo_cobranca || 'outros')}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                ) : (
-                  /* Detalhes da Cobrança Individual (apenas para modo individual) */
-                         <div className="flex items-center justify-between">
-                              <span className="font-medium text-gray-800">Cobrança #{index + 1}</span>
-                              <span className="font-semibold text-red-600">{formatarMoeda(charge.valor_total)}</span>
-                            </div>
-                            <div className="text-sm text-gray-600 mt-1">
-                              <div className="grid grid-cols-2 gap-2">
-                                <span>Vencimento: {formatarData(charge.data_vencimento_antiga)}</span>
-                                <span>Tipo: {formatarTipoDebito(charge.tipo_debito)}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            charge.status_atual === 'quitado' ? 'bg-green-100 text-green-800' :
-                            charge.status_atual === 'negociando' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {formatarStatusCobranca(charge.status_atual)}
-                          </span>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCriticidadeBadge(charge.criticidade)}`}>
-                            {charge.criticidade.toUpperCase()}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
+
+                {/* Lista de Cobranças da Unidade */}
+                {todasCobrancasUnidade.length > 0 && (
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-800 mb-4">
+                      Cobranças desta Unidade ({todasCobrancasUnidade.length})
+                    </h4>
+                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                      {todasCobrancasUnidade.map((cobranca, index) => (
+                        <div key={cobranca.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium text-gray-800">
+                                #{index + 1} - {formatarMoeda(cobranca.valor_total)}
+                              </span>
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${getCriticidadeBadge(cobranca.criticidade)}`}>
+                                {formatarStatusCobranca(cobranca.status_atual)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-gray-600">
+                              <span>Venc: {formatarData(cobranca.data_vencimento_antiga)}</span>
+                              <span>{formatarTipoDebito(cobranca.tipo_debito)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Observações da Unidade */}
                 {unitSelecionada.observacoes && (
@@ -1208,36 +1179,23 @@ export function KanbanCobranca() {
                       <label className="text-sm font-medium text-gray-600">CNPJ</label>
                       <p className="text-gray-800">{formatarCNPJCPF(cobrancaSelecionada.cnpj)}</p>
                     </div>
-                    <h4 className="text-lg font-semibold text-gray-800 mb-4">Detalhes da Cobrança</h4>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <span className="text-sm font-medium text-gray-600">Cliente:</span>
-                          <p className="text-gray-900">{cardSelecionado.nome_unidade}</p>
-                        </div>
-                        <div>
-                          <span className="text-sm font-medium text-gray-600">CNPJ:</span>
-                          <p className="text-gray-900">{cardSelecionado.cnpj}</p>
-                        </div>
-                        <div>
-                          <span className="text-sm font-medium text-gray-600">Valor:</span>
-                          <p className="text-lg font-bold text-red-600">{formatarMoeda(cardSelecionado.valor_total)}</p>
-                        </div>
-                        <div>
-                          <span className="text-sm font-medium text-gray-600">Vencimento:</span>
-                          <p className="text-gray-900">{formatarData(cardSelecionado.data_vencimento_antiga)}</p>
-                        </div>
-                        <div>
-                          <span className="text-sm font-medium text-gray-600">Status:</span>
-                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(cardSelecionado.status_atual)}`}>
-                            {formatarStatus(cardSelecionado.status_atual)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-sm font-medium text-gray-600">Tipo:</span>
-                          <p className="text-gray-900">{formatarTipoCobranca(cardSelecionado.tipo_debito)}</p>
-                        </div>
-                      </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Valor</label>
+                      <p className="text-red-600 font-semibold">{formatarMoeda(cobrancaSelecionada.valor_total)}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Vencimento</label>
+                      <p className="text-gray-800">{formatarData(cobrancaSelecionada.data_vencimento_antiga)}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Status</label>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getCriticidadeBadge(cobrancaSelecionada.criticidade)}`}>
+                        {formatarStatusCobranca(cobrancaSelecionada.status_atual)}
+                      </span>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Tipo</label>
+                      <p className="text-gray-800">{formatarTipoDebito(cobrancaSelecionada.tipo_debito)}</p>
                     </div>
                   </div>
                 </div>
