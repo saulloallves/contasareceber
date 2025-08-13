@@ -58,8 +58,8 @@ export class SimulacaoParcelamentoService {
         throw new Error("Cobrança não encontrada");
       }
 
-  // Busca configuração
-  const config = await this.buscarConfiguracao();
+      // Busca configuração
+      const config = await this.buscarConfiguracao();
 
       // Validação de valor mínimo
       const valorAtualizado =
@@ -301,9 +301,11 @@ export class SimulacaoParcelamentoService {
         throw new Error("Proposta não encontrada");
       }
 
-      const unidade = (proposta as any).cobrancas_franqueados?.unidades_franqueadas;
-      const telefone = unidade?.telefone_unidade || 
-                      unidade?.franqueado_unidades?.[0]?.franqueados?.telefone;
+      const unidade = (proposta as any).cobrancas_franqueados
+        ?.unidades_franqueadas;
+      const telefone =
+        unidade?.telefone_unidade ||
+        unidade?.franqueado_unidades?.[0]?.franqueados?.telefone;
 
       if (!telefone) {
         throw new Error("Telefone não cadastrado para esta unidade.");
@@ -334,8 +336,8 @@ export class SimulacaoParcelamentoService {
         instanceName: "automacoes_3",
         metadata: {
           tipo: "proposta_parcelamento",
-          cobrancaId: proposta.titulo_id, // Usar titulo_id que é o ID da cobrança
-          propostaId: propostaId,
+          cobrancaId: proposta.titulo_id, // ID da cobrança original (FK válida)
+          propostaId: propostaId, // ID da proposta (para referência)
           origem: "simulacao_parcelamento",
         },
       });
@@ -425,10 +427,12 @@ export class SimulacaoParcelamentoService {
         throw new Error(`Proposta não encontrada: ${propostaError?.message}`);
       }
 
-      const unidade = (proposta as any).cobrancas_franqueados.unidades_franqueadas;
-      const email = unidade.email_unidade || 
-                   unidade.franqueado_unidades?.[0]?.franqueados?.email;
-      
+      const unidade = (proposta as any).cobrancas_franqueados
+        .unidades_franqueadas;
+      const email =
+        unidade.email_unidade ||
+        unidade.franqueado_unidades?.[0]?.franqueados?.email;
+
       if (!email) {
         throw new Error("Email não cadastrado para a unidade.");
       }
@@ -442,8 +446,9 @@ export class SimulacaoParcelamentoService {
 
       const dadosEmail = {
         destinatario: email,
-        nome_destinatario: unidade.franqueado_unidades?.[0]?.franqueados?.nome_completo || 
-                          unidade.nome_unidade,
+        nome_destinatario:
+          unidade.franqueado_unidades?.[0]?.franqueados?.nome_completo ||
+          unidade.nome_unidade,
         assunto: template.assunto,
         corpo_html: template.corpo_html,
         corpo_texto: template.corpo_texto,
@@ -451,9 +456,11 @@ export class SimulacaoParcelamentoService {
           origem: "frontend",
           via: "n8n",
           tipo: "proposta_parcelamento",
-          cobrancaId: (proposta as any).cobrancas_franqueados?.id,
-          propostaId: propostaId,
-          cliente: unidade.franqueado_unidades?.[0]?.franqueados?.nome_completo || "Franqueado(a)",
+          cobrancaId: proposta.titulo_id, // ID da cobrança original (FK válida)
+          propostaId: propostaId, // ID da proposta (para referência)
+          cliente:
+            unidade.franqueado_unidades?.[0]?.franqueados?.nome_completo ||
+            "Franqueado(a)",
         },
       };
 
@@ -734,9 +741,11 @@ Equipe Financeira`,
     const template = config.template_whatsapp;
 
     const variaveis = {
-      "{{cliente}}": franqueado?.nome_completo && franqueado.nome_completo !== "Sem nome cadastrado" 
-        ? franqueado.nome_completo 
-        : "Franqueado(a)", // SEMPRE usar "Franqueado(a)" quando não há franqueado válido
+      "{{cliente}}":
+        franqueado?.nome_completo &&
+        franqueado.nome_completo !== "Sem nome cadastrado"
+          ? franqueado.nome_completo
+          : "Franqueado(a)", // SEMPRE usar "Franqueado(a)" quando não há franqueado válido
       "{{codigo_unidade}}": unidade?.codigo_unidade || "N/A",
       "{{valor_original}}": this.formatarMoeda(simulacao.valor_original),
       "{{valor_atualizado}}": this.formatarMoeda(simulacao.valor_atualizado),
