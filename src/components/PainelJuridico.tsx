@@ -21,7 +21,6 @@ import {
 import { JuridicoService } from "../services/juridicoService";
 import { FiltrosJuridico, EstatisticasJuridico } from "../types/juridico";
 import { reunioesJuridicoService } from "../services/reunioesJuridicoService";
-import { evolutionApiService } from "../services/evolutionApiService";
 import { supabase } from "../services/databaseService";
 
 export function PainelJuridico() {
@@ -430,11 +429,11 @@ export function PainelJuridico() {
       }
       const mensagem = notificacao.conteudo_notificacao;
       // Envia WhatsApp
-      await evolutionApiService.sendTextMessage({
-        instanceName: "automacoes_backup",
-        number: numero,
-        text: mensagem,
-      });
+      // await evolutionApiService.sendTextMessage({
+      //   instanceName: "automacoes_backup",
+      //   number: numero,
+      //   text: mensagem,
+      // });
       // Registra envio
       await supabase.from("envios_mensagem").insert({
         canal: "whatsapp",
