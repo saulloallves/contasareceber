@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "../lib/supabaseClient";
 import {
   CobrancaFranqueado,
@@ -31,6 +31,61 @@ type HistoricoEnvio = {
 };
 
 export class CobrancaService {
+  // Garante que apenas colunas válidas sejam enviadas para update/insert
+  private sanitizeUpdatePayload(
+    dados: Partial<CobrancaFranqueado>
+  ): Record<string, unknown> {
+    if (!dados) return {};
+    const {
+      // id e unidades_franqueadas são ignorados propositalmente
+      cnpj,
+      cliente,
+      cliente_codigo,
+      tipo_cobranca,
+      email_cobranca,
+      descricao,
+      valor_original,
+      valor_recebido,
+      data_vencimento,
+      data_vencimento_original,
+      dias_em_atraso,
+      valor_atualizado,
+      status,
+      telefone,
+      referencia_importacao,
+      hash_titulo,
+      nivel_criticidade,
+      unidade_id_fk,
+    } = dados as any;
+
+    const payload: Record<string, unknown> = {
+      cnpj,
+      cliente,
+      cliente_codigo,
+      tipo_cobranca,
+      email_cobranca,
+      descricao,
+      valor_original,
+      valor_recebido,
+      data_vencimento,
+      data_vencimento_original,
+      dias_em_atraso,
+      valor_atualizado,
+      status,
+      telefone,
+      referencia_importacao,
+      hash_titulo,
+      nivel_criticidade,
+      unidade_id_fk,
+    };
+
+    // Remove chaves undefined para evitar updates nulos desnecessários
+    Object.keys(payload).forEach((k) => {
+      if (payload[k] === undefined) delete payload[k];
+    });
+
+    return payload;
+  }
   private async buscarOuCriarUnidadePorCNPJ(cnpj: string): Promise<string> {
     const cnpjLimpo = cnpj.replace(/\D/g, "");
     const { data, error } = await supabase
@@ -70,7 +125,7 @@ export class CobrancaService {
   ): Promise<ResultadoImportacao> {
   const erros: string[] = [];
   const referenciasNovaPlanilha = new Set<string>();
-  const cobrancasParaInserir: Array<Partial<CobrancaFranqueado> & { unidade_id: string; referencia_importacao: string }> = [];
+  const cobrancasParaInserir: Array<Partial<CobrancaFranqueado> & { unidade_id_fk: string; referencia_importacao: string }> = [];
     const cobrancasParaAtualizar: CobrancaFranqueado[] = [];
     const cobrancasQuitadas: string[] = [];
 
@@ -85,7 +140,7 @@ export class CobrancaService {
         const referenciaLinha = gerarReferenciaLinha(dados);
         referenciasNovaPlanilha.add(referenciaLinha);
 
-        const unidadeId = await this.buscarOuCriarUnidadePorCNPJ(dados.cnpj);
+  const unidadeId = await this.buscarOuCriarUnidadePorCNPJ(dados.cnpj);
 
         const cobrancaExistente = await this.buscarCobrancaExistente(
           referenciaLinha
@@ -100,7 +155,7 @@ export class CobrancaService {
         } else {
           cobrancasParaInserir.push({
             ...dados,
-            unidade_id: unidadeId,
+            unidade_id_fk: unidadeId,
             referencia_importacao: referenciaLinha,
           });
         }
@@ -198,9 +253,10 @@ export class CobrancaService {
 
   private async atualizarCobrancasExistentes(cobrancas: CobrancaFranqueado[]) {
     for (const cobranca of cobrancas) {
+      const payload = this.sanitizeUpdatePayload(cobranca);
       const { error } = await supabase
         .from("cobrancas_franqueados")
-        .update(cobranca)
+        .update(payload)
         .eq("id", cobranca.id);
 
       if (error) {
@@ -498,9 +554,10 @@ export class CobrancaService {
     id: string,
     dados: Partial<CobrancaFranqueado>
   ): Promise<void> {
+    const payload = this.sanitizeUpdatePayload(dados);
     const { error } = await supabase
       .from("cobrancas_franqueados")
-      .update({ ...dados, data_ultima_atualizacao: new Date().toISOString() })
+      .update({ ...payload, data_ultima_atualizacao: new Date().toISOString() })
       .eq("id", id);
 
     if (error) {
@@ -573,123 +630,9 @@ export class CobrancaService {
     } catch (e) {
       console.warn("Falha ao buscar logs_envio_email:", e);
     }
-
-    // 3) [OPCIONAL] Mantém compatibilidade com mensagens antigas se existirem
-    try {
-      const { data, error } = await supabase
-        .from("mensagens_enviadas")
-        .select("id, titulo_id, cliente, cnpj, telefone, data_envio, mensagem_enviada, status_envio, erro_detalhes, created_at")
-        .eq("titulo_id", cobrancaId)
-        .order("data_envio", { ascending: false });
-
-      if (!error && data) {
-        historico.push(
-          ...data.map((row: any): HistoricoEnvio => ({
-            id: row.id,
-            canal: "whatsapp",
-            tipo: "whatsapp_legado",
-            cliente: row.cliente,
-            cnpj: row.cnpj,
-            numero_telefone: row.telefone,
-            mensagem_enviada: row.mensagem_enviada,
-            status_envio: row.status_envio,
-            erro_detalhes: row.erro_detalhes,
-            data_envio: row.data_envio || row.created_at,
-          }))
-        );
-      }
-    } catch (e) {
-      console.warn("Falha ao buscar mensagens_enviadas (legado):", e);
-    }
-
     // Ordena por data desc como fallback
     historico.sort((a, b) => new Date(b.data_envio || 0).getTime() - new Date(a.data_envio || 0).getTime());
     return historico;
-  }
-
-  /**
-   * Registra log de envio via WhatsApp na tabela 'mensagens_enviadas'
-   */
-  async registrarLogEnvioWhatsapp(params: {
-    cobrancaId: string;
-    tipo: string;
-    numero: string;
-    mensagem: string;
-    usuario: string;
-    sucesso?: boolean;
-    erro_detalhes?: string;
-  }): Promise<void> {
-    const { cobrancaId, numero, mensagem, sucesso = true, erro_detalhes } = params;
-
-    // Busca dados da cobrança para complementar o registro
-    const { data: cobranca, error: fetchError } = await supabase
-      .from("cobrancas_franqueados")
-      .select("id, cliente, cnpj")
-      .eq("id", cobrancaId)
-      .single();
-
-    if (fetchError || !cobranca) {
-      throw new Error(`Erro ao buscar cobrança para log: ${fetchError?.message}`);
-    }
-
-    const { error } = await supabase.from("mensagens_enviadas").insert({
-      titulo_id: cobrancaId,
-      cliente: cobranca.cliente,
-      cnpj: cobranca.cnpj,
-      telefone: numero,
-      mensagem_enviada: mensagem,
-      status_envio: sucesso ? "sucesso" : "falha",
-      erro_detalhes: erro_detalhes,
-      data_envio: new Date().toISOString(),
-    });
-
-    if (error) {
-      throw new Error(`Erro ao registrar log de WhatsApp: ${error.message}`);
-    }
-  }
-
-  /**
-   * Registra log de envio por e-mail em 'logs_envio_email' (se existir)
-   * Usado pelo EmailService após envio bem-sucedido
-   */
-  async registrarLogEnvioEmail(params: {
-    cobrancaId: string;
-    tipo: string;
-    destinatario: string;
-    assunto: string;
-    mensagem: string;
-    usuario: string;
-  metadados?: Record<string, unknown>;
-  }): Promise<void> {
-  const payload = {
-      cobranca_id: params.cobrancaId,
-      tipo: params.tipo,
-      destinatario: params.destinatario,
-      assunto: params.assunto,
-      mensagem: params.mensagem,
-      usuario: params.usuario,
-      metadados: params.metadados || {},
-      created_at: new Date().toISOString(),
-      sucesso: true,
-  };
-
-    try {
-      const { error } = await supabase.from("logs_envio_email").insert(payload);
-      if (error) {
-        throw error;
-      }
-    } catch (e) {
-      console.warn("Falha ao registrar log de e-mail (logs_envio_email)", e);
-    }
-  }
-
-  /**
-   * Verificação pós-importação para possíveis escalonamentos/acionamentos
-   * (stub para compatibilidade)
-   */
-  async verificarAcionamentoJuridico(_importacaoId?: string): Promise<void> {
-    // Implementação futura: analisar cobranças importadas e acionar processos
-    return;
   }
 }
 

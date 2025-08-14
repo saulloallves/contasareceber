@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from './databaseService';
 import { OperacaoManual, CobrancaManual, TrativativaManual, NotificacaoManual, CancelamentoManual, FiltrosOperacaoManual, EstatisticasOperacaoManual } from '../types/operacaoManual';
 import { CobrancaService } from './cobrancaService';
@@ -112,9 +113,14 @@ export class OperacaoManualService {
       }
 
       // Atualiza a cobrança
+  // Remove campos que não pertencem à tabela (ex.: objetos de join)
+  const dadosAtualizacao: Record<string, unknown> = { ...(dadosNovos as Record<string, unknown>) };
+  delete (dadosAtualizacao as any).unidades_franqueadas;
+  delete (dadosAtualizacao as any).id;
+
       const { error: errorUpdate } = await supabase
         .from('cobrancas_franqueados')
-        .update(dadosNovos)
+        .update(dadosAtualizacao)
         .eq('id', tituloId);
 
       if (errorUpdate) {

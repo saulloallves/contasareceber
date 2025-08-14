@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Home, Building2, Calendar, //Scale,
-  BarChart3, Settings, ChevronLeft, ChevronRight,
-  Menu, X, //FileText,
-  Shield, Receipt, CircleDollarSign, Calculator, Users,
+import { 
+  Home, Building2, 
+  Settings, ChevronLeft, ChevronRight,
+  Menu, X, Shield, Receipt, CircleDollarSign, Calculator, Users,
+  // BarChart3, Calendar, Scale, FileText,
 } from "lucide-react";
 
 const FAVICON_URL =
@@ -30,10 +31,10 @@ export function Sidebar({
     { id: "simulacao-parcelamento", label: "Simulação Parcelamento", icon: Calculator, permissions: ["admin", "financeiro", "cobranca"], description: "Propostas de parcelamento", },
     { id: "unidades", label: "Unidades", icon: Building2, permissions: ["admin", "financeiro"], description: "Cadastro e gestão de unidades", },
     { id: "franqueados", label: "Franqueados", icon: Users, permissions: ["admin", "financeiro"], description: "Cadastro e vínculos de franqueados", },
-    { id: "reunioes", label: "Reuniões", icon: Calendar, permissions: ["admin", "financeiro", "cobranca"], description: "Agenda e negociações", },
- // { id: "juridico", label: "Jurídico", icon: Scale, permissions: ["admin", "juridico"], description: "Escalonamentos e ações legais", },
- // { id: "templates-juridicos", label: "Templates Jurídicos", icon: FileText, permissions: ["admin", "juridico"], description: "Templates e gatilhos automáticos", },
-    { id: "relatorios", label: "Relatórios", icon: BarChart3, permissions: ["admin", "financeiro", "juridico", "leitura"], description: "Análises e indicadores", },
+  //  { id: "reunioes", label: "Reuniões", icon: Calendar, permissions: ["admin", "financeiro", "cobranca"], description: "Agenda e negociações", },
+  //  { id: "juridico", label: "Jurídico", icon: Scale, permissions: ["admin", "juridico"], description: "Escalonamentos e ações legais", },
+  //  { id: "templates-juridicos", label: "Templates Jurídicos", icon: FileText, permissions: ["admin", "juridico"], description: "Templates e gatilhos automáticos", },
+  //  { id: "relatorios", label: "Relatórios", icon: BarChart3, permissions: ["admin", "financeiro", "juridico", "leitura"], description: "Análises e indicadores", },
     { id: "admin", label: "Configurações", icon: Settings, permissions: ["admin"], description: "Parâmetros do sistema", },
   ];
 

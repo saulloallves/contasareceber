@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from './databaseService';
 import { CobrancaFranqueado } from '../types/cobranca';
 import { gerarReferenciaLinha } from '../utils/planilhaProcessor';
