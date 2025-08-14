@@ -9,7 +9,7 @@ import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban, } from "
 import { formatarCNPJCPF, formatarMoeda, formatarData, } from "../utils/formatters";
 import { supabase } from "../lib/supabaseClient";
 import { n8nService } from "../services/n8nService";
-import { toast, Toaster } from "react-hot-toast";
+import { toast } from "react-hot-toast";
 
 type UnitKanbanCard = {
   codigo_unidade: string;
@@ -579,6 +579,14 @@ export function KanbanCobranca() {
   }, [unidadesComStatusMisto, detalhesStatusMisto, salvarStatusMistoStorage, carregarDados, resetarTravasAutomatico]);
 
   // (Funções de liberação forçada removidas)
+
+  // Aviso temporário para funcionalidade de reuniões ainda não implementada
+  const avisarReuniaoIndisponivel = useCallback(() => {
+    toast("Funcionalidade de reuniões ainda não foi implementada.", {
+      duration: 4000,
+      style: { background: "#7c3aed", color: "#fff" },
+    });
+  }, []);
 
   /**
    * Função auxiliar para buscar o nome do franqueado baseado no CNPJ
@@ -1207,32 +1215,7 @@ export function KanbanCobranca() {
     }
   };
 
-  const executarAcao = async (cardId: string, acao: string) => {
-    setProcessando(true);
-    try {
-      console.log(`Executando ação '${acao}' no card ${cardId}`);
-      await kanbanService.executarAcaoRapida(
-        cardId,
-        acao,
-        "usuario_atual",
-        aba === "unidade"
-      );
-      carregarDados();
-      limparEstadosModal();
-      console.log(`Ação '${acao}' executada com sucesso`);
-    } catch (error) {
-      console.error("Erro ao executar ação:", error);
-      toast.error(`Erro ao executar ação: ${error}`, {
-        duration: 5000,
-        style: {
-          background: "#ef4444",
-          color: "#fff",
-        },
-      });
-    } finally {
-      setProcessando(false);
-    }
-  };
+  // executarAcao removido temporariamente; reuniões não implementadas
 
   const salvarObservacao = async () => {
     if (!observacaoEditando.trim()) return;
@@ -1301,9 +1284,9 @@ export function KanbanCobranca() {
       const mensagem = `
 🔔 *Notificação de Cobrança* 🔔
 
-Prezado(a) ${nomeFranqueado},
+Olá ${nomeFranqueado} 👋,
 
-Identificamos uma cobrança pendente em sua conta:
+Identificamos uma cobrança pendente para sua unidade: *${cobranca.nome_unidade}*:
 
 💰 *Valor:* ${formatarMoeda(cobranca.valor_total)}
 📅 *Vencimento:* ${formatarData(cobranca.data_vencimento_antiga)}
@@ -1312,7 +1295,11 @@ Identificamos uma cobrança pendente em sua conta:
 
 Para regularizar sua situação, entre em contato conosco o mais breve possível.
 
-_Equipe de Cobrança_
+Entre em contato diretamente com nossa Equipe de Cobrança pelo WhatsApp abaixo:
+
+📞 *Telefone: (19) 99595-7880*
+
+_Mensagem Automática do Sistema_
       `.trim();
 
       console.log(`Enviando WhatsApp para cobrança ${cobranca.id}`);
@@ -1428,11 +1415,11 @@ _Equipe de Cobrança_
 
       // Criar mensagem personalizada para cobranças agrupadas
       const mensagem = `
-🔔 *Notificação de Cobranças Pendentes* 🔔
+🔔 *Notificação de Cobranças* 🔔
 
-Prezado(a) ${nomeFranqueado},
+Olá ${nomeFranqueado} 👋,
 
-Identificamos ${cobrancasUnidade.length} cobrança(s) pendente(s) em sua conta:
+Identificamos ${cobrancasUnidade.length} cobrança(s) pendente(s) para sua unidade: *${unidade.nome_unidade}*:
 
 💰 *Valor Total:* ${formatarMoeda(valorTotalGeral)}
 📅 *Vencimento mais antigo:* ${formatarData(vencimentoMaisAntigo)}
@@ -1442,7 +1429,11 @@ ${listaCobrancas}
 
 Para regularizar sua situação, entre em contato conosco o mais breve possível.
 
-_Equipe de Cobrança_
+Entre em contato diretamente com nossa Equipe de Cobrança pelo WhatsApp abaixo:
+
+📞 *Telefone: (19) 99595-7880*
+
+_Mensagem Automática do Sistema_
       `.trim();
 
       console.log(
@@ -1796,17 +1787,7 @@ _Equipe de Cobrança_
 
   return (
     <div className="max-w-full mx-auto p-6">
-      <Toaster
-        position="top-center"
-        reverseOrder={false}
-        toastOptions={{
-          duration: 5000,
-          style: {
-            background: "#363636",
-            color: "#fff",
-          },
-        }}
-      />
+  {/* Toaster global já está em main.tsx; removido para evitar duplicidade */}
       <div className="bg-white rounded-lg shadow-lg p-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
@@ -2658,12 +2639,7 @@ _Equipe de Cobrança_
                         WhatsApp
                       </button>
                       <button
-                        onClick={() =>
-                          executarAcao(
-                            unitSelecionada.codigo_unidade,
-                            "reuniao"
-                          )
-                        }
+                        onClick={avisarReuniaoIndisponivel}
                         disabled={processando}
                         className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
                       >
@@ -2794,9 +2770,7 @@ _Equipe de Cobrança_
                         WhatsApp
                       </button>
                       <button
-                        onClick={() =>
-                          executarAcao(cobrancaSelecionada.id, "reuniao")
-                        }
+                        onClick={avisarReuniaoIndisponivel}
                         disabled={processando}
                         className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
                       >
