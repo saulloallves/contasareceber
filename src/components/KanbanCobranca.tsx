@@ -1,14 +1,15 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { DragDropContext, Droppable, Draggable, DropResult, } from "react-beautiful-dnd";
-import { MessageSquare, Calendar, DollarSign, AlertTriangle, Filter, Download, RefreshCw, Edit, X, Save, CircleDollarSign, Lock, RotateCcw, } from "lucide-react";
+import { MessageSquare, Calendar, DollarSign, AlertTriangle, Filter, Download, RefreshCw, Edit, X, Save, CircleDollarSign, Lock } from "lucide-react";
 import { KanbanService } from "../services/kanbanService";
 import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban, } from "../types/kanban";
 import { formatarCNPJCPF, formatarMoeda, formatarData, } from "../utils/formatters";
 import { supabase } from "../lib/supabaseClient";
 import { n8nService } from "../services/n8nService";
+import { toast, Toaster } from "react-hot-toast";
 
 type UnitKanbanCard = {
   codigo_unidade: string;
@@ -51,37 +52,44 @@ export function KanbanCobranca() {
   const [unidadeParaWhatsApp, setUnidadeParaWhatsApp] = useState<UnitKanbanCard | null>(null);
   const [monitoramentoAtivo, setMonitoramentoAtivo] = useState(false);
   const kanbanService = new KanbanService();
+  const processandoAnteriorRef = useRef(processando);
 
   // Chaves para localStorage
-  const STORAGE_KEY_STATUS_MISTO = 'kanban_unidades_status_misto';
-  const STORAGE_KEY_MOVIMENTACAO_INDIVIDUAL = 'kanban_movimentacao_individual';
+  const STORAGE_KEY_STATUS_MISTO = "kanban_unidades_status_misto";
+  const STORAGE_KEY_MOVIMENTACAO_INDIVIDUAL = "kanban_movimentacao_individual";
 
   /**
    * Salva o estado de unidades com status misto no localStorage
    */
-  const salvarStatusMistoStorage = (unidadesMistas: Set<string>, detalhes: Record<string, { statusList: string[], nomeUnidade: string }>) => {
+  const salvarStatusMistoStorage = (
+    unidadesMistas: Set<string>,
+    detalhes: Record<string, { statusList: string[]; nomeUnidade: string }>
+  ) => {
     try {
       const data = {
         unidades: Array.from(unidadesMistas),
         detalhes,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       localStorage.setItem(STORAGE_KEY_STATUS_MISTO, JSON.stringify(data));
-      console.log('💾 Status misto salvo no localStorage:', data);
+      console.log("💾 Status misto salvo no localStorage:", data);
     } catch (error) {
-      console.warn('Erro ao salvar status misto no localStorage:', error);
+      console.warn("Erro ao salvar status misto no localStorage:", error);
     }
   };
 
   /**
    * Carrega o estado de unidades com status misto do localStorage
    */
-  const carregarStatusMistoStorage = (): { unidades: Set<string>, detalhes: Record<string, { statusList: string[], nomeUnidade: string }> } => {
+  const carregarStatusMistoStorage = (): {
+    unidades: Set<string>;
+    detalhes: Record<string, { statusList: string[]; nomeUnidade: string }>;
+  } => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_STATUS_MISTO);
       if (stored) {
         const data = JSON.parse(stored);
-        
+
         // Verifica se os dados não são muito antigos (máximo 1 hora)
         const tempoLimite = 60 * 60 * 1000; // 1 hora em ms
         if (Date.now() - data.timestamp > tempoLimite) {
@@ -89,14 +97,14 @@ export function KanbanCobranca() {
           return { unidades: new Set(), detalhes: {} };
         }
 
-        console.log('📂 Status misto carregado do localStorage:', data);
+        console.log("📂 Status misto carregado do localStorage:", data);
         return {
           unidades: new Set(data.unidades || []),
-          detalhes: data.detalhes || {}
+          detalhes: data.detalhes || {},
         };
       }
     } catch (error) {
-      console.warn('Erro ao carregar status misto do localStorage:', error);
+      console.warn("Erro ao carregar status misto do localStorage:", error);
     }
     return { unidades: new Set(), detalhes: {} };
   };
@@ -106,12 +114,15 @@ export function KanbanCobranca() {
    */
   const salvarMovimentacaoIndividualStorage = (movimentou: boolean) => {
     try {
-      sessionStorage.setItem(STORAGE_KEY_MOVIMENTACAO_INDIVIDUAL, JSON.stringify({
-        movimentou,
-        timestamp: Date.now()
-      }));
+      sessionStorage.setItem(
+        STORAGE_KEY_MOVIMENTACAO_INDIVIDUAL,
+        JSON.stringify({
+          movimentou,
+          timestamp: Date.now(),
+        })
+      );
     } catch (error) {
-      console.warn('Erro ao salvar movimentação individual:', error);
+      console.warn("Erro ao salvar movimentação individual:", error);
     }
   };
 
@@ -120,13 +131,15 @@ export function KanbanCobranca() {
    */
   const carregarMovimentacaoIndividualStorage = (): boolean => {
     try {
-      const stored = sessionStorage.getItem(STORAGE_KEY_MOVIMENTACAO_INDIVIDUAL);
+      const stored = sessionStorage.getItem(
+        STORAGE_KEY_MOVIMENTACAO_INDIVIDUAL
+      );
       if (stored) {
         const data = JSON.parse(stored);
         return data.movimentou || false;
       }
     } catch (error) {
-      console.warn('Erro ao carregar movimentação individual:', error);
+      console.warn("Erro ao carregar movimentação individual:", error);
     }
     return false;
   };
@@ -138,327 +151,42 @@ export function KanbanCobranca() {
     try {
       localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
       sessionStorage.removeItem(STORAGE_KEY_MOVIMENTACAO_INDIVIDUAL);
-      console.log('🧹 Storage do Kanban limpo');
+      console.log("🧹 Storage do Kanban limpo");
     } catch (error) {
-      console.warn('Erro ao limpar storage:', error);
+      console.warn("Erro ao limpar storage:", error);
     }
   };
 
-  /**
-   * Monitora mudanças de status e libera travas automaticamente
-   */
-  const monitorarELiberarTravas = useCallback(async () => {
+  // Helper para reset automático das travas (equivalente ao botão "Resetar Travas")
+  const resetarTravasAutomatico = useCallback(() => {
     try {
-      console.log('🔍 Monitorando status das unidades bloqueadas...', Array.from(unidadesComStatusMisto));
-      
-      // SEMPRE verifica o estado real no banco, ignorando localStorage temporariamente
-      const resultado = await detectarUnidadesComStatusMisto();
-      const novasUnidadesMistas = resultado.unidadesMistas;
-      const novosDetalhes = resultado.detalhes;
-
-      console.log('📊 Comparação de estados:');
-      console.log('  - Unidades bloqueadas antes:', Array.from(unidadesComStatusMisto));
-      console.log('  - Unidades bloqueadas no banco agora:', Array.from(novasUnidadesMistas));
-
-      // Se não há mais unidades com status misto no banco, limpa TUDO
-      if (novasUnidadesMistas.size === 0) {
-        console.log('🎉 TODAS AS UNIDADES FORAM LIBERADAS! Limpando estado completo...');
-        
-        // Limpa os estados locais
-        setUnidadesComStatusMisto(new Set());
-        setDetalhesStatusMisto({});
-        setMonitoramentoAtivo(false);
-        
-        // FORÇA a limpeza do localStorage
-        try {
-          localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
-          console.log('🧹 localStorage limpo com sucesso');
-        } catch (error) {
-          console.warn('Erro ao limpar localStorage:', error);
-        }
-        
-        // Notificação de liberação total
-        if (unidadesComStatusMisto.size > 0) {
-          const nomesLiberadas = Array.from(unidadesComStatusMisto).map(cnpj => 
-            detalhesStatusMisto[cnpj]?.nomeUnidade || cnpj
-          ).join(', ');
-          
-          alert(`✅ TODAS AS TRAVAS FORAM LIBERADAS!\n\nTodas as unidades tiveram seus status padronizados:\n${nomesLiberadas}\n\nVocê pode voltar ao modo por unidade.`);
-        }
-        
-        console.log('🛑 Monitoramento interrompido - todas as unidades foram liberadas');
-        return;
-      }
-
-      // Verifica se alguma unidade específica foi liberada
-      const unidadesLiberadas = Array.from(unidadesComStatusMisto).filter(
-        cnpj => !novasUnidadesMistas.has(cnpj)
-      );
-
-      if (unidadesLiberadas.length > 0) {
-        console.log('🎉 Unidades específicas liberadas:', unidadesLiberadas);
-        
-        const nomesLiberadas = unidadesLiberadas.map(cnpj => 
-          detalhesStatusMisto[cnpj]?.nomeUnidade || cnpj
-        ).join(', ');
-
-        // Notificação de liberação parcial
-        if (unidadesLiberadas.length === 1) {
-          alert(`✅ TRAVA LIBERADA!\n\nA unidade "${nomesLiberadas}" teve seus status padronizados e foi desbloqueada automaticamente.`);
-        } else {
-          alert(`✅ TRAVAS LIBERADAS!\n\n${unidadesLiberadas.length} unidades foram desbloqueadas automaticamente:\n${nomesLiberadas}`);
-        }
-      }
-
-      // Atualiza os estados sempre (mesmo se não houve mudança para garantir sincronização)
-      setUnidadesComStatusMisto(novasUnidadesMistas);
-      setDetalhesStatusMisto(novosDetalhes);
-      
-      // Salva no localStorage apenas se ainda há unidades bloqueadas
-      if (novasUnidadesMistas.size > 0) {
-        salvarStatusMistoStorage(novasUnidadesMistas, novosDetalhes);
-        console.log(`📊 Estado atualizado - ${novasUnidadesMistas.size} unidades ainda bloqueadas`);
-      }
-
-    } catch (error) {
-      console.error('❌ Erro no monitoramento de travas:', error);
-      // Em caso de erro, tenta limpar estados inconsistentes
-      console.log('🔧 Tentando limpar estados inconsistentes devido ao erro...');
+      // Limpa caches
+      limparStorageKanban();
+      // Reseta flags e estados
+      setMovimentacaoIndividualFeita(false);
       setUnidadesComStatusMisto(new Set());
       setDetalhesStatusMisto({});
-      localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
+      setShowMixedStatusWarning(false);
+      setModalDetalhesStatusMisto(null);
+      setModalConfirmacaoAberto(false);
+      setMovimentoPendente(null);
+      // Garante parada do monitoramento
+      setMonitoramentoAtivo(false);
+      // Retorna para o modo por unidade automaticamente
+      setAba("unidade");
+      console.log("✅ Travas resetadas automaticamente após liberação total");
+    } catch (e) {
+      console.warn("Erro ao resetar travas automaticamente:", e);
     }
-  }, [unidadesComStatusMisto, detalhesStatusMisto, salvarStatusMistoStorage]);
+  }, [limparStorageKanban]);
 
-  /**
-   * Inicia o monitoramento automático quando há unidades bloqueadas
-   */
-  const iniciarMonitoramento = useCallback(() => {
-    if (unidadesComStatusMisto.size > 0 && !monitoramentoAtivo) {
-      setMonitoramentoAtivo(true);
-      console.log('🚀 Monitoramento automático iniciado');
-    }
-  }, [unidadesComStatusMisto.size, monitoramentoAtivo]);
-
-  /**
-   * Para o monitoramento automático
-   */
-  const pararMonitoramento = useCallback(() => {
-    setMonitoramentoAtivo(false);
-    console.log('🛑 Monitoramento automático interrompido');
-  }, []);
-
-  /**
-   * Força a liberação de todas as travas (botão de emergência)
-   */
-  const forcarLiberacaoTravas = useCallback(() => {
-    if (window.confirm(
-      '⚠️ LIBERAÇÃO FORÇADA DE TRAVAS\n\n' +
-      'Esta ação irá liberar TODAS as unidades bloqueadas, mesmo que ainda tenham status mistos.\n\n' +
-      '⚡ Use apenas se:\n' +
-      '• O monitoramento automático não está funcionando\n' +
-      '• Você tem certeza que deseja mover as unidades mesmo com status mistos\n' +
-      '• Precisa de acesso de emergência\n\n' +
-      'Continuar?'
-    )) {
-      console.log('🚨 LIBERAÇÃO FORÇADA DE TRAVAS EXECUTADA PELO USUÁRIO');
-      
-      try {
-        // Limpa TODOS os estados de trava imediatamente
-        setUnidadesComStatusMisto(new Set());
-        setDetalhesStatusMisto({});
-        setMonitoramentoAtivo(false);
-        
-        // FORÇA a limpeza de TODOS os dados do localStorage/sessionStorage
-        localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
-        sessionStorage.removeItem(STORAGE_KEY_MOVIMENTACAO_INDIVIDUAL);
-        
-        // Tenta limpar outros possíveis dados relacionados
-        try {
-          // Limpa qualquer outro dado relacionado ao Kanban que possa existir
-          Object.keys(localStorage).forEach(key => {
-            if (key.includes('kanban') || key.includes('status_misto') || key.includes('movimentacao')) {
-              localStorage.removeItem(key);
-              console.log(`🧹 Removido localStorage: ${key}`);
-            }
-          });
-          Object.keys(sessionStorage).forEach(key => {
-            if (key.includes('kanban') || key.includes('status_misto') || key.includes('movimentacao')) {
-              sessionStorage.removeItem(key);
-              console.log(`🧹 Removido sessionStorage: ${key}`);
-            }
-          });
-        } catch (storageError) {
-          console.warn('Erro ao limpar storage adicional:', storageError);
-        }
-        
-        console.log('✅ Todos os estados foram limpos com sucesso');
-        
-        alert('✅ TRAVAS LIBERADAS COM SUCESSO!\n\nTodas as unidades foram desbloqueadas.\nTodos os dados de cache foram limpos.\nVocê pode voltar ao modo por unidade.');
-        
-        // Força um recarregamento completo dos dados
-        setTimeout(() => {
-          console.log('🔄 Recarregando dados após liberação forçada...');
-          window.location.reload(); // Força reload completo para garantir limpeza total
-        }, 500);
-        
-      } catch (error) {
-        console.error('❌ Erro durante liberação forçada:', error);
-        alert('⚠️ Erro durante a liberação forçada. Recarregando a página...');
-        window.location.reload();
-      }
-    }
-  }, []);
-
-  /**
-   * Função auxiliar para buscar o nome do franqueado baseado no CNPJ
-   */
-  const buscarNomeFranqueado = useCallback(async (cnpj: string): Promise<string> => {
-    try {
-      // Busca dados completos da unidade via Supabase com relacionamentos
-      const { data: unidade, error } = await supabase
-        .from("unidades_franqueadas")
-        .select(`
-          nome_unidade,
-          franqueado_unidades!left (
-            franqueados!left (
-              nome_completo
-            )
-          )
-        `)
-        .eq("codigo_interno", cnpj)
-        .single();
-
-      if (error) {
-        console.warn("Erro ao buscar unidade por CNPJ:", error);
-        return "Cliente";
-      }
-
-      // Prioriza APENAS nome do franqueado - nunca usar nome da unidade
-      const nomeFranqueado = (unidade as any)?.franqueado_unidades?.[0]?.franqueados?.nome_completo;
-      
-      // Se tem franqueado vinculado e o nome não é "Sem nome cadastrado"
-      if (nomeFranqueado && nomeFranqueado !== "Sem nome cadastrado") {
-        return nomeFranqueado;
-      }
-      
-      // Para TODOS os outros casos (sem franqueado, franqueado com "Sem nome cadastrado", etc.)
-      // SEMPRE retorna "Franqueado(a)" - nunca o nome da unidade
-      return "Franqueado(a)";
-    } catch (error) {
-      console.warn("Erro ao buscar nome do franqueado:", error);
-      return "Franqueado(a)";
-    }
-  }, []);
-
-  // Função para limpar estados do modal
-  const limparEstadosModal = () => {
-    setUnitSelecionada(null);
-    setCobrancaSelecionada(null);
-    setTodasCobrancasUnidade([]);
-    setObservacaoEditando("");
-    setModalAberto(null);
-    setModalConfirmacaoWhatsAppUnidade(false);
-    setUnidadeParaWhatsApp(null);
-  };
-
-  // Função para obter quantidade total de cobranças de uma unidade
-  const obterQuantidadeTotalCobrancas = (cnpj: string): number => {
-    return quantidadesTotaisPorUnidade[cnpj] || 0;
-  };
-
-  // Função para detectar unidades com status misto
-  const detectarUnidadesComStatusMisto = async (): Promise<{ 
-    unidadesMistas: Set<string>, 
-    detalhes: Record<string, { statusList: string[], nomeUnidade: string }> 
-  }> => {
-    try {
-      console.log('🔍 Buscando cobranças no banco para detectar status misto...');
-      
-      const { data: cobrancas, error } = await supabase
-        .from("cobrancas_franqueados")
-        .select(`
-          id, 
-          cnpj, 
-          status,
-          unidades_franqueadas!unidade_id_fk (
-            nome_unidade
-          )
-        `)
-        .neq("status", "quitado"); // Ignora quitados para análise
-
-      if (error) {
-        console.error("❌ Erro ao detectar status misto:", error);
-        return { unidadesMistas: new Set(), detalhes: {} };
-      }
-
-      console.log(`📊 Encontradas ${cobrancas?.length || 0} cobranças ativas no banco`);
-
-      const unidadesMistas = new Set<string>();
-      const statusPorUnidade = new Map<string, Set<string>>();
-      const nomesPorUnidade = new Map<string, string>();
-      const detalhesCompletos: Record<string, { statusList: string[], nomeUnidade: string }> = {};
-
-      // Agrupa status por unidade usando CNPJ como chave
-      cobrancas?.forEach((cobranca: any) => {
-        const cnpj = cobranca.cnpj;
-        const nomeUnidade = cobranca.unidades_franqueadas?.nome_unidade || 'Unidade não identificada';
-        
-        if (!statusPorUnidade.has(cnpj)) {
-          statusPorUnidade.set(cnpj, new Set());
-          nomesPorUnidade.set(cnpj, nomeUnidade);
-        }
-        statusPorUnidade.get(cnpj)!.add(cobranca.status);
-      });
-
-      console.log(`📋 Analisando ${statusPorUnidade.size} unidades diferentes`);
-
-      // Identifica unidades com múltiplos status
-      statusPorUnidade.forEach((statusSet, cnpj) => {
-        const statusArray = Array.from(statusSet);
-        console.log(`  - CNPJ ${cnpj}: ${statusArray.length} status diferentes (${statusArray.join(', ')})`);
-        
-        if (statusSet.size > 1) {
-          unidadesMistas.add(cnpj);
-          detalhesCompletos[cnpj] = {
-            statusList: statusArray.sort(),
-            nomeUnidade: nomesPorUnidade.get(cnpj) || 'Unidade não identificada'
-          };
-          console.log(`    ⚠️  UNIDADE COM STATUS MISTO DETECTADA: ${nomesPorUnidade.get(cnpj)}`);
-        } else {
-          console.log(`    ✅ Unidade com status único: ${statusArray[0]}`);
-        }
-      });
-
-      console.log(`🎯 RESULTADO: ${unidadesMistas.size} unidades com status misto encontradas`);
-      
-      if (unidadesMistas.size === 0) {
-        console.log('🧹 Nenhuma unidade com status misto - removendo localStorage se existir');
-        try {
-          localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
-        } catch (error) {
-          console.warn('Erro ao limpar localStorage:', error);
-        }
-      }
-
-      return { unidadesMistas, detalhes: detalhesCompletos };
-    } catch (error) {
-      console.error("❌ Erro ao detectar unidades com status misto:", error);
-      // Em caso de erro, limpa localStorage para evitar estados inconsistentes
-      try {
-        localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
-      } catch (e) {
-        console.warn('Erro ao limpar localStorage após erro na detecção:', e);
-      }
-      return { unidadesMistas: new Set(), detalhes: {} };
-    }
-  };
-
+  // ===== carregarDados vem antes das funções de verificação para evitar closures obsoletas =====
   const carregarDados = useCallback(async () => {
     setCarregando(true);
     try {
       // Carrega estados do storage primeiro
-      const movimentacaoIndividualDoStorage = carregarMovimentacaoIndividualStorage();
+      const movimentacaoIndividualDoStorage =
+        carregarMovimentacaoIndividualStorage();
       setMovimentacaoIndividualFeita(movimentacaoIndividualDoStorage);
 
       // Converte filtros avançados para o formato esperado pelo serviço
@@ -536,53 +264,532 @@ export function KanbanCobranca() {
 
       // Detecta unidades com status misto com validação em tempo real
       if (aba === "unidade") {
-        console.log('🔍 Detectando status misto em tempo real (ignorando storage temporariamente)...');
+        console.log(
+          "🔍 Detectando status misto em tempo real (ignorando storage temporariamente)..."
+        );
         const resultado = await detectarUnidadesComStatusMisto();
-        
+
         // Carrega dados do storage apenas para comparação/log
-        const { unidades: unidadesMistasStorage } = carregarStatusMistoStorage();
-        
-        console.log('📊 Comparação storage vs banco:');
-        console.log('  - Storage:', Array.from(unidadesMistasStorage));
-        console.log('  - Banco:', Array.from(resultado.unidadesMistas));
-        
+        const { unidades: unidadesMistasStorage } =
+          carregarStatusMistoStorage();
+
+        console.log("📊 Comparação storage vs banco:");
+        console.log("  - Storage:", Array.from(unidadesMistasStorage));
+        console.log("  - Banco:", Array.from(resultado.unidadesMistas));
+
         // SEMPRE usa os dados do banco (fonte da verdade)
         setUnidadesComStatusMisto(resultado.unidadesMistas);
         setDetalhesStatusMisto(resultado.detalhes);
-        
+
         // Se há diferença, atualiza o storage ou remove se não há unidades bloqueadas
         if (resultado.unidadesMistas.size === 0) {
-          console.log('🧹 Nenhuma unidade bloqueada no banco - limpando storage');
+          console.log(
+            "🧹 Nenhuma unidade bloqueada no banco - limpando storage"
+          );
           try {
             localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
           } catch (error) {
-            console.warn('Erro ao limpar localStorage:', error);
+            console.warn("Erro ao limpar localStorage:", error);
           }
         } else {
-          console.log(`� Salvando ${resultado.unidadesMistas.size} unidades bloqueadas no storage`);
-          salvarStatusMistoStorage(resultado.unidadesMistas, resultado.detalhes);
+          console.log(
+            `� Salvando ${resultado.unidadesMistas.size} unidades bloqueadas no storage`
+          );
+          salvarStatusMistoStorage(
+            resultado.unidadesMistas,
+            resultado.detalhes
+          );
         }
-        
-        // Inicia monitoramento se há unidades bloqueadas
+
+        // Inicia/para monitoramento conforme necessário
         if (resultado.unidadesMistas.size > 0 && !monitoramentoAtivo) {
-          console.log('� Iniciando monitoramento automático...');
+          console.log("� Iniciando monitoramento automático...");
           setMonitoramentoAtivo(true);
         } else if (resultado.unidadesMistas.size === 0 && monitoramentoAtivo) {
-          console.log('🛑 Parando monitoramento - nenhuma unidade bloqueada');
+          console.log("🛑 Parando monitoramento - nenhuma unidade bloqueada");
           setMonitoramentoAtivo(false);
         }
       }
     } catch (error) {
       console.error("❌ Erro ao carregar dados do Kanban:", error);
-      alert("Erro ao carregar dados do Kanban. Verifique a conexão.");
+      toast.error("Erro ao carregar dados do Kanban. Verifique a conexão.", {
+        duration: 5000,
+        style: {
+          background: "#ef4444",
+          color: "#fff",
+        },
+      });
     } finally {
       setCarregando(false);
     }
-  }, [filtros, aba, filtrosAvancados]);
+  }, [filtros, aba, filtrosAvancados, monitoramentoAtivo]);
+
+  // Botão Atualizar: se houver travas, aplica reset automático; caso contrário, apenas recarrega
+  const handleAtualizarClick = useCallback(async () => {
+    if (movimentacaoIndividualFeita || unidadesComStatusMisto.size > 0) {
+      resetarTravasAutomatico();
+      await carregarDados();
+      toast.success('Travas resetadas e dados atualizados');
+    } else {
+      carregarDados();
+    }
+  }, [movimentacaoIndividualFeita, unidadesComStatusMisto.size, resetarTravasAutomatico, carregarDados]);
+
+  /**
+   * Monitora mudanças de status e libera travas automaticamente
+   */
+  const monitorarELiberarTravas = useCallback(async () => {
+    try {
+      console.log(
+        "🔍 Monitorando status das unidades bloqueadas...",
+        Array.from(unidadesComStatusMisto)
+      );
+
+      // SEMPRE verifica o estado real no banco, ignorando localStorage temporariamente
+      const resultado = await detectarUnidadesComStatusMisto();
+      const novasUnidadesMistas = resultado.unidadesMistas;
+      const novosDetalhes = resultado.detalhes;
+
+      console.log("📊 Comparação de estados:");
+      console.log(
+        "  - Unidades bloqueadas antes:",
+        Array.from(unidadesComStatusMisto)
+      );
+      console.log(
+        "  - Unidades bloqueadas no banco agora:",
+        Array.from(novasUnidadesMistas)
+      );
+
+      // Se não há mais unidades com status misto no banco, limpa TUDO
+      if (novasUnidadesMistas.size === 0) {
+        console.log(
+          "🎉 TODAS AS UNIDADES FORAM LIBERADAS! Limpando estado completo..."
+        );
+
+        // Para o monitoramento PRIMEIRO para evitar loops
+        setMonitoramentoAtivo(false);
+
+        // Limpa os estados locais
+        setUnidadesComStatusMisto(new Set());
+        setDetalhesStatusMisto({});
+        // Também limpa flag de movimentação individual e storage (como o botão Resetar Travas)
+        setMovimentacaoIndividualFeita(false);
+        try {
+          sessionStorage.removeItem(STORAGE_KEY_MOVIMENTACAO_INDIVIDUAL);
+        } catch (e) {
+          console.warn("Falha ao limpar sessionStorage:", e);
+        }
+
+        // FORÇA a limpeza do localStorage
+        try {
+          localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
+          console.log("🧹 localStorage limpo com sucesso");
+        } catch (error) {
+          console.warn("Erro ao limpar localStorage:", error);
+        }
+
+        // Notificação de liberação total usando toast
+        if (unidadesComStatusMisto.size > 0) {
+          const nomesLiberadas = Array.from(unidadesComStatusMisto)
+            .map((cnpj) => detalhesStatusMisto[cnpj]?.nomeUnidade || cnpj)
+            .join(", ");
+
+          toast.success(
+            `🎉 TODAS AS TRAVAS FORAM LIBERADAS!\n\nUnidades desbloqueadas: ${nomesLiberadas}\n\nVocê pode voltar ao modo por unidade.`,
+            {
+              id: "liberacao-total",
+              duration: 8000,
+              style: {
+                background: "#22c55e",
+                color: "#fff",
+                fontSize: "14px",
+                padding: "16px",
+                maxWidth: "500px",
+              },
+            }
+          );
+        }
+
+        console.log(
+          "🛑 Monitoramento interrompido - todas as unidades foram liberadas"
+        );
+
+        // Aplica reset automático (equivalente ao botão) e recarrega dados
+        resetarTravasAutomatico();
+        setTimeout(() => {
+          carregarDados();
+        }, 800);
+
+        return;
+      }
+
+      // Verifica se alguma unidade específica foi liberada
+      const unidadesLiberadas = Array.from(unidadesComStatusMisto).filter(
+        (cnpj) => !novasUnidadesMistas.has(cnpj)
+      );
+
+      if (unidadesLiberadas.length > 0) {
+        console.log("🎉 Unidades específicas liberadas:", unidadesLiberadas);
+
+        const nomesLiberadas = unidadesLiberadas
+          .map((cnpj) => detalhesStatusMisto[cnpj]?.nomeUnidade || cnpj)
+          .join(", ");
+
+        // Notificação de liberação parcial usando toast
+        const keyParcial = `liberacao-parcial-${unidadesLiberadas
+          .sort()
+          .join("|")}`;
+        if (unidadesLiberadas.length === 1) {
+          toast.success(
+            `✅ TRAVA LIBERADA!\n\nA unidade "${nomesLiberadas}" foi desbloqueada automaticamente.`,
+            {
+              id: keyParcial,
+              duration: 6000,
+              style: {
+                background: "#22c55e",
+                color: "#fff",
+                fontSize: "14px",
+                padding: "16px",
+                maxWidth: "400px",
+              },
+            }
+          );
+        } else {
+          toast.success(
+            `✅ ${unidadesLiberadas.length} TRAVAS LIBERADAS!\n\nUnidades desbloqueadas: ${nomesLiberadas}`,
+            {
+              id: keyParcial,
+              duration: 7000,
+              style: {
+                background: "#22c55e",
+                color: "#fff",
+                fontSize: "14px",
+                padding: "16px",
+                maxWidth: "500px",
+              },
+            }
+          );
+        }
+      }
+
+      // Atualiza os estados sempre (mesmo se não houve mudança para garantir sincronização)
+      setUnidadesComStatusMisto(novasUnidadesMistas);
+      setDetalhesStatusMisto(novosDetalhes);
+
+      // Salva no localStorage apenas se ainda há unidades bloqueadas
+      if (novasUnidadesMistas.size > 0) {
+        salvarStatusMistoStorage(novasUnidadesMistas, novosDetalhes);
+        console.log(
+          `📊 Estado atualizado - ${novasUnidadesMistas.size} unidades ainda bloqueadas`
+        );
+      }
+    } catch (error) {
+      console.error("❌ Erro no monitoramento de travas:", error);
+
+      // Notifica erro via toast em vez de alert
+      toast.error(
+        "Erro no monitoramento de travas. Tentando recuperar estados...",
+        {
+          duration: 5000,
+          style: {
+            background: "#ef4444",
+            color: "#fff",
+          },
+        }
+      );
+
+      // Em caso de erro, tenta limpar estados inconsistentes
+      console.log(
+        "🔧 Tentando limpar estados inconsistentes devido ao erro..."
+      );
+      setUnidadesComStatusMisto(new Set());
+      setDetalhesStatusMisto({});
+      setMonitoramentoAtivo(false);
+      localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
+    }
+  }, [
+    unidadesComStatusMisto,
+    detalhesStatusMisto,
+    salvarStatusMistoStorage,
+    carregarDados,
+    resetarTravasAutomatico,
+  ]);
+
+  /**
+   * Inicia o monitoramento automático quando há unidades bloqueadas
+   */
+  const iniciarMonitoramento = useCallback(() => {
+    if (unidadesComStatusMisto.size > 0 && !monitoramentoAtivo) {
+      setMonitoramentoAtivo(true);
+      console.log("🚀 Monitoramento automático iniciado");
+    }
+  }, [unidadesComStatusMisto.size, monitoramentoAtivo]);
+
+  // (Parar monitoramento) — removido: o reset automático já desliga via setMonitoramentoAtivo(false)
+
+  /**
+   * Força uma verificação imediata das travas (sem depender do intervalo)
+   */
+  const forcarVerificacaoTravas = useCallback(async () => {
+    console.log("🔍 VERIFICAÇÃO FORÇADA DE TRAVAS SOLICITADA");
+    try {
+      const { unidadesMistas: novasUnidadesMistas, detalhes: novosDetalhes } =
+        await detectarUnidadesComStatusMisto();
+
+      console.log("📊 Verificação forçada - Unidades antes:", Array.from(unidadesComStatusMisto));
+      console.log("📊 Verificação forçada - Unidades agora:", Array.from(novasUnidadesMistas));
+
+      const unidadesLiberadas = Array.from(unidadesComStatusMisto).filter(
+        (cnpj) => !novasUnidadesMistas.has(cnpj)
+      );
+      if (unidadesLiberadas.length > 0) {
+        const nomesLiberadas = unidadesLiberadas
+          .map((cnpj) => detalhesStatusMisto[cnpj]?.nomeUnidade || cnpj)
+          .join(", ");
+        toast.success(`🔓 Unidades liberadas: ${nomesLiberadas}` , {
+          id: `liberacao-parcial-${unidadesLiberadas.sort().join('-')}`,
+          duration: 4000,
+          style: { background: '#16a34a', color: '#fff' }
+        });
+      }
+
+      if (novasUnidadesMistas.size === 0) {
+        toast.success('🔓 Todas as travas foram liberadas.', {
+          id: 'liberacao-total',
+          duration: 4000,
+          style: { background: '#16a34a', color: '#fff' }
+        });
+        resetarTravasAutomatico();
+        setTimeout(() => { carregarDados(); }, 800);
+        return;
+      }
+
+      setUnidadesComStatusMisto(novasUnidadesMistas);
+      setDetalhesStatusMisto(novosDetalhes);
+      if (novasUnidadesMistas.size > 0) {
+        salvarStatusMistoStorage(novasUnidadesMistas, novosDetalhes);
+      }
+    } catch (error) {
+      console.error("❌ Erro na verificação forçada:", error);
+      toast.error("Erro na verificação de travas. Tentando novamente...", {
+        duration: 5000,
+        style: { background: "#ef4444", color: "#fff" },
+      });
+    }
+  }, [unidadesComStatusMisto, detalhesStatusMisto, salvarStatusMistoStorage, carregarDados, resetarTravasAutomatico]);
+
+  // (Funções de liberação forçada removidas)
+
+  /**
+   * Função auxiliar para buscar o nome do franqueado baseado no CNPJ
+   */
+  const buscarNomeFranqueado = useCallback(
+    async (cnpj: string): Promise<string> => {
+      try {
+        // Busca dados completos da unidade via Supabase com relacionamentos
+        const { data: unidade, error } = await supabase
+          .from("unidades_franqueadas")
+          .select(
+            `
+          nome_unidade,
+          franqueado_unidades!left (
+            franqueados!left (
+              nome_completo
+            )
+          )
+        `
+          )
+          .eq("codigo_interno", cnpj)
+          .single();
+
+        if (error) {
+          console.warn("Erro ao buscar unidade por CNPJ:", error);
+          return "Cliente";
+        }
+
+        // Prioriza APENAS nome do franqueado - nunca usar nome da unidade
+        const nomeFranqueado = (unidade as any)?.franqueado_unidades?.[0]
+          ?.franqueados?.nome_completo;
+
+        // Se tem franqueado vinculado e o nome não é "Sem nome cadastrado"
+        if (nomeFranqueado && nomeFranqueado !== "Sem nome cadastrado") {
+          return nomeFranqueado;
+        }
+
+        // Para TODOS os outros casos (sem franqueado, franqueado com "Sem nome cadastrado", etc.)
+        // SEMPRE retorna "Franqueado(a)" - nunca o nome da unidade
+        return "Franqueado(a)";
+      } catch (error) {
+        console.warn("Erro ao buscar nome do franqueado:", error);
+        return "Franqueado(a)";
+      }
+    },
+    []
+  );
+
+  // Função para limpar estados do modal
+  const limparEstadosModal = () => {
+    setUnitSelecionada(null);
+    setCobrancaSelecionada(null);
+    setTodasCobrancasUnidade([]);
+    setObservacaoEditando("");
+    setModalAberto(null);
+    setModalConfirmacaoWhatsAppUnidade(false);
+    setUnidadeParaWhatsApp(null);
+  };
+
+  // Função para obter quantidade total de cobranças de uma unidade
+  const obterQuantidadeTotalCobrancas = (cnpj: string): number => {
+    return quantidadesTotaisPorUnidade[cnpj] || 0;
+  };
+
+  // Função para detectar unidades com status misto
+  const detectarUnidadesComStatusMisto = async (): Promise<{
+    unidadesMistas: Set<string>;
+    detalhes: Record<string, { statusList: string[]; nomeUnidade: string }>;
+  }> => {
+    try {
+      console.log(
+        "🔍 Buscando cobranças no banco para detectar status misto..."
+      );
+
+      const { data: cobrancas, error } = await supabase
+        .from("cobrancas_franqueados")
+        .select(
+          `
+          id, 
+          cnpj, 
+          status,
+          unidades_franqueadas!unidade_id_fk (
+            nome_unidade
+          )
+        `
+        )
+        .neq("status", "quitado"); // Ignora quitados para análise
+
+      if (error) {
+        console.error("❌ Erro ao detectar status misto:", error);
+        return { unidadesMistas: new Set(), detalhes: {} };
+      }
+
+      console.log(
+        `📊 Encontradas ${cobrancas?.length || 0} cobranças ativas no banco`
+      );
+
+      const unidadesMistas = new Set<string>();
+      const statusPorUnidade = new Map<string, Set<string>>();
+      const nomesPorUnidade = new Map<string, string>();
+      const detalhesCompletos: Record<
+        string,
+        { statusList: string[]; nomeUnidade: string }
+      > = {};
+
+      // Log detalhado das cobranças encontradas
+      console.log("📋 Detalhes das cobranças encontradas:");
+      cobrancas?.forEach((cobranca: any, index) => {
+        console.log(
+          `  ${index + 1}. CNPJ: ${cobranca.cnpj} | Status: ${
+            cobranca.status
+          } | Unidade: ${cobranca.unidades_franqueadas?.nome_unidade}`
+        );
+      });
+
+      // Agrupa status por unidade usando CNPJ como chave
+      cobrancas?.forEach((cobranca: any) => {
+        const cnpj = cobranca.cnpj;
+        const nomeUnidade =
+          cobranca.unidades_franqueadas?.nome_unidade ||
+          "Unidade não identificada";
+
+        if (!statusPorUnidade.has(cnpj)) {
+          statusPorUnidade.set(cnpj, new Set());
+          nomesPorUnidade.set(cnpj, nomeUnidade);
+        }
+        statusPorUnidade.get(cnpj)!.add(cobranca.status);
+      });
+
+      console.log(`📋 Analisando ${statusPorUnidade.size} unidades diferentes`);
+
+      // Identifica unidades com múltiplos status
+      statusPorUnidade.forEach((statusSet, cnpj) => {
+        const statusArray = Array.from(statusSet);
+        console.log(
+          `  - CNPJ ${cnpj}: ${
+            statusArray.length
+          } status diferentes (${statusArray.join(", ")})`
+        );
+
+        if (statusSet.size > 1) {
+          unidadesMistas.add(cnpj);
+          detalhesCompletos[cnpj] = {
+            statusList: statusArray.sort(),
+            nomeUnidade:
+              nomesPorUnidade.get(cnpj) || "Unidade não identificada",
+          };
+          console.log(
+            `    ⚠️  UNIDADE COM STATUS MISTO DETECTADA: ${nomesPorUnidade.get(
+              cnpj
+            )}`
+          );
+        } else {
+          console.log(`    ✅ Unidade com status único: ${statusArray[0]}`);
+        }
+      });
+
+      console.log(
+        `🎯 RESULTADO FINAL: ${unidadesMistas.size} unidades com status misto encontradas`
+      );
+
+      if (unidadesMistas.size === 0) {
+        console.log(
+          "🧹 Nenhuma unidade com status misto - removendo localStorage se existir"
+        );
+        try {
+          localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
+        } catch (error) {
+          console.warn("Erro ao limpar localStorage:", error);
+        }
+      } else {
+        console.log("📝 Unidades com status misto:");
+        unidadesMistas.forEach((cnpj) => {
+          console.log(
+            `  - ${cnpj}: ${
+              detalhesCompletos[cnpj].nomeUnidade
+            } (${detalhesCompletos[cnpj].statusList.join(", ")})`
+          );
+        });
+      }
+
+      return { unidadesMistas, detalhes: detalhesCompletos };
+    } catch (error) {
+      console.error("❌ Erro ao detectar unidades com status misto:", error);
+      // Em caso de erro, limpa localStorage para evitar estados inconsistentes
+      try {
+        localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
+      } catch (e) {
+        console.warn("Erro ao limpar localStorage após erro na detecção:", e);
+      }
+      return { unidadesMistas: new Set(), detalhes: {} };
+    }
+  };
+
+  // Removido: definição duplicada de carregarDados
 
   useEffect(() => {
     carregarDados();
   }, [carregarDados]);
+
+  // Após concluir uma operação (processando: true -> false), verifica e limpa travas automaticamente
+  useEffect(() => {
+    const terminou = processandoAnteriorRef.current && !processando;
+    if (terminou) {
+      // Se havia travas/monitoramento, força uma verificação imediata
+      if (monitoramentoAtivo || unidadesComStatusMisto.size > 0) {
+        forcarVerificacaoTravas();
+      }
+    }
+    processandoAnteriorRef.current = processando;
+  }, [processando, monitoramentoAtivo, unidadesComStatusMisto.size]);
 
   // Effect para carregar estados do localStorage na inicialização
   useEffect(() => {
@@ -590,17 +797,21 @@ export function KanbanCobranca() {
       const movimentacaoIndividual = carregarMovimentacaoIndividualStorage();
       if (movimentacaoIndividual) {
         setMovimentacaoIndividualFeita(true);
-        console.log('📂 Restaurado estado de movimentação individual do sessionStorage');
+        console.log(
+          "📂 Restaurado estado de movimentação individual do sessionStorage"
+        );
       }
 
       const { unidades, detalhes } = carregarStatusMistoStorage();
       if (unidades.size > 0) {
         setUnidadesComStatusMisto(unidades);
         setDetalhesStatusMisto(detalhes);
-        console.log('📂 Restaurado estado de unidades com status misto do localStorage');
+        console.log(
+          "📂 Restaurado estado de unidades com status misto do localStorage"
+        );
       }
     } catch (error) {
-      console.warn('Erro ao carregar dados do storage, limpando cache:', error);
+      console.warn("Erro ao carregar dados do storage, limpando cache:", error);
       limparStorageKanban();
     }
   }, []);
@@ -608,25 +819,65 @@ export function KanbanCobranca() {
   // Effect para detectar o atalho de teclado para limpar cache (Ctrl+Shift+K)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey && event.shiftKey && event.key === 'K') {
+      if (event.ctrlKey && event.shiftKey && event.key === "K") {
         event.preventDefault();
-        if (window.confirm(
-          '🧹 LIMPAR CACHE DO KANBAN\n\n' +
-          'Esta ação irá:\n' +
-          '• Limpar todos os dados salvos localmente\n' +
-          '• Resetar travas de movimentação\n' +
-          '• Recarregar a página\n\n' +
-          'Útil para resolver problemas de sincronização.\n\n' +
-          'Continuar?'
-        )) {
-          limparStorageKanban();
-          window.location.reload();
-        }
+        // Usa toast em vez de confirm para evitar bloqueio
+        toast(
+          (t) => (
+            <div className="flex flex-col gap-3">
+              <div className="font-bold text-orange-600">
+                🧹 LIMPAR CACHE DO KANBAN
+              </div>
+              <div className="text-sm text-gray-700">
+                Esta ação irá:
+                <br />• Limpar todos os dados salvos localmente
+                <br />• Resetar travas de movimentação
+                <br />• Recarregar a página
+                <br />
+                <br />
+                Útil para resolver problemas de sincronização.
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
+                  onClick={() => toast.dismiss(t.id)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="px-3 py-1 bg-orange-500 text-white rounded text-sm hover:bg-orange-600"
+                  onClick={() => {
+                    toast.dismiss(t.id);
+                    console.log(
+                      "🧹 Limpando cache do Kanban via atalho Ctrl+Shift+K"
+                    );
+                    limparStorageKanban();
+                    setTimeout(() => {
+                      window.location.reload();
+                    }, 500);
+                  }}
+                >
+                  Limpar Cache
+                </button>
+              </div>
+            </div>
+          ),
+          {
+            duration: Infinity,
+            style: {
+              background: "#fff",
+              color: "#333",
+              border: "2px solid #f97316",
+              padding: "16px",
+              maxWidth: "500px",
+            },
+          }
+        );
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   // Effect para salvar estado de movimentação individual no sessionStorage
@@ -641,26 +892,25 @@ export function KanbanCobranca() {
     let intervalId: NodeJS.Timeout | null = null;
 
     if (monitoramentoAtivo) {
-      console.log('⏰ Iniciando monitoramento automático a cada 10 segundos');
-      
+      console.log("⏰ Iniciando monitoramento automático a cada 10 segundos");
+
       // Executa imediatamente
       monitorarELiberarTravas();
-      
+
       // Configura execução periódica
       intervalId = setInterval(() => {
-        console.log('⏰ Executando verificação periódica...');
+        console.log("⏰ Executando verificação periódica...");
         monitorarELiberarTravas();
       }, 10000); // Verifica a cada 10 segundos
-
     } else {
-      console.log('🛑 Monitoramento automático está inativo');
+      console.log("🛑 Monitoramento automático está inativo");
     }
 
     // Cleanup
     return () => {
       if (intervalId) {
         clearInterval(intervalId);
-        console.log('🧹 Intervalo de monitoramento limpo');
+        console.log("🧹 Intervalo de monitoramento limpo");
       }
     };
   }, [monitoramentoAtivo, monitorarELiberarTravas]);
@@ -669,7 +919,10 @@ export function KanbanCobranca() {
   useEffect(() => {
     if (unidadesComStatusMisto.size > 0 && !monitoramentoAtivo) {
       // Inicia monitoramento automaticamente quando há unidades bloqueadas
-      console.log('🚀 Iniciando monitoramento automático - unidades detectadas:', Array.from(unidadesComStatusMisto));
+      console.log(
+        "🚀 Iniciando monitoramento automático - unidades detectadas:",
+        Array.from(unidadesComStatusMisto)
+      );
       iniciarMonitoramento();
     }
   }, [unidadesComStatusMisto.size, monitoramentoAtivo, iniciarMonitoramento]);
@@ -750,11 +1003,15 @@ export function KanbanCobranca() {
 
     // Busca a unidade pelo draggableId para verificar o CNPJ
     const unidadeCard = getUnitCardsByColuna(result.source.droppableId).find(
-      u => u.codigo_unidade === result.draggableId
+      (u) => u.codigo_unidade === result.draggableId
     );
 
     // Verifica se é uma unidade com status misto no modo agrupado usando CNPJ
-    if (aba === "unidade" && unidadeCard && unidadesComStatusMisto.has(unidadeCard.cnpj)) {
+    if (
+      aba === "unidade" &&
+      unidadeCard &&
+      unidadesComStatusMisto.has(unidadeCard.cnpj)
+    ) {
       // Define qual unidade será mostrada no modal de detalhes
       setModalDetalhesStatusMisto(unidadeCard.cnpj);
       setShowMixedStatusWarning(true);
@@ -783,7 +1040,9 @@ export function KanbanCobranca() {
       );
 
       if (!unit) {
-        throw new Error(`Unidade ${draggableId} não encontrada na coluna ${source.droppableId}`);
+        throw new Error(
+          `Unidade ${draggableId} não encontrada na coluna ${source.droppableId}`
+        );
       }
 
       console.log(
@@ -792,31 +1051,48 @@ export function KanbanCobranca() {
 
       // CORREÇÃO: Buscar cobranças individuais usando KanbanService com modo individual
       // Em vez de usar cards do estado (que pode ter dados agrupados), busca diretamente do banco
-      console.log(`Buscando cobranças individuais da unidade CNPJ: ${unit.cnpj}`);
-      
-      const todasCobrancasIndividuais = await kanbanService.buscarCards({}, false); // false = modo individual
-      const cobrancasUnidade = todasCobrancasIndividuais.filter(card => card.cnpj === unit.cnpj);
-      
-      console.log(`Total de cobranças individuais encontradas para a unidade: ${cobrancasUnidade.length}`);
-      
+      console.log(
+        `Buscando cobranças individuais da unidade CNPJ: ${unit.cnpj}`
+      );
+
+      const todasCobrancasIndividuais = await kanbanService.buscarCards(
+        {},
+        false
+      ); // false = modo individual
+      const cobrancasUnidade = todasCobrancasIndividuais.filter(
+        (card) => card.cnpj === unit.cnpj
+      );
+
+      console.log(
+        `Total de cobranças individuais encontradas para a unidade: ${cobrancasUnidade.length}`
+      );
+
       if (cobrancasUnidade.length === 0) {
-        throw new Error(`Nenhuma cobrança individual encontrada para a unidade ${unit.nome_unidade}`);
+        throw new Error(
+          `Nenhuma cobrança individual encontrada para a unidade ${unit.nome_unidade}`
+        );
       }
 
       // Valida que todas as cobranças têm UUIDs válidos
-      const cobrancasComUUIDInvalido = cobrancasUnidade.filter(card => 
-        !card.id || card.id.length !== 36 || !card.id.includes('-')
+      const cobrancasComUUIDInvalido = cobrancasUnidade.filter(
+        (card) => !card.id || card.id.length !== 36 || !card.id.includes("-")
       );
-      
+
       if (cobrancasComUUIDInvalido.length > 0) {
-        console.error('Cobranças com UUID inválido:', cobrancasComUUIDInvalido);
-        throw new Error(`Encontradas ${cobrancasComUUIDInvalido.length} cobranças com UUID inválido`);
+        console.error("Cobranças com UUID inválido:", cobrancasComUUIDInvalido);
+        throw new Error(
+          `Encontradas ${cobrancasComUUIDInvalido.length} cobranças com UUID inválido`
+        );
       }
 
       // Move todas as cobranças da unidade para o status de destino
       await Promise.all(
         cobrancasUnidade.map(async (card) => {
-          console.log(`Movendo cobrança UUID: ${card.id} de ${card.status_atual} para ${destination!.droppableId}`);
+          console.log(
+            `Movendo cobrança UUID: ${card.id} de ${card.status_atual} para ${
+              destination!.droppableId
+            }`
+          );
           return kanbanService.moverCard(
             card.id, // UUID correto da cobrança individual
             destination!.droppableId,
@@ -832,10 +1108,15 @@ export function KanbanCobranca() {
 
       // Recarrega os dados para refletir as mudanças
       await carregarDados();
-      
     } catch (error) {
       console.error("Erro ao mover cobranças da unidade:", error);
-      alert(`Erro ao mover unidade: ${error}`);
+      toast.error(`Erro ao mover unidade: ${error}`, {
+        duration: 5000,
+        style: {
+          background: "#ef4444",
+          color: "#fff",
+        },
+      });
       // Recarrega os dados mesmo em caso de erro para garantir consistência
       await carregarDados();
     } finally {
@@ -879,21 +1160,26 @@ export function KanbanCobranca() {
       );
 
       console.log(`Card ${draggableId} movido com sucesso`);
-      
+
       // Inicia monitoramento se não estiver ativo
       if (!monitoramentoAtivo && unidadesComStatusMisto.size > 0) {
         iniciarMonitoramento();
       }
-      
+
       // Força verificação imediata após movimentação (com delay para garantir que o banco foi atualizado)
       setTimeout(async () => {
-        console.log('🔍 Verificação automática pós-movimentação...');
-        await monitorarELiberarTravas();
-      }, 3000); // 3 segundos de delay para garantir que a transação foi processada
-      
+        console.log("🔍 Verificação forçada pós-movimentação...");
+        await forcarVerificacaoTravas();
+      }, 2000); // 2 segundos de delay para garantir que a transação foi processada
     } catch (error) {
       console.error("Erro ao mover cobrança, revertendo:", error);
-      alert(`Erro ao mover cobrança: ${error}`);
+      toast.error(`Erro ao mover cobrança: ${error}`, {
+        duration: 5000,
+        style: {
+          background: "#ef4444",
+          color: "#fff",
+        },
+      });
       // Se falhar, reverte para o estado original
       setCards(originalCards);
     } finally {
@@ -936,7 +1222,13 @@ export function KanbanCobranca() {
       console.log(`Ação '${acao}' executada com sucesso`);
     } catch (error) {
       console.error("Erro ao executar ação:", error);
-      alert(`Erro ao executar ação: ${error}`);
+      toast.error(`Erro ao executar ação: ${error}`, {
+        duration: 5000,
+        style: {
+          background: "#ef4444",
+          color: "#fff",
+        },
+      });
     } finally {
       setProcessando(false);
     }
@@ -960,7 +1252,13 @@ export function KanbanCobranca() {
       }
     } catch (error) {
       console.error("Erro ao salvar observação:", error);
-      alert(`Erro ao salvar observação: ${error}`);
+      toast.error(`Erro ao salvar observação: ${error}`, {
+        duration: 5000,
+        style: {
+          background: "#ef4444",
+          color: "#fff",
+        },
+      });
     } finally {
       setProcessando(false);
     }
@@ -980,7 +1278,16 @@ export function KanbanCobranca() {
 
       if (error) {
         console.error("Erro ao buscar unidade:", error);
-        alert("Erro ao buscar informações da unidade para envio do WhatsApp.");
+        toast.error(
+          "Erro ao buscar informações da unidade para envio do WhatsApp.",
+          {
+            duration: 5000,
+            style: {
+              background: "#ef4444",
+              color: "#fff",
+            },
+          }
+        );
         return;
       }
 
@@ -1025,7 +1332,13 @@ _Equipe de Cobrança_
       });
 
       if (resultado.success) {
-        alert("✅ WhatsApp enviado com sucesso!");
+        toast.success("✅ WhatsApp enviado com sucesso!", {
+          duration: 4000,
+          style: {
+            background: "#22c55e",
+            color: "#fff",
+          },
+        });
         console.log(
           `WhatsApp enviado com sucesso. Message ID: ${resultado.messageId}`
         );
@@ -1037,7 +1350,13 @@ _Equipe de Cobrança_
       }
     } catch (error) {
       console.error("Erro ao enviar WhatsApp:", error);
-      alert(`❌ Erro ao enviar WhatsApp: ${error}`);
+      toast.error(`❌ Erro ao enviar WhatsApp: ${error}`, {
+        duration: 5000,
+        style: {
+          background: "#ef4444",
+          color: "#fff",
+        },
+      });
     } finally {
       setProcessando(false);
     }
@@ -1057,7 +1376,16 @@ _Equipe de Cobrança_
 
       if (error) {
         console.error("Erro ao buscar unidade:", error);
-        alert("Erro ao buscar informações da unidade para envio do WhatsApp.");
+        toast.error(
+          "Erro ao buscar informações da unidade para envio do WhatsApp.",
+          {
+            duration: 5000,
+            style: {
+              background: "#ef4444",
+              color: "#fff",
+            },
+          }
+        );
         return;
       }
 
@@ -1137,7 +1465,13 @@ _Equipe de Cobrança_
       });
 
       if (resultado.success) {
-        alert("✅ WhatsApp agrupado enviado com sucesso!");
+        toast.success("✅ WhatsApp agrupado enviado com sucesso!", {
+          duration: 4000,
+          style: {
+            background: "#22c55e",
+            color: "#fff",
+          },
+        });
         console.log(
           `WhatsApp agrupado enviado com sucesso. Message ID: ${resultado.messageId}`
         );
@@ -1146,7 +1480,13 @@ _Equipe de Cobrança_
       }
     } catch (error) {
       console.error("Erro ao enviar WhatsApp agrupado:", error);
-      alert(`❌ Erro ao enviar WhatsApp agrupado: ${error}`);
+      toast.error(`❌ Erro ao enviar WhatsApp agrupado: ${error}`, {
+        duration: 5000,
+        style: {
+          background: "#ef4444",
+          color: "#fff",
+        },
+      });
     } finally {
       setProcessando(false);
       setModalConfirmacaoWhatsAppUnidade(false);
@@ -1172,7 +1512,13 @@ _Equipe de Cobrança_
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      alert("Erro ao exportar dados");
+      toast.error("Erro ao exportar dados", {
+        duration: 5000,
+        style: {
+          background: "#ef4444",
+          color: "#fff",
+        },
+      });
     }
   };
 
@@ -1181,7 +1527,7 @@ _Equipe de Cobrança_
     if (status === "quitado") {
       return "border-green-500 bg-green-50";
     }
-    
+
     switch (criticidade) {
       case "critica":
         return "border-red-500 bg-red-50";
@@ -1197,7 +1543,7 @@ _Equipe de Cobrança_
     if (status === "quitado") {
       return "bg-green-100 text-green-800";
     }
-    
+
     switch (criticidade) {
       case "critica":
         return "bg-red-100 text-red-800";
@@ -1213,7 +1559,7 @@ _Equipe de Cobrança_
     if (status === "quitado") {
       return "QUITADO";
     }
-    
+
     return criticidade?.toUpperCase() || "NORMAL";
   };
 
@@ -1323,7 +1669,10 @@ _Equipe de Cobrança_
                 </div>
                 {detalhesStatusMisto[unit.cnpj]?.statusList && (
                   <div className="mt-1 text-xs">
-                    Status: {detalhesStatusMisto[unit.cnpj].statusList.map(s => formatarStatusCobranca(s)).join(', ')}
+                    Status:{" "}
+                    {detalhesStatusMisto[unit.cnpj].statusList
+                      .map((s) => formatarStatusCobranca(s))
+                      .join(", ")}
                   </div>
                 )}
               </div>
@@ -1357,7 +1706,10 @@ _Equipe de Cobrança_
                   unit.status_atual
                 )}`}
               >
-                {getCriticidadeTexto(unit.charges[0]?.criticidade || "normal", unit.status_atual)}
+                {getCriticidadeTexto(
+                  unit.charges[0]?.criticidade || "normal",
+                  unit.status_atual
+                )}
               </span>
               <span className="text-xs text-gray-500">
                 {unit.responsavel_atual}
@@ -1444,6 +1796,17 @@ _Equipe de Cobrança_
 
   return (
     <div className="max-w-full mx-auto p-6">
+      <Toaster
+        position="top-center"
+        reverseOrder={false}
+        toastOptions={{
+          duration: 5000,
+          style: {
+            background: "#363636",
+            color: "#fff",
+          },
+        }}
+      />
       <div className="bg-white rounded-lg shadow-lg p-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
@@ -1459,12 +1822,15 @@ _Equipe de Cobrança_
                 {monitoramentoAtivo && (
                   <span className="ml-2 inline-flex items-center">
                     <div className="animate-pulse w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></div>
-                    <span className="text-green-600 text-xs font-medium">Monitoramento ativo</span>
+                    <span className="text-green-600 text-xs font-medium">
+                      Monitoramento ativo
+                    </span>
                   </span>
                 )}
               </p>
               <p className="text-gray-500 text-xs mt-1">
-                💡 Dica: Use Ctrl+Shift+K para limpar cache • Sistema monitora travas automaticamente
+                💡 Dica: Use Ctrl+Shift+K para limpar cache • Sistema monitora
+                travas automaticamente
               </p>
             </div>
           </div>
@@ -1478,8 +1844,9 @@ _Equipe de Cobrança_
               Exportar
             </button>
             <button
-              onClick={carregarDados}
+              onClick={handleAtualizarClick}
               disabled={carregando}
+              title={(movimentacaoIndividualFeita || unidadesComStatusMisto.size > 0) ? 'Liberar travas e atualizar' : 'Atualizar dados'}
               className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               <RefreshCw
@@ -1523,7 +1890,7 @@ _Equipe de Cobrança_
         {/* Seletor de Modo */}
         <div className="space-y-4 mb-6">
           <div className="flex items-center space-x-4">
-            <div className="flex bg-gray-100 rounded-lg p-1">
+            <div className="flex bg-gray-100 rounded-lg p-1 flex-wrap gap-1 md:flex-nowrap">
               <button
                 onClick={() => {
                   if (movimentacaoIndividualFeita) {
@@ -1542,7 +1909,7 @@ _Equipe de Cobrança_
                     setAba("unidade");
                   }
                 }}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                   aba === "unidade"
                     ? "bg-blue-600 text-white"
                     : "text-gray-600 hover:text-gray-800"
@@ -1566,7 +1933,7 @@ _Equipe de Cobrança_
               </button>
               <button
                 onClick={() => setAba("individual")}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                   aba === "individual"
                     ? "bg-blue-600 text-white"
                     : "text-gray-600 hover:text-gray-800"
@@ -1581,99 +1948,12 @@ _Equipe de Cobrança_
               </button>
             </div>
 
-            {/* Botões de controle de travas */}
-            {(movimentacaoIndividualFeita || unidadesComStatusMisto.size > 0) && (
-              <div className="flex items-center space-x-2">
-                {/* Botão para resetar travas */}
-                <button
-                  onClick={() => {
-                    if (window.confirm(
-                      "🔄 RESETAR TRAVAS\n\n" +
-                      "Esta ação irá:\n" +
-                      "• Limpar o histórico de movimentações individuais\n" +
-                      "• Re-detectar unidades com status misto\n" +
-                      "• Parar o monitoramento automático\n" +
-                      "• Recarregar todos os dados\n\n" +
-                      "Deseja continuar?"
-                    )) {
-                      limparStorageKanban();
-                      setMovimentacaoIndividualFeita(false);
-                      setUnidadesComStatusMisto(new Set());
-                      setDetalhesStatusMisto({});
-                      pararMonitoramento();
-                      carregarDados();
-                    }
-                  }}
-                  className="flex items-center px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
-                >
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Resetar Travas
-                </button>
-
-                {/* Botão de liberação forçada - só mostra se há unidades bloqueadas */}
-                {unidadesComStatusMisto.size > 0 && (
-                  <button
-                    onClick={forcarLiberacaoTravas}
-                    className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                    title="Força a liberação de todas as travas (usar apenas em emergências)"
-                  >
-                    <AlertTriangle className="w-4 h-4 mr-2" />
-                    Forçar Liberação
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Controle do monitoramento */}
-            {unidadesComStatusMisto.size > 0 && (
-              <button
-                onClick={() => {
-                  if (monitoramentoAtivo) {
-                    pararMonitoramento();
-                  } else {
-                    iniciarMonitoramento();
-                  }
-                }}
-                className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-                  monitoramentoAtivo 
-                    ? 'bg-red-600 hover:bg-red-700 text-white' 
-                    : 'bg-green-600 hover:bg-green-700 text-white'
-                }`}
-              >
-                {monitoramentoAtivo ? (
-                  <>
-                    <div className="w-4 h-4 mr-2 flex items-center justify-center">
-                      <div className="w-2 h-2 bg-white rounded-full"></div>
-                    </div>
-                    Parar Monitor
-                  </>
-                ) : (
-                  <>
-                    <div className="animate-pulse w-2 h-2 bg-white rounded-full mr-3"></div>
-                    Iniciar Monitor
-                  </>
-                )}
-              </button>
-            )}
-
             {movimentacaoIndividualFeita && (
               <div className="flex items-center px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg">
                 <AlertTriangle className="w-4 h-4 text-orange-600 mr-2" />
                 <span className="text-sm text-orange-800 font-medium">
-                  Modo Individual Ativo - Continue movendo uma por uma
+                  Modo Individual Ativo - O modo de movimento de cobranças por unidade está desativado até todas as cobranças terem o mesmo status!
                 </span>
-              </div>
-            )}
-
-            {/* Indicador de monitoramento ativo */}
-            {monitoramentoAtivo && unidadesComStatusMisto.size > 0 && (
-              <div className="flex items-center px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center">
-                  <div className="animate-pulse w-2 h-2 bg-blue-600 rounded-full mr-2"></div>
-                  <span className="text-sm text-blue-800 font-medium">
-                    Monitoramento ativo - verificando liberação de travas...
-                  </span>
-                </div>
               </div>
             )}
           </div>
@@ -1903,29 +2183,40 @@ _Equipe de Cobrança_
                 <AlertTriangle className="w-5 h-5 text-orange-600 mr-3 mt-0.5" />
                 <div className="flex-1">
                   <p className="text-orange-800 font-medium mb-2">
-                    ⚠️ {unidadesMistasCount} unidade(s) com status misto detectada(s)
+                    ⚠️ {unidadesMistasCount} unidade(s) com status misto
+                    detectada(s)
                   </p>
                   <p className="text-orange-700 text-sm mb-3">
-                    Essas unidades possuem cobranças com status diferentes e estão bloqueadas no modo agrupado.
+                    Essas unidades possuem cobranças com status diferentes e
+                    estão bloqueadas no modo agrupado.
                   </p>
-                  
+
                   {/* Lista resumida das unidades bloqueadas */}
                   <div className="bg-orange-100 border border-orange-300 rounded-lg p-3 mb-3">
-                    <p className="text-orange-800 font-medium text-sm mb-2">📋 Unidades bloqueadas:</p>
+                    <p className="text-orange-800 font-medium text-sm mb-2">
+                      📋 Unidades bloqueadas:
+                    </p>
                     <div className="space-y-1 max-h-32 overflow-y-auto">
-                      {Array.from(unidadesComStatusMisto).slice(0, 5).map((cnpj) => {
-                        const detalhes = detalhesStatusMisto[cnpj];
-                        return (
-                          <div key={cnpj} className="text-xs text-orange-700 flex items-center justify-between">
-                            <span className="font-medium">
-                              {detalhes?.nomeUnidade || 'Unidade não identificada'}
-                            </span>
-                            <span className="text-orange-600">
-                              {detalhes?.statusList?.join(', ') || 'Status não identificado'}
-                            </span>
-                          </div>
-                        );
-                      })}
+                      {Array.from(unidadesComStatusMisto)
+                        .slice(0, 5)
+                        .map((cnpj) => {
+                          const detalhes = detalhesStatusMisto[cnpj];
+                          return (
+                            <div
+                              key={cnpj}
+                              className="text-xs text-orange-700 flex items-center justify-between"
+                            >
+                              <span className="font-medium">
+                                {detalhes?.nomeUnidade ||
+                                  "Unidade não identificada"}
+                              </span>
+                              <span className="text-orange-600">
+                                {detalhes?.statusList?.join(", ") ||
+                                  "Status não identificado"}
+                              </span>
+                            </div>
+                          );
+                        })}
                       {unidadesMistasCount > 5 && (
                         <div className="text-xs text-orange-600 italic">
                           ... e mais {unidadesMistasCount - 5} unidade(s)
@@ -1935,12 +2226,26 @@ _Equipe de Cobrança_
                   </div>
 
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-blue-800 text-sm font-medium mb-1">💡 Como resolver:</p>
+                    <p className="text-blue-800 text-sm font-medium mb-1">
+                      💡 Como resolver:
+                    </p>
                     <ul className="text-blue-700 text-sm space-y-1">
-                      <li>• <strong>Modo Individual:</strong> Mova cada cobrança separadamente para padronizar o status</li>
-                      <li>• <strong>Verificação:</strong> Confirme se algumas cobranças foram quitadas parcialmente</li>
-                      <li>• <strong>Liberação automática:</strong> Sistema monitora e libera travas automaticamente quando status forem padronizados</li>
-                      <li>• <strong>Ação manual:</strong> Use "Resetar Travas" se necessário</li>
+                      <li>
+                        • <strong>Modo Individual:</strong> Mova cada cobrança
+                        separadamente para padronizar o status
+                      </li>
+                      <li>
+                        • <strong>Verificação:</strong> Confirme se algumas
+                        cobranças foram quitadas parcialmente
+                      </li>
+                      <li>
+                        • <strong>Liberação automática:</strong> Sistema
+                        monitora e libera travas automaticamente quando status
+                        forem padronizados
+                      </li>
+                      <li>
+                        • <strong>Ação manual:</strong> Clique em "Atualizar" para limpar travas quando houver bloqueios
+                      </li>
                     </ul>
                   </div>
 
@@ -1949,7 +2254,9 @@ _Equipe de Cobrança_
                       <div className="flex items-center">
                         <div className="animate-pulse w-2 h-2 bg-green-600 rounded-full mr-2"></div>
                         <p className="text-green-800 text-sm font-medium">
-                          🤖 Monitoramento automático ativo - O sistema está verificando a cada 10 segundos se as unidades podem ser liberadas
+                          🤖 Monitoramento automático ativo - O sistema está
+                          verificando a cada 10 segundos se as unidades podem
+                          ser liberadas
                         </p>
                       </div>
                     </div>
@@ -1966,7 +2273,7 @@ _Equipe de Cobrança_
                 </button>
                 <button
                   onClick={async () => {
-                    console.log('🔍 Verificação manual solicitada...');
+                    console.log("🔍 Verificação manual solicitada...");
                     await monitorarELiberarTravas();
                   }}
                   className="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
@@ -1976,11 +2283,13 @@ _Equipe de Cobrança_
                 </button>
                 <button
                   onClick={() => {
-                    if (window.confirm(
-                      "🔄 Deseja re-detectar unidades com status misto?\n\n" +
-                      "Esta ação irá verificar novamente todas as unidades."
-                    )) {
-                      detectarUnidadesComStatusMisto().then(resultado => {
+                    if (
+                      window.confirm(
+                        "🔄 Deseja re-detectar unidades com status misto?\n\n" +
+                          "Esta ação irá verificar novamente todas as unidades."
+                      )
+                    ) {
+                      detectarUnidadesComStatusMisto().then((resultado) => {
                         setUnidadesComStatusMisto(resultado.unidadesMistas);
                         setDetalhesStatusMisto(resultado.detalhes);
                       });
@@ -2091,25 +2400,34 @@ _Equipe de Cobrança_
                 🔒 Unidade com Status Misto Bloqueada
               </h3>
             </div>
-            
+
             {(() => {
               const detalhes = detalhesStatusMisto[modalDetalhesStatusMisto];
               return (
                 <div className="space-y-4 mb-6">
                   <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                     <h4 className="text-orange-800 font-semibold mb-2">
-                      📋 {detalhes?.nomeUnidade || 'Unidade não identificada'}
+                      📋 {detalhes?.nomeUnidade || "Unidade não identificada"}
                     </h4>
                     <p className="text-orange-700 text-sm mb-3">
-                      Esta unidade possui cobranças com <strong>{detalhes?.statusList?.length || 0} status diferentes</strong> e não pode ser movida no modo agrupado.
+                      Esta unidade possui cobranças com{" "}
+                      <strong>
+                        {detalhes?.statusList?.length || 0} status diferentes
+                      </strong>{" "}
+                      e não pode ser movida no modo agrupado.
                     </p>
-                    
+
                     {detalhes?.statusList && (
                       <div className="bg-orange-100 border border-orange-300 rounded-lg p-3">
-                        <p className="text-orange-800 text-sm font-medium mb-2">🏷️ Status encontrados:</p>
+                        <p className="text-orange-800 text-sm font-medium mb-2">
+                          🏷️ Status encontrados:
+                        </p>
                         <div className="flex flex-wrap gap-2">
                           {detalhes.statusList.map((status, index) => (
-                            <span key={index} className="px-2 py-1 bg-orange-200 text-orange-800 text-xs rounded-full">
+                            <span
+                              key={index}
+                              className="px-2 py-1 bg-orange-200 text-orange-800 text-xs rounded-full"
+                            >
                               {formatarStatusCobranca(status)}
                             </span>
                           ))}
@@ -2119,18 +2437,30 @@ _Equipe de Cobrança_
                   </div>
 
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-blue-800 text-sm font-medium mb-2">💡 Como resolver:</p>
+                    <p className="text-blue-800 text-sm font-medium mb-2">
+                      💡 Como resolver:
+                    </p>
                     <ul className="text-blue-700 text-sm space-y-1">
-                      <li>• <strong>Modo Individual:</strong> Acesse "Por Cobrança" para mover cada cobrança separadamente</li>
-                      <li>• <strong>Padronização:</strong> Mova todas as cobranças para o mesmo status</li>
-                      <li>• <strong>Verificação:</strong> Confirme se algumas cobranças foram quitadas parcialmente</li>
+                      <li>
+                        • <strong>Modo Individual:</strong> Acesse "Por
+                        Cobrança" para mover cada cobrança separadamente
+                      </li>
+                      <li>
+                        • <strong>Padronização:</strong> Mova todas as cobranças
+                        para o mesmo status
+                      </li>
+                      <li>
+                        • <strong>Verificação:</strong> Confirme se algumas
+                        cobranças foram quitadas parcialmente
+                      </li>
                     </ul>
                   </div>
 
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                     <p className="text-yellow-800 text-sm">
-                      ⚠️ <strong>Exemplo:</strong> Se uma unidade tem uma cobrança "quitada" e outra "em aberto", 
-                      elas não podem ser movidas juntas pois estão em situações diferentes.
+                      ⚠️ <strong>Exemplo:</strong> Se uma unidade tem uma
+                      cobrança "quitada" e outra "em aberto", elas não podem ser
+                      movidas juntas pois estão em situações diferentes.
                     </p>
                   </div>
                 </div>
@@ -2296,7 +2626,7 @@ _Equipe de Cobrança_
                   <h4 className="font-semibold text-gray-800 mb-3">
                     Ações para Toda a Unidade
                   </h4>
-                  
+
                   {unitSelecionada.status_atual === "quitado" ? (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                       <div className="flex items-center">
@@ -2304,8 +2634,13 @@ _Equipe de Cobrança_
                           <span className="text-green-600 font-bold">✓</span>
                         </div>
                         <div>
-                          <p className="text-green-800 font-medium">Unidade Quitada</p>
-                          <p className="text-green-700 text-sm">Todas as cobranças desta unidade foram quitadas. Não é possível realizar ações de cobrança.</p>
+                          <p className="text-green-800 font-medium">
+                            Unidade Quitada
+                          </p>
+                          <p className="text-green-700 text-sm">
+                            Todas as cobranças desta unidade foram quitadas. Não
+                            é possível realizar ações de cobrança.
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -2324,7 +2659,10 @@ _Equipe de Cobrança_
                       </button>
                       <button
                         onClick={() =>
-                          executarAcao(unitSelecionada.codigo_unidade, "reuniao")
+                          executarAcao(
+                            unitSelecionada.codigo_unidade,
+                            "reuniao"
+                          )
                         }
                         disabled={processando}
                         className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
@@ -2425,7 +2763,7 @@ _Equipe de Cobrança_
                   <h4 className="font-semibold text-gray-800 mb-3">
                     Ações para Esta Cobrança
                   </h4>
-                  
+
                   {cobrancaSelecionada.status_atual === "quitado" ? (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                       <div className="flex items-center">
@@ -2433,8 +2771,13 @@ _Equipe de Cobrança_
                           <span className="text-green-600 font-bold">✓</span>
                         </div>
                         <div>
-                          <p className="text-green-800 font-medium">Cobrança Quitada</p>
-                          <p className="text-green-700 text-sm">Esta cobrança já foi quitada. Não é possível realizar ações.</p>
+                          <p className="text-green-800 font-medium">
+                            Cobrança Quitada
+                          </p>
+                          <p className="text-green-700 text-sm">
+                            Esta cobrança já foi quitada. Não é possível
+                            realizar ações.
+                          </p>
                         </div>
                       </div>
                     </div>
