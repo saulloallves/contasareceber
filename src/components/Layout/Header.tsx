@@ -1,4 +1,4 @@
-import { Bell, Maximize } from "lucide-react";
+//import { Bell, Maximize } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Alerta } from "../../types/alertas";
 import { alertasService } from "../../services/alertasService";
@@ -76,14 +76,6 @@ export function Header({ user }: HeaderProps) {
     };
   }, []); // O array vazio garante que isso rode apenas uma vez
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
-  };
-
   // Função para fechar o modal de resultado da importação
   // e marcar o alerta como resolvido
   const handleFecharModalResultado = async () => {
@@ -117,17 +109,8 @@ export function Header({ user }: HeaderProps) {
         </div>
 
         <div className="flex items-center space-x-2">
-          {/* Fullscreen Toggle */}
-          <button
-            onClick={toggleFullscreen}
-            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Tela cheia"
-          >
-            <Maximize className="w-5 h-5" />
-          </button>
-
           {/* Notifications */}
-          <button
+          {/* <button
             onClick={() => setShowNotifications((v) => !v)}
             className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
             title="Notificações"
@@ -138,7 +121,7 @@ export function Header({ user }: HeaderProps) {
                 {alertas.length > 9 ? "9+" : alertas.length}
               </span>
             )}
-          </button>
+          </button> */}
 
           {showNotifications && (
             <NotificationsDropdown
@@ -148,8 +131,8 @@ export function Header({ user }: HeaderProps) {
             />
           )}
 
-          {/* User Account Dropdown */}
-          <div className="border-l border-gray-200 pl-4 flex flex-col items-end">
+          {/* User Account Dropdown - border-l border-gray-200  */}
+          <div className="pl-4 flex flex-col items-end">
             {user ? (
               <UserAccountDropdown user={user} />
             ) : (

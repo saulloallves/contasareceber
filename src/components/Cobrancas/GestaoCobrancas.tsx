@@ -1372,7 +1372,7 @@ Entre em contato: (11) 99999-9999`,
         <div className="flex items-center justify-between mb-8">
           {/* Ícone e Título */}
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-[#ff9923] to-[#ffc31a] rounded-xl flex items-center justify-center shadow-lg mr-4">
               <Receipt className="w-7 h-7 text-white" />
             </div>
             <div>
@@ -1407,7 +1407,7 @@ Entre em contato: (11) 99999-9999`,
             </button>
             <button
               onClick={abrirModalCriar}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="flex items-center px-4 py-2 bg-[#ff9923] text-white rounded-lg hover:bg-[#6b3a10] transition-colors duration-300"
             >
               <Plus className="w-4 h-4 mr-2" />
               Nova Cobrança
@@ -1432,13 +1432,13 @@ Entre em contato: (11) 99999-9999`,
               </button>
               <button
                 onClick={aplicarFiltros}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                className="px-4 py-2 bg-[#ffc31a] text-white rounded-lg hover:bg-[#ff9923] text-sm transition-colors duration-300"
               >
                 Aplicar
               </button>
               <button
                 onClick={limparFiltros}
-                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 text-sm"
+                className="px-4 py-2 bg-[#6b3a10] text-white rounded-lg hover:bg-[#a35919] text-sm transition-colors duration-300"
               >
                 Limpar
               </button>

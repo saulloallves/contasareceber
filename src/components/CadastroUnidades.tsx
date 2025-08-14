@@ -2,17 +2,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import {
-  Building2,
-  Settings,
-  Phone,
-  Mail,
-  Instagram,
-  MapPin,
-  Calendar,
-  Clock,
-  Info,
-  ChevronLeft,
-  ChevronRight,
+  Building2, Settings, Phone, Mail,
+  Instagram, MapPin, Calendar, Clock, Info,
 } from "lucide-react";
 import { supabase } from "../services/databaseService";
 
@@ -295,7 +286,7 @@ export function CadastroUnidades() {
     <div className="max-w-full mx-auto p-6">
       <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8 mb-8">
         <div className="flex items-center mb-2">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-[#ff9923] to-[#ffc31a] rounded-xl flex items-center justify-center shadow-lg mr-4">
             <Building2 className="w-7 h-7 text-white" />
           </div>
           <div>
@@ -325,7 +316,7 @@ export function CadastroUnidades() {
           </div>
           <button
             onClick={abrirModalNova}
-            className="px-4 py-2 bg-yellow-400 text-white rounded-lg font-semibold hover:bg-yellow-500 transition-all"
+            className="px-4 py-2 bg-[#ff9923] text-white rounded-lg font-semibold hover:bg-[#6b3a10] transition-colors duration-300"
           >
             + Nova Unidade
           </button>

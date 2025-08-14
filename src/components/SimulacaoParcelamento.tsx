@@ -1,26 +1,17 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
-  Calculator,
-  Send,
-  MessageSquare,
-  Mail,
-  CheckCircle,
-  Clock,
-  FileText,
-  Download,
-  Filter,
-  RefreshCw,
-  Eye,
-  AlertTriangle,
-  X,
+  Calculator, Send, MessageSquare, Mail, CheckCircle,
+  Clock, FileText, Download, Filter, RefreshCw,
+  Eye, AlertTriangle, X,
 } from "lucide-react";
 import { SimulacaoParcelamentoService } from "../services/simulacaoParcelamentoService";
-import {
-  SimulacaoParcelamento as SimulacaoParcelamentoType,
-  FiltrosSimulacao,
-  EstatisticasParcelamento,
-} from "../types/simulacaoParcelamento";
+import { SimulacaoParcelamento as SimulacaoParcelamentoType, FiltrosSimulacao, EstatisticasParcelamento, RegistroAceite } from "../types/simulacaoParcelamento";
+import { toast } from "react-hot-toast";
+import { cobrancaService } from "../services/cobrancaService";
+import { supabase } from "../lib/supabaseClient";
+import { useUserProfile } from "../hooks/useUserProfile";
 
 export function SimulacaoParcelamento() {
   const [abaSelecionada, setAbaSelecionada] = useState<
@@ -28,16 +19,34 @@ export function SimulacaoParcelamento() {
   >("simular");
   const [propostas, setPropostas] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(false);
-  const [processando, setProcessando] = useState(false);
+  // Estados separados de processamento
+  const [processandoSimulacao, setProcessandoSimulacao] = useState(false);
+  const [processandoProposta, setProcessandoProposta] = useState(false);
+  const [processandoAceite, setProcessandoAceite] = useState(false);
   const [filtros, setFiltros] = useState<FiltrosSimulacao>({});
   const [modalAberto, setModalAberto] = useState<
-    "simular" | "proposta" | "aceite" | null
+    "simular" | "proposta" | "aceite" | "detalhes" | "selecionarCobranca" | null
   >(null);
   const [simulacaoAtual, setSimulacaoAtual] =
     useState<SimulacaoParcelamentoType | null>(null);
   const [propostaSelecionada, setPropostaSelecionada] = useState<any>(null);
   const [estatisticas, setEstatisticas] =
     useState<EstatisticasParcelamento | null>(null);
+  const [aceites, setAceites] = useState<RegistroAceite[]>([]);
+  const [carregandoAceites, setCarregandoAceites] = useState(false);
+
+  // Autenticação/Perfil para "enviado_por"
+  const [userId, setUserId] = useState<string | undefined>(undefined);
+  const { profile } = useUserProfile(userId);
+
+  useEffect(() => {
+    // Captura o usuário autenticado atual
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      const uid = data.user?.id;
+      if (uid) setUserId(uid);
+    })();
+  }, []);
 
   // Form de simulação
   const [formSimulacao, setFormSimulacao] = useState({
@@ -59,11 +68,92 @@ export function SimulacaoParcelamento() {
     observacoes: "",
   });
 
-  const simulacaoService = new SimulacaoParcelamentoService();
+  const simulacaoService = useMemo(() => new SimulacaoParcelamentoService(), []);
+
+  // Estado e lógica para seleção de cobrança
+  const [cobrancas, setCobrancas] = useState<any[]>([]);
+  const [carregandoCobrancas, setCarregandoCobrancas] = useState(false);
+  // Paginação do modal Selecionar Cobrança
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const pageSize = 50;
+  // Filtros do modal Selecionar Cobrança
+  const [filtroNomeUnidade, setFiltroNomeUnidade] = useState("");
+  const [filtroCnpjUnidade, setFiltroCnpjUnidade] = useState("");
+  const [filtroCodigoUnidade, setFiltroCodigoUnidade] = useState("");
+  const [filtroValorMin, setFiltroValorMin] = useState<string>("");
+  const [filtroValorMax, setFiltroValorMax] = useState<string>("");
+  const [cobrancaSelecionada, setCobrancaSelecionada] = useState<any | null>(null);
+
+  const carregarCobrancas = async () => {
+    setCarregandoCobrancas(true);
+    try {
+  // Sempre que buscar novamente, volta para a primeira página
+  setPaginaAtual(1);
+      const filtrosServico: any = {
+        apenasInadimplentes: true,
+        colunaOrdenacao: "data_vencimento",
+        direcaoOrdenacao: "asc",
+      };
+  // CNPJ: aplicar filtro local por prefixo (usuário pode digitar só o começo)
+      if (filtroValorMin.trim()) filtrosServico.valorMin = parseFloat(filtroValorMin);
+      if (filtroValorMax.trim()) filtrosServico.valorMax = parseFloat(filtroValorMax);
+
+      let lista = await cobrancaService.buscarCobrancas(filtrosServico);
+
+      // Filtros locais por nome e código da unidade
+      if (filtroCnpjUnidade.trim()) {
+        const termoCnpj = filtroCnpjUnidade.replace(/\D/g, "");
+        lista = lista.filter((c: any) =>
+          (c.cnpj || "").replace(/\D/g, "").startsWith(termoCnpj)
+        );
+      }
+      if (filtroNomeUnidade.trim()) {
+        const termo = filtroNomeUnidade.toLowerCase();
+        lista = lista.filter((c: any) =>
+          (c.unidades_franqueadas?.nome_unidade || c.cliente || "")
+            .toLowerCase()
+            .includes(termo)
+        );
+      }
+      if (filtroCodigoUnidade.trim()) {
+        const termoCod = filtroCodigoUnidade.toLowerCase();
+        lista = lista.filter((c: any) =>
+          (c.unidades_franqueadas?.codigo_unidade || "")
+            .toLowerCase()
+            .includes(termoCod)
+        );
+      }
+
+      // Mantém todas as cobranças filtradas em memória; exibimos 50 por página
+      setCobrancas(lista);
+    } catch (error) {
+      console.error("Erro ao carregar cobranças:", error);
+      toast.error("Erro ao carregar cobranças");
+    } finally {
+      setCarregandoCobrancas(false);
+    }
+  };
+
+  // Garante que a página atual seja válida quando o total de itens mudar
+  useEffect(() => {
+    const totalPaginas = Math.max(1, Math.ceil(cobrancas.length / pageSize));
+    if (paginaAtual > totalPaginas) {
+      setPaginaAtual(totalPaginas);
+    }
+  }, [cobrancas]);
+
+  useEffect(() => {
+    if (modalAberto === "selecionarCobranca") {
+      carregarCobrancas();
+    }
+  }, [modalAberto]);
 
   useEffect(() => {
     if (abaSelecionada === "propostas") {
       carregarPropostas();
+    }
+    if (abaSelecionada === "aceites") {
+      carregarAceites();
     }
     carregarEstatisticas();
   }, [abaSelecionada, filtros]);
@@ -74,7 +164,8 @@ export function SimulacaoParcelamento() {
       const dados = await simulacaoService.buscarPropostas(filtros);
       setPropostas(dados);
     } catch (error) {
-      console.error("Erro ao carregar propostas:", error);
+  console.error("Erro ao carregar propostas:", error);
+  toast.error("Erro ao carregar propostas");
     } finally {
       setCarregando(false);
     }
@@ -85,17 +176,31 @@ export function SimulacaoParcelamento() {
       const stats = await simulacaoService.buscarEstatisticas();
       setEstatisticas(stats);
     } catch (error) {
-      console.error("Erro ao carregar estatísticas:", error);
+  console.error("Erro ao carregar estatísticas:", error);
+  toast.error("Erro ao carregar estatísticas");
+    }
+  };
+
+  const carregarAceites = async () => {
+    setCarregandoAceites(true);
+    try {
+      const dados = await simulacaoService.buscarAceites();
+      setAceites(dados);
+    } catch (error) {
+      console.error("Erro ao carregar aceites:", error);
+      toast.error("Erro ao carregar aceites");
+    } finally {
+      setCarregandoAceites(false);
     }
   };
 
   const simularParcelamento = async () => {
     if (!formSimulacao.titulo_id || !formSimulacao.data_primeira_parcela) {
-      alert("ID do título e data da primeira parcela são obrigatórios");
+      toast.error("ID do título e data da primeira parcela são obrigatórios");
       return;
     }
 
-    setProcessando(true);
+    setProcessandoSimulacao(true);
     try {
       const simulacao = await simulacaoService.simularParcelamento(
         formSimulacao.titulo_id,
@@ -106,16 +211,18 @@ export function SimulacaoParcelamento() {
 
       setSimulacaoAtual(simulacao);
     } catch (error) {
-      alert(`Erro na simulação: ${error instanceof Error ? error.message : error}`);
+      toast.error(
+        `Erro na simulação: ${error instanceof Error ? error.message : String(error)}`
+      );
     } finally {
-      setProcessando(false);
+      setProcessandoSimulacao(false);
     }
   };
 
   const gerarProposta = async () => {
     if (!simulacaoAtual) return;
 
-    setProcessando(true);
+  setProcessandoProposta(true);
     try {
       // Salva simulação primeiro
       const simulacaoId = await simulacaoService.salvarSimulacao(
@@ -126,7 +233,7 @@ export function SimulacaoParcelamento() {
       const proposta = await simulacaoService.gerarProposta(
         simulacaoId,
         formProposta.canais_envio,
-        "usuario_atual" // Em produção, pegar do contexto
+    (profile?.nome_completo || profile?.email || "Usuário")
       );
 
       // Envia pelos canais selecionados
@@ -146,7 +253,7 @@ export function SimulacaoParcelamento() {
         resultados.push(`Email: ${sucessoEmail ? "Enviado" : "Falha"}`);
       }
 
-      alert(`Proposta gerada e enviada!\n${resultados.join("\n")}`);
+  toast.success(`Proposta gerada e enviada!\n${resultados.join("\n")}`);
 
       setModalAberto(null);
       setSimulacaoAtual(null);
@@ -156,38 +263,42 @@ export function SimulacaoParcelamento() {
         data_primeira_parcela: "",
         valor_entrada: 0,
       });
-
-      if (abaSelecionada === "propostas") {
-        carregarPropostas();
-      }
+      // Alterna para a aba de propostas e atualiza a lista e as estatísticas imediatamente
+      setAbaSelecionada("propostas");
+      await carregarPropostas();
+      await carregarEstatisticas();
     } catch (error) {
-      alert(`Erro ao gerar proposta: ${error}`);
+  toast.error(`Erro ao gerar proposta: ${String(error)}`);
     } finally {
-      setProcessando(false);
+  setProcessandoProposta(false);
     }
   };
 
   const registrarAceite = async () => {
     if (!propostaSelecionada) return;
 
-    setProcessando(true);
+    setProcessandoAceite(true);
     try {
       await simulacaoService.registrarAceite(
         propostaSelecionada.id,
         formAceite.metodo_aceite,
-        "unknown_ip", // Em produção, capturar IP real
+        "unknown_ip", // TODO: capturar IP real no backend
         navigator.userAgent,
         formAceite.observacoes
       );
 
-      alert("Aceite registrado com sucesso!");
+      toast.success("Aceite registrado com sucesso!");
       setModalAberto(null);
       setPropostaSelecionada(null);
-      carregarPropostas();
+  // Atualiza propostas, estatísticas e a lista de aceites e alterna para a aba de aceites
+  await carregarPropostas();
+  await carregarEstatisticas();
+  await carregarAceites();
+  setAbaSelecionada("aceites");
     } catch (error) {
-      alert(`Erro ao registrar aceite: ${error}`);
+      toast.error(`Erro ao registrar aceite: ${String(error)}`);
     } finally {
-      setProcessando(false);
+      setProcessandoAceite(false);
     }
   };
 
@@ -205,8 +316,9 @@ export function SimulacaoParcelamento() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+  toast.success("Exportação iniciada");
     } catch (error) {
-      alert(`Erro ao exportar dados: ${error}`);
+  toast.error(`Erro ao exportar dados: ${String(error)}`);
     }
   };
 
@@ -256,7 +368,7 @@ export function SimulacaoParcelamento() {
       <div className="bg-white rounded-lg shadow-lg p-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-[#ff9923] to-[#ffc31a] rounded-xl flex items-center justify-center shadow-lg mr-4">
               <Calculator className="w-7 h-7 text-white" />
             </div>
             <div>
@@ -272,17 +384,10 @@ export function SimulacaoParcelamento() {
           <div className="flex space-x-3">
             <button
               onClick={exportarDados}
-              className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              className="flex items-center px-4 py-2 bg-[#ff9923] text-white rounded-lg hover:bg-[#6b3a10] transition-colors duration-300"
             >
               <Download className="w-4 h-4 mr-2" />
               Exportar
-            </button>
-            <button
-              onClick={() => setModalAberto("simular")}
-              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-            >
-              <Calculator className="w-4 h-4 mr-2" />
-              Nova Simulação
             </button>
           </div>
         </div>
@@ -367,18 +472,35 @@ export function SimulacaoParcelamento() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     ID do Título (Cobrança) *
                   </label>
-                  <input
-                    type="text"
-                    value={formSimulacao.titulo_id}
-                    onChange={(e) =>
-                      setFormSimulacao({
-                        ...formSimulacao,
-                        titulo_id: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                    placeholder="UUID da cobrança"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={formSimulacao.titulo_id}
+                      onChange={(e) => {
+                        setFormSimulacao({
+                          ...formSimulacao,
+                          titulo_id: e.target.value,
+                        });
+                        setCobrancaSelecionada(null);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                      placeholder="UUID da cobrança"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setModalAberto("selecionarCobranca")}
+                      className="px-3 py-2 bg-[#ff9923] text-white rounded-lg hover:bg-[#6b3a10] transition-colors duration-300 "
+                    >
+                      Selecionar
+                    </button>
+                  </div>
+                  {cobrancaSelecionada && (
+                    <div className="mt-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded p-2">
+                      <div><span className="font-medium">Unidade:</span> {cobrancaSelecionada.unidades_franqueadas?.nome_unidade || cobrancaSelecionada.cliente}</div>
+                      <div><span className="font-medium">CNPJ:</span> {cobrancaSelecionada.cnpj}</div>
+                      <div className="flex gap-4"><span className="font-medium">Valor:</span> {formatarMoeda(cobrancaSelecionada.valor_atualizado || cobrancaSelecionada.valor_original)} <span className="font-medium">Venc.:</span> {formatarData(cobrancaSelecionada.data_vencimento)}</div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -441,10 +563,10 @@ export function SimulacaoParcelamento() {
 
                 <button
                   onClick={simularParcelamento}
-                  disabled={processando}
+                  disabled={processandoSimulacao}
                   className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                 >
-                  {processando ? "Simulando..." : "Simular Parcelamento"}
+                  {processandoSimulacao ? "Simulando..." : "Simular Parcelamento"}
                 </button>
               </div>
 
@@ -480,13 +602,19 @@ export function SimulacaoParcelamento() {
                       <span>Parcelas:</span>
                       <span className="font-medium">
                         {simulacaoAtual.quantidade_parcelas}x{" "}
-                        {formatarMoeda(simulacaoAtual.parcelas[0].valor)}
+                        {formatarMoeda(simulacaoAtual.parcelas?.[0]?.valor || 0)}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Juros por parcela:</span>
+                      <span>Multa:</span>
                       <span className="font-medium">
-                        {simulacaoAtual.percentual_juros_parcela}%
+                        10% ({formatarMoeda(simulacaoAtual.parcelas?.[0]?.multa || 0)})
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Juros Mora:</span>
+                      <span className="font-medium">
+                        {simulacaoAtual.percentual_juros_mora}% ({formatarMoeda(simulacaoAtual.parcelas?.[0]?.juros_mora || 0)})
                       </span>
                     </div>
                     <div className="flex justify-between border-t pt-2">
@@ -510,11 +638,69 @@ export function SimulacaoParcelamento() {
                     ))}
                   </div>
 
+                  {/* Canais de envio */}
+                  <div className="mb-4">
+                    <h5 className="font-medium text-gray-800 mb-2">Canais de envio</h5>
+                    <div className="flex flex-wrap items-center gap-6">
+                      <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          id="whatsapp-card"
+                          checked={formProposta.canais_envio.includes("whatsapp")}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormProposta({
+                                ...formProposta,
+                                canais_envio: [...formProposta.canais_envio, "whatsapp"],
+                              });
+                            } else {
+                              setFormProposta({
+                                ...formProposta,
+                                canais_envio: formProposta.canais_envio.filter((c) => c !== "whatsapp"),
+                              });
+                            }
+                          }}
+                          className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                        />
+                        <span className="flex items-center">
+                          <MessageSquare className="w-4 h-4 mr-1 text-green-600" />
+                          WhatsApp
+                        </span>
+                      </label>
+                      <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          id="email-card"
+                          checked={formProposta.canais_envio.includes("email")}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormProposta({
+                                ...formProposta,
+                                canais_envio: [...formProposta.canais_envio, "email"],
+                              });
+                            } else {
+                              setFormProposta({
+                                ...formProposta,
+                                canais_envio: formProposta.canais_envio.filter((c) => c !== "email"),
+                              });
+                            }
+                          }}
+                          className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                        />
+                        <span className="flex items-center">
+                          <Mail className="w-4 h-4 mr-1 text-blue-600" />
+                          Email
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
                   <button
-                    onClick={() => setModalAberto("proposta")}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    onClick={gerarProposta}
+                    disabled={processandoProposta || formProposta.canais_envio.length === 0}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors duration-300"
                   >
-                    Gerar Proposta
+                    {processandoProposta ? "Gerando..." : "Gerar e Enviar Proposta"}
                   </button>
                 </div>
               )}
@@ -675,11 +861,55 @@ export function SimulacaoParcelamento() {
         )}
 
         {abaSelecionada === "aceites" && (
-          <div className="text-center py-8">
-            <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-            <p className="text-gray-600">
-              Funcionalidade de aceites em desenvolvimento
-            </p>
+          <div className="space-y-6">
+            <div className="flex items-center mb-2">
+              <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+              <h3 className="text-lg font-semibold text-gray-800">Aceites Registrados</h3>
+            </div>
+
+            {carregandoAceites ? (
+              <div className="text-center py-8">
+                <RefreshCw className="w-8 h-8 animate-spin text-green-600 mx-auto mb-4" />
+                <p className="text-gray-600">Carregando aceites...</p>
+              </div>
+            ) : aceites.length === 0 ? (
+              <div className="text-center py-8">
+                <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">Nenhum aceite registrado</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {aceites.map((a) => (
+                  <div key={a.id} className="border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="text-sm text-gray-600">CNPJ</p>
+                        <h4 className="text-base font-semibold text-gray-800">{a.cnpj_unidade}</h4>
+                      </div>
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 capitalize">
+                        {a.metodo_aceite}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-700">
+                      <div>
+                        <span className="font-medium">Data do aceite:</span> {new Date(a.data_aceite).toLocaleString("pt-BR")}
+                      </div>
+                      <div>
+                        <span className="font-medium">Proposta ID:</span> {a.proposta_id}
+                      </div>
+                      <div>
+                        <span className="font-medium">Título ID:</span> {a.titulo_id}
+                      </div>
+                    </div>
+                    {a.observacoes && (
+                      <p className="mt-3 text-sm text-gray-600">
+                        <span className="font-medium">Observações:</span> {a.observacoes}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -701,98 +931,108 @@ export function SimulacaoParcelamento() {
             </div>
 
             <div className="space-y-6">
-              {/* Resumo da Simulação */}
+              {/* Resumo da Simulação (igual ao modal da Gestão de Cobranças) */}
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <h4 className="font-medium text-green-800 mb-2">
-                  Resumo da Simulação:
+                  Resultado da Simulação
                 </h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    Valor Atualizado:{" "}
-                    {formatarMoeda(simulacaoAtual.valor_atualizado)}
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Valor Original:</span>
+                    <span className="font-medium">{formatarMoeda(simulacaoAtual.valor_original)}</span>
                   </div>
-                  <div>
-                    Parcelas: {simulacaoAtual.quantidade_parcelas}x{" "}
-                    {formatarMoeda(simulacaoAtual.parcelas[0].valor)}
+                  <div className="flex justify-between">
+                    <span>Valor Atualizado:</span>
+                    <span className="font-medium text-red-600">{formatarMoeda(simulacaoAtual.valor_atualizado)}</span>
                   </div>
-                  <div>Juros: {simulacaoAtual.percentual_juros_parcela}%</div>
-                  <div>
-                    Total:{" "}
-                    {formatarMoeda(simulacaoAtual.valor_total_parcelamento)}
+                  <div className="flex justify-between">
+                    <span>Parcelas:</span>
+                    <span className="font-medium">{simulacaoAtual.quantidade_parcelas}x {formatarMoeda(simulacaoAtual.parcelas?.[0]?.valor || 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Multa:</span>
+                    <span className="font-medium">10% ({formatarMoeda(simulacaoAtual.parcelas?.[0]?.multa || 0)})</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Juros Mora:</span>
+                    <span className="font-medium">{simulacaoAtual.percentual_juros_mora}% ({formatarMoeda(simulacaoAtual.parcelas?.[0]?.juros_mora || 0)})</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="font-semibold">Total:</span>
+                    <span className="font-bold text-blue-600">{formatarMoeda(simulacaoAtual.valor_total_parcelamento)}</span>
                   </div>
                 </div>
-              </div>
 
-              {/* Canais de Envio */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Canais de Envio
-                </label>
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="whatsapp"
-                      checked={formProposta.canais_envio.includes("whatsapp")}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setFormProposta({
-                            ...formProposta,
-                            canais_envio: [
-                              ...formProposta.canais_envio,
-                              "whatsapp",
-                            ],
-                          });
-                        } else {
-                          setFormProposta({
-                            ...formProposta,
-                            canais_envio: formProposta.canais_envio.filter(
-                              (c) => c !== "whatsapp"
-                            ),
-                          });
-                        }
-                      }}
-                      className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                    />
-                    <label
-                      htmlFor="whatsapp"
-                      className="ml-2 text-sm text-gray-700 flex items-center"
-                    >
-                      <MessageSquare className="w-4 h-4 mr-1 text-green-600" />
-                      WhatsApp
-                    </label>
+                {/* Cronograma */}
+                <div className="bg-white border rounded-lg p-3 mt-3">
+                  <h5 className="font-medium mb-2">Cronograma:</h5>
+                  <div className="space-y-1 text-sm">
+                    {simulacaoAtual.parcelas.map((parcela, idx) => (
+                      <div key={idx} className="flex justify-between">
+                        <span>
+                          Parcela {parcela.numero} ({formatarData(parcela.data_vencimento)}):
+                        </span>
+                        <span>{formatarMoeda(parcela.valor)}</span>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="email"
-                      checked={formProposta.canais_envio.includes("email")}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setFormProposta({
-                            ...formProposta,
-                            canais_envio: [
-                              ...formProposta.canais_envio,
-                              "email",
-                            ],
-                          });
-                        } else {
-                          setFormProposta({
-                            ...formProposta,
-                            canais_envio: formProposta.canais_envio.filter(
-                              (c) => c !== "email"
-                            ),
-                          });
-                        }
-                      }}
-                      className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                    />
-                    <label
-                      htmlFor="email"
-                      className="ml-2 text-sm text-gray-700 flex items-center"
-                    >
-                      <Mail className="w-4 h-4 mr-1 text-blue-600" />
-                      Email
+                </div>
+
+                {/* Canais de envio */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Canais de envio
+                  </label>
+                  <div className="flex flex-wrap items-center gap-6">
+                    <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        id="whatsapp"
+                        checked={formProposta.canais_envio.includes("whatsapp")}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormProposta({
+                              ...formProposta,
+                              canais_envio: [...formProposta.canais_envio, "whatsapp"],
+                            });
+                          } else {
+                            setFormProposta({
+                              ...formProposta,
+                              canais_envio: formProposta.canais_envio.filter((c) => c !== "whatsapp"),
+                            });
+                          }
+                        }}
+                        className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                      />
+                      <span className="flex items-center">
+                        <MessageSquare className="w-4 h-4 mr-1 text-green-600" />
+                        WhatsApp
+                      </span>
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        id="email"
+                        checked={formProposta.canais_envio.includes("email")}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormProposta({
+                              ...formProposta,
+                              canais_envio: [...formProposta.canais_envio, "email"],
+                            });
+                          } else {
+                            setFormProposta({
+                              ...formProposta,
+                              canais_envio: formProposta.canais_envio.filter((c) => c !== "email"),
+                            });
+                          }
+                        }}
+                        className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                      />
+                      <span className="flex items-center">
+                        <Mail className="w-4 h-4 mr-1 text-blue-600" />
+                        Email
+                      </span>
                     </label>
                   </div>
                 </div>
@@ -821,10 +1061,10 @@ export function SimulacaoParcelamento() {
             <div className="flex space-x-3 mt-6">
               <button
                 onClick={gerarProposta}
-                disabled={processando || formProposta.canais_envio.length === 0}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                disabled={processandoProposta || formProposta.canais_envio.length === 0}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                {processando ? "Gerando..." : "Gerar e Enviar Proposta"}
+                {processandoProposta ? "Gerando..." : "Gerar e Enviar Proposta"}
               </button>
               <button
                 onClick={() => setModalAberto(null)}
@@ -1062,10 +1302,10 @@ export function SimulacaoParcelamento() {
             <div className="flex space-x-3 mt-6">
               <button
                 onClick={registrarAceite}
-                disabled={processando}
+                disabled={processandoAceite}
                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
               >
-                {processando ? "Registrando..." : "Confirmar Aceite"}
+                {processandoAceite ? "Registrando..." : "Confirmar Aceite"}
               </button>
               <button
                 onClick={() => setModalAberto(null)}
@@ -1074,6 +1314,204 @@ export function SimulacaoParcelamento() {
                 Cancelar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Modal Selecionar Cobrança */}
+      {modalAberto === "selecionarCobranca" && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-5xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Selecionar Cobrança</h3>
+              <button
+                onClick={() => setModalAberto(null)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+              <input
+                type="text"
+                value={filtroNomeUnidade}
+                onChange={(e) => setFiltroNomeUnidade(e.target.value)}
+                placeholder="Nome da unidade"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+              />
+              <input
+                type="text"
+                value={filtroCnpjUnidade}
+                onChange={(e) => setFiltroCnpjUnidade(e.target.value)}
+                placeholder="CNPJ da unidade"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+              />
+              <input
+                type="text"
+                value={filtroCodigoUnidade}
+                onChange={(e) => setFiltroCodigoUnidade(e.target.value)}
+                placeholder="Código da unidade"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  step="0.01"
+                  value={filtroValorMin}
+                  onChange={(e) => setFiltroValorMin(e.target.value)}
+                  placeholder="Valor mín."
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  value={filtroValorMax}
+                  onChange={(e) => setFiltroValorMax(e.target.value)}
+                  placeholder="Valor máx."
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={carregarCobrancas}
+                className="px-4 py-2 bg-[#6b3a10] text-white rounded-lg hover:bg-[#a35919] transition-colors duration-200"
+              >
+                Buscar
+              </button>
+              <button
+                onClick={() => {
+                  setFiltroNomeUnidade("");
+                  setFiltroCnpjUnidade("");
+                  setFiltroCodigoUnidade("");
+                  setFiltroValorMin("");
+                  setFiltroValorMax("");
+                  carregarCobrancas();
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+              >
+                Resetar
+              </button>
+            </div>
+
+            {/* Controles de paginação (topo) */}
+            {cobrancas.length > 0 && (
+              <div className="flex items-center justify-between mb-3 text-sm text-gray-700">
+                {(() => {
+                  const total = cobrancas.length;
+                  const totalPaginas = Math.max(1, Math.ceil(total / pageSize));
+                  const inicio = (paginaAtual - 1) * pageSize + 1;
+                  const fim = Math.min(paginaAtual * pageSize, total);
+                  return (
+                    <>
+                      <div>
+                        Mostrando {inicio}–{fim} de {total}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setPaginaAtual((p) => Math.max(1, p - 1))}
+                          disabled={paginaAtual === 1}
+                          className="px-3 py-1 border rounded disabled:opacity-50"
+                        >
+                          Anterior
+                        </button>
+                        <span>
+                          Página {paginaAtual} de {totalPaginas}
+                        </span>
+                        <button
+                          onClick={() => setPaginaAtual((p) => Math.min(totalPaginas, p + 1))}
+                          disabled={paginaAtual === totalPaginas}
+                          className="px-3 py-1 border rounded disabled:opacity-50"
+                        >
+                          Próxima
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
+            {carregandoCobrancas ? (
+              <div className="text-center py-6">
+                <RefreshCw className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
+                <p className="text-gray-600">Carregando cobranças...</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {cobrancas.length === 0 ? (
+                  <div className="text-center py-6 text-gray-600">Nenhuma cobrança encontrada</div>
+                ) : (
+                  // Fatia da página atual com 50 itens
+                  cobrancas
+                    .slice((paginaAtual - 1) * pageSize, (paginaAtual - 1) * pageSize + pageSize)
+                    .map((c) => (
+                    <div key={c.id} className="border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+                      <div className="text-sm text-gray-700">
+                        <div className="font-medium text-gray-900">
+                          {c.unidades_franqueadas?.nome_unidade || c.cliente}
+                        </div>
+                        <div className="text-gray-600">CNPJ: {c.cnpj}</div>
+                        <div className="flex gap-4">
+                          <span>Valor: <span className="font-medium">{formatarMoeda(c.valor_atualizado || c.valor_original)}</span></span>
+                          <span>Venc.: <span className="font-medium">{formatarData(c.data_vencimento)}</span></span>
+                          <span>Status: <span className="font-medium capitalize">{c.status}</span></span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setCobrancaSelecionada(c);
+                          setFormSimulacao((prev) => ({ ...prev, titulo_id: c.id }));
+                          setModalAberto(null);
+                          toast.success("Cobrança selecionada");
+                        }}
+                        className="px-3 py-2 bg-[#ff9923] text-white rounded-lg hover:bg-[#ffc31a] transition-colors duration-200"
+                      >
+                        Selecionar
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Controles de paginação (rodapé) */}
+            {cobrancas.length > 0 && (
+              <div className="flex items-center justify-between mt-4 text-sm text-gray-700">
+                {(() => {
+                  const total = cobrancas.length;
+                  const totalPaginas = Math.max(1, Math.ceil(total / pageSize));
+                  const inicio = (paginaAtual - 1) * pageSize + 1;
+                  const fim = Math.min(paginaAtual * pageSize, total);
+                  return (
+                    <>
+                      <div>
+                        Mostrando {inicio}–{fim} de {total}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setPaginaAtual((p) => Math.max(1, p - 1))}
+                          disabled={paginaAtual === 1}
+                          className="px-3 py-1 border rounded disabled:opacity-50"
+                        >
+                          Anterior
+                        </button>
+                        <span>
+                          Página {paginaAtual} de {totalPaginas}
+                        </span>
+                        <button
+                          onClick={() => setPaginaAtual((p) => Math.min(totalPaginas, p + 1))}
+                          disabled={paginaAtual === totalPaginas}
+                          className="px-3 py-1 border rounded disabled:opacity-50"
+                        >
+                          Próxima
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </div>
       )}

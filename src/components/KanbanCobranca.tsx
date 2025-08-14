@@ -1791,7 +1791,7 @@ _Mensagem Automática do Sistema_
       <div className="bg-white rounded-lg shadow-lg p-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-[#ff9923] to-[#ffc31a] rounded-xl flex items-center justify-center shadow-lg mr-4">
               <CircleDollarSign className="w-7 h-7 text-white" />
             </div>
             <div>
@@ -1819,7 +1819,7 @@ _Mensagem Automática do Sistema_
           <div className="flex space-x-3">
             <button
               onClick={exportarDados}
-              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               <Download className="w-4 h-4 mr-2" />
               Exportar
@@ -1828,7 +1828,7 @@ _Mensagem Automática do Sistema_
               onClick={handleAtualizarClick}
               disabled={carregando}
               title={(movimentacaoIndividualFeita || unidadesComStatusMisto.size > 0) ? 'Liberar travas e atualizar' : 'Atualizar dados'}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center px-4 py-2 bg-[#ff9923] text-white rounded-lg hover:bg-[#6b3a10] disabled:opacity-50 transition-colors"
             >
               <RefreshCw
                 className={`w-4 h-4 mr-2 ${carregando ? "animate-spin" : ""}`}
@@ -1892,7 +1892,7 @@ _Mensagem Automática do Sistema_
                 }}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                   aba === "unidade"
-                    ? "bg-blue-600 text-white"
+                    ? "bg-[#ff9923] text-white"
                     : "text-gray-600 hover:text-gray-800"
                 } ${movimentacaoIndividualFeita ? "opacity-50" : ""}`}
                 disabled={movimentacaoIndividualFeita}
@@ -1916,7 +1916,7 @@ _Mensagem Automática do Sistema_
                 onClick={() => setAba("individual")}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                   aba === "individual"
-                    ? "bg-blue-600 text-white"
+                    ? "bg-[#ff9923] text-white"
                     : "text-gray-600 hover:text-gray-800"
                 }`}
               >
@@ -1943,7 +1943,7 @@ _Mensagem Automática do Sistema_
           <div className="flex items-center justify-between">
             <button
               onClick={() => setShowFiltrosAvancados(!showFiltrosAvancados)}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="flex items-center px-4 py-2 bg-[#6b3a10] text-white rounded-lg hover:bg-[#a35919] transition-colors"
             >
               <Filter className="w-4 h-4 mr-2" />
               {showFiltrosAvancados ? "Ocultar Filtros" : "Mostrar Filtros"}

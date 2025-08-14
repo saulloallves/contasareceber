@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { LogIn, Shield } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 // import logo from "../../assets/logo-header.png";
 const LOGO_URL = "https://raw.githubusercontent.com/saulloallves/contasareceber/refs/heads/main/src/assets/logo-header.png";
@@ -32,62 +32,6 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
       }
     } catch {
       setError("Erro ao fazer login");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDemoLogin = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      // Faz login com usuário demo fixo (certifique-se que existe no Authentication)
-      const { error } = await supabase.auth.signInWithPassword({
-        email: "admin@crescieperdi.com",
-        password: "admin123456",
-      });
-
-      if (error) {
-        // Se usuário demo não existe, cria automaticamente
-        if (error.message.includes('Invalid login credentials')) {
-          console.log('🔧 Usuário demo não existe, criando...');
-          const { error: signUpError } = await supabase.auth.signUp({
-            email: "admin@crescieperdi.com",
-            password: "admin123456",
-            options: {
-              data: {
-                name: "Admin Demo",
-                full_name: "Administrador Demo"
-              }
-            }
-          });
-          
-          if (signUpError) {
-            setError("Erro ao criar usuário demo: " + signUpError.message);
-            return;
-          }
-          
-          // Tenta login novamente
-          const { error: loginError } = await supabase.auth.signInWithPassword({
-            email: "admin@crescieperdi.com",
-            password: "admin123456",
-          });
-          
-          if (loginError) {
-            setError("Erro no login após criação: " + loginError.message);
-            return;
-          }
-        } else {
-          setError("Erro ao fazer login demo: " + error.message);
-          return;
-        }
-      }
-
-      onAuthSuccess();
-    } catch (error) {
-      console.error('❌ Erro no login demo:', error);
-      setError("Erro ao acessar modo demo");
     } finally {
       setLoading(false);
     }
@@ -214,7 +158,7 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
               type="button"
               onClick={handleRegularLogin}
               disabled={loading}
-              className="w-full flex items-center justify-center px-4 py-2 bg-[#ffc31b] text-white rounded-lg hover:bg-[#663912] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+              className="w-full flex items-center justify-center px-4 py-2 bg-[#ff9923] text-white rounded-lg hover:bg-[#663912] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
             >
               {loading ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
@@ -222,15 +166,6 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
                 <LogIn className="w-5 h-5 mr-2" />
               )}
               {loading ? "Entrando..." : "Entrar"}
-            </button>
-            <button
-              type="button"
-              onClick={handleDemoLogin}
-              disabled={loading}
-              className="w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-all duration-300"
-            >
-              <Shield className="w-5 h-5 mr-2" />
-              {loading ? "Carregando..." : "Modo Demo"}
             </button>
           </div>
         </form>

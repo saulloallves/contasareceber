@@ -6,13 +6,11 @@ const GestaoCobrancas = lazy(() => import("./components/Cobrancas/GestaoCobranca
 const CadastroUnidades = lazy(() => import("./components/CadastroUnidades").then(m => ({ default: m.CadastroUnidades })));
 const GestaoReunioes = lazy(() => import("./components/GestaoReunioes").then(m => ({ default: m.GestaoReunioes })));
 const GestaoAcordos = lazy(() => import("./components/GestaoAcordos").then(m => ({ default: m.GestaoAcordos })));
-const ScoreRisco = lazy(() => import("./components/ScoreRisco").then(m => ({ default: m.ScoreRisco })));
 const GestaoBloqueios = lazy(() => import("./components/GestaoBloqueios").then(m => ({ default: m.GestaoBloqueios })));
 const PainelJuridico = lazy(() => import("./components/PainelJuridico").then(m => ({ default: m.PainelJuridico })));
 const ConfiguracaoAdmin = lazy(() => import("./components/ConfiguracaoAdmin").then(m => ({ default: m.ConfiguracaoAdmin })));
 const GeradorDocumentos = lazy(() => import("./components/GeradorDocumentos").then(m => ({ default: m.GeradorDocumentos })));
 const RelatoriosMensais = lazy(() => import("./components/RelatoriosMensais").then(m => ({ default: m.RelatoriosMensais })));
-const ModuloIntegracoes = lazy(() => import("./components/ModuloIntegracoes").then(m => ({ default: m.ModuloIntegracoes })));
 const GestaoUsuarios = lazy(() => import("./components/Usuarios/GestaoUsuarios").then(m => ({ default: m.GestaoUsuarios })));
 const AuditoriaLogs = lazy(() => import("./components/AuditoriaLogs").then(m => ({ default: m.AuditoriaLogs })));
 const TemplatesJuridicos = lazy(() => import("./components/TemplatesJuridicos").then(m => ({ default: m.TemplatesJuridicos })));
@@ -86,7 +84,7 @@ function AppContent() {
   const renderContent = () => {
   switch (activeTab) {
       case "dashboard":
-    return <DashboardGeral />;
+        return <DashboardGeral onNavigate={setActiveTab} />;
       case "cobrancas":
         return <KanbanCobranca />;
       case "cobrancas-lista":
@@ -103,8 +101,6 @@ function AppContent() {
         return <GestaoReunioes />;
       case "acordos":
         return <GestaoAcordos />;
-      case "score-risco":
-        return <ScoreRisco />;
       case "bloqueios":
         return <GestaoBloqueios />;
       case "juridico":
@@ -115,8 +111,6 @@ function AppContent() {
         return <PainelIndicadoresEstrategicos />;
       case "documentos":
         return <GeradorDocumentos />;
-      case "integracoes":
-        return <ModuloIntegracoes />;
       case "admin":
         return <ConfiguracaoAdmin />;
       case "auditoria":

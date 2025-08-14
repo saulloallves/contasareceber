@@ -133,33 +133,6 @@ export class EmailService {
     };
 
     const resultado = await this.enviarEmail(dadosEmail);
-
-    // Registra o log se o envio foi bem-sucedido
-    if (resultado.sucesso && dadosCobranca.id) {
-      try {
-        const { cobrancaService } = await import("./cobrancaService");
-        await cobrancaService.registrarLogEnvioEmail({
-          cobrancaId: dadosCobranca.id,
-          tipo: "proposta_parcelamento",
-          destinatario: destinatario,
-          assunto: template.assunto,
-          mensagem: template.corpo_texto,
-          usuario: "Sistema",
-          metadados: {
-            valor_original: simulacao.valor_original,
-            valor_parcelamento: simulacao.valor_total_parcelamento,
-            quantidade_parcelas: simulacao.quantidade_parcelas,
-            codigo_unidade: dadosUnidade.codigo_unidade,
-          },
-        });
-      } catch (logError) {
-        console.warn(
-          "Erro ao registrar log de proposta de parcelamento:",
-          logError
-        );
-      }
-    }
-
     return resultado;
   }
 
@@ -229,34 +202,6 @@ export class EmailService {
     };
 
     const resultado = await this.enviarEmail(dadosEmail);
-
-    // Registra o log se o envio foi bem-sucedido
-    if (resultado.sucesso && dadosCobranca.id) {
-      try {
-        const { cobrancaService } = await import("./cobrancaService");
-        const tipoEnvio =
-          tipoTemplate === "personalizada"
-            ? "cobranca_padrao"
-            : `cobranca_${tipoTemplate}`;
-        await cobrancaService.registrarLogEnvioEmail({
-          cobrancaId: dadosCobranca.id,
-          tipo: tipoEnvio as any,
-          destinatario: destinatario,
-          assunto: template.assunto,
-          mensagem: template.corpo_texto,
-          usuario: "Sistema",
-          metadados: {
-            valor_original: dadosCobranca.valor_original,
-            valor_atualizado: dadosCobranca.valor_atualizado,
-            dias_atraso: dadosCobranca.dias_em_atraso,
-            codigo_unidade: dadosUnidade.codigo_unidade,
-          },
-        });
-      } catch (logError) {
-        console.warn("Erro ao registrar log de cobrança por email:", logError);
-      }
-    }
-
     return resultado;
   }
 
@@ -339,21 +284,23 @@ export class EmailService {
       // Para TODOS os outros casos, sempre usa "Franqueado(a)"
       nomeCliente = "Franqueado(a)";
     }
-    const codigoUnidade = dadosUnidade.codigo_unidade || dadosCobranca.cnpj;
+  const codigoUnidade = dadosUnidade.codigo_unidade || dadosCobranca.cnpj;
+  const nomeUnidade = dadosUnidade.nome_unidade || dadosCobranca?.cliente || codigoUnidade;
 
-    const assunto = `Proposta de Parcelamento - ${codigoUnidade}`;
+  // Assunto sem código/unidade, conforme solicitado
+  const assunto = `Proposta de Parcelamento`;
 
     const corpo_html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
         <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
           <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #3B82F6; margin: 0;">💰 Proposta de Parcelamento</h1>
+            <h1 style="color: #3B82F6; margin: 0;">Proposta de Parcelamento</h1>
             <p style="color: #666; margin: 10px 0 0 0;">Cresci e Perdi - Departamento Financeiro</p>
           </div>
           
           <p>Prezado(a) <strong>${nomeCliente}</strong>,</p>
           
-          <p>Temos uma proposta especial para regularizar o débito da unidade <strong>${codigoUnidade}</strong>.</p>
+          <p>Temos uma proposta especial para regularizar o débito da unidade <strong>${nomeUnidade}</strong>.</p>
           
           <div style="background-color: #EBF8FF; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="color: #2563EB; margin-top: 0;">📋 Detalhes da Proposta:</h3>
@@ -469,12 +416,12 @@ export class EmailService {
       </div>
     `;
 
-    const corpo_texto = `
-PROPOSTA DE PARCELAMENTO - ${codigoUnidade}
+  const corpo_texto = `
+PROPOSTA DE PARCELAMENTO
 
 Prezado(a) ${nomeCliente},
 
-Temos uma proposta especial para regularizar o débito da unidade ${codigoUnidade}.
+Temos uma proposta especial para regularizar o débito da unidade ${nomeUnidade}.
 
 DETALHES DA PROPOSTA:
 - Valor Original: ${this.formatarMoeda(simulacao.valor_original)}

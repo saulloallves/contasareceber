@@ -29,7 +29,7 @@ export const alertasService = {
     return data as Alerta[];
   },
 
-  async marcarComoResolvido(alertaId: string): Promise<void> {
+  async marcarComoResolvido(id: number, alertaId: string): Promise<void> {
     const { error } = await supabase
       .from("alertas_sistema")
       .update({

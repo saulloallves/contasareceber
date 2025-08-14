@@ -629,11 +629,15 @@ export class SimulacaoParcelamentoService {
         .from("simulacoes_parcelamento")
         .select("valor_total_parcelamento");
 
+      // Usa a tabela de registros de aceite como fonte oficial de propostas aceitas
+      const { data: aceites } = await supabase
+        .from("registros_aceite_parcelamento")
+        .select("id");
+
       const stats: EstatisticasParcelamento = {
         total_simulacoes: simulacoes?.length || 0,
         propostas_enviadas: propostas?.length || 0,
-        propostas_aceitas:
-          propostas?.filter((p) => p.status_proposta === "aceita").length || 0,
+  propostas_aceitas: aceites?.length || 0,
         propostas_recusadas:
           propostas?.filter((p) => p.status_proposta === "recusada").length ||
           0,
@@ -652,6 +656,27 @@ export class SimulacaoParcelamentoService {
       return stats;
     } catch (error) {
       console.error("Erro ao buscar estatísticas:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Lista registros de aceite
+   */
+  async buscarAceites(): Promise<RegistroAceite[]> {
+    try {
+      const { data, error } = await supabase
+        .from("registros_aceite_parcelamento")
+        .select("*")
+        .order("data_aceite", { ascending: false });
+
+      if (error) {
+        throw new Error(`Erro ao buscar aceites: ${error.message}`);
+      }
+
+      return (data as unknown as RegistroAceite[]) || [];
+    } catch (error) {
+      console.error("Erro ao buscar aceites:", error);
       throw error;
     }
   }
