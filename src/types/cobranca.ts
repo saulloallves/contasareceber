@@ -19,6 +19,8 @@ export interface CobrancaFranqueado {
   telefone?: string;
   created_at?: string;
   nivel_criticidade?: string;
+  // FK para a unidade vinculada à cobrança (cobrancas_franqueados.unidade_id_fk)
+  unidade_id_fk?: string;
   unidades_franqueadas?: {
     id: string;
     codigo_unidade: string;

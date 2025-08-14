@@ -3,13 +3,14 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Plus, Edit, Eye, Upload, Receipt, CheckCircle,
   XCircle, Clock, Filter, RefreshCw, FileText,
-  ArrowUp, ArrowDown, AlertTriangle, Info, Calculator, MessageSquare,
+  ArrowUp, ArrowDown, AlertTriangle, Calculator, MessageSquare,
   //Scale, MessageCircle, Mail,
 } from "lucide-react";
+import { toast } from "react-hot-toast";
 import { CobrancaFranqueado } from "../../types/cobranca";
 import { cobrancaService } from "../../services/cobrancaService";
 import { n8nService, N8nService } from "../../services/n8nService";
-import { processarPlanilhaExcel, processarPlanilhaXML, } from "../../utils/planilhaProcessor";
+import { processarPlanilhaExcel } from "../../utils/planilhaProcessor";
 import type { ResultadoComparacao } from "../../services/comparacaoPlanilhaService";
 import { comparacaoPlanilhaService } from "../../services/comparacaoPlanilhaService";
 import { formatarCNPJCPF, formatarMoeda, formatarData, } from "../../utils/formatters";
@@ -36,10 +37,10 @@ export function GestaoCobrancas() {
   const [showFiltrosAvancados, setShowFiltrosAvancados] = useState(false);
   const [colunaOrdenacao, setColunaOrdenacao] = useState("data_vencimento"); // Coluna padrão
   const [direcaoOrdenacao, setDirecaoOrdenacao] = useState("desc"); // Ordenação 'asc' ou 'desc'
-  const [mostrarApenasInadimplentes, setMostrarApenasInadimplentes] = useState(false); // Controlar a exibição de inadimplentes
+  //const [mostrarApenasInadimplentes, setMostrarApenasInadimplentes] = useState(false); // Controlar a exibição de inadimplentes
   const [errosImportacao, setErrosImportacao] = useState<string[]>([]);
   const [modalErrosAberto, setModalErrosAberto] = useState(false);
-  const [mensagemFeedback, setMensagemFeedback] = useState<{tipo: "sucesso" | "erro" | "info"; texto: string;} | null>(null);
+  // Mensagens agora são exibidas via react-hot-toast
   const [enviandoWhatsapp, setEnviandoWhatsapp] = useState<string | null>(null); // ID da cobrança sendo enviada
   const [modalHistoricoAberto, setModalHistoricoAberto] = useState(false);
   const [historicoEnvios, setHistoricoEnvios] = useState<any[]>([]);
@@ -55,43 +56,49 @@ export function GestaoCobrancas() {
   /**
    * Função auxiliar para buscar o nome do franqueado baseado no CNPJ da cobrança
    */
-  const buscarNomeFranqueado = useCallback(async (cnpj: string): Promise<string> => {
-    try {
-      // Busca dados completos da unidade via Supabase com relacionamentos
-      const { data: unidade, error } = await supabase
-        .from("unidades_franqueadas")
-        .select(`
+  const buscarNomeFranqueado = useCallback(
+    async (cnpj: string): Promise<string> => {
+      try {
+        // Busca dados completos da unidade via Supabase com relacionamentos
+        const { data: unidade, error } = await supabase
+          .from("unidades_franqueadas")
+          .select(
+            `
           nome_unidade,
           franqueado_unidades!left (
             franqueados!left (
               nome_completo
             )
           )
-        `)
-        .eq("codigo_interno", cnpj)
-        .single();
+        `
+          )
+          .eq("codigo_interno", cnpjKey(cnpj))
+          .single();
 
-      if (error) {
-        console.warn("Erro ao buscar unidade por CNPJ:", error);
-        return "Cliente";
-      }
+        if (error) {
+          console.warn("Erro ao buscar unidade por CNPJ:", error);
+          return "Cliente";
+        }
 
-      // Prioriza APENAS nome do franqueado - nunca usar nome da unidade
-      const nomeFranqueado = (unidade as any)?.franqueado_unidades?.[0]?.franqueados?.nome_completo;
-      
-      // Se tem franqueado vinculado e o nome não é "Sem nome cadastrado"
-      if (nomeFranqueado && nomeFranqueado !== "Sem nome cadastrado") {
-        return nomeFranqueado;
+        // Prioriza APENAS nome do franqueado - nunca usar nome da unidade
+        const nomeFranqueado = (unidade as any)?.franqueado_unidades?.[0]
+          ?.franqueados?.nome_completo;
+
+        // Se tem franqueado vinculado e o nome não é "Sem nome cadastrado"
+        if (nomeFranqueado && nomeFranqueado !== "Sem nome cadastrado") {
+          return nomeFranqueado;
+        }
+
+        // Para TODOS os outros casos (sem franqueado, franqueado com "Sem nome cadastrado", etc.)
+        // SEMPRE retorna "Franqueado(a)" - nunca o nome da unidade
+        return "Franqueado(a)";
+      } catch (error) {
+        console.warn("Erro ao buscar nome do franqueado:", error);
+        return "Franqueado(a)";
       }
-      
-      // Para TODOS os outros casos (sem franqueado, franqueado com "Sem nome cadastrado", etc.)
-      // SEMPRE retorna "Franqueado(a)" - nunca o nome da unidade
-      return "Franqueado(a)";
-    } catch (error) {
-      console.warn("Erro ao buscar nome do franqueado:", error);
-      return "Franqueado(a)";
-    }
-  }, []);
+  },
+  [cnpjKey]
+  );
 
   // Estados do modal unificado
   const [abaAcoes, setAbaAcoes] = useState<"acoes_rapidas" | "simulacao" | "mensagem" | "detalhes">("acoes_rapidas");
@@ -142,8 +149,20 @@ Entre em contato: (11) 99999-9999`,
     tipo: "sucesso" | "erro" | "info",
     texto: string
   ) => {
-    setMensagemFeedback({ tipo, texto });
-    setTimeout(() => setMensagemFeedback(null), 5000);
+    const base = { duration: 5000 } as const;
+    if (tipo === "sucesso") {
+      toast.success(texto, {
+        ...base,
+        style: { background: "#047857", color: "#fff" }, // verde
+      });
+    } else if (tipo === "erro") {
+      toast.error(texto, {
+        ...base,
+        style: { background: "#b91c1c", color: "#fff" }, // vermelho
+      });
+    } else {
+      toast(texto, base);
+    }
   };
 
   /**
@@ -172,7 +191,7 @@ Entre em contato: (11) 99999-9999`,
         ...filtrosServico,
         colunaOrdenacao,
         direcaoOrdenacao,
-        apenasInadimplentes: mostrarApenasInadimplentes, // Linha adicionada para filtrar apenas inadimplentes
+        //apenasInadimplentes: mostrarApenasInadimplentes, // Linha adicionada para filtrar apenas inadimplentes
       });
 
       // Aplica filtros locais que não são suportados pelo serviço
@@ -180,7 +199,11 @@ Entre em contato: (11) 99999-9999`,
 
       if (filtrosAvancados.nomeUnidade) {
         cobrancasFiltradas = cobrancasFiltradas.filter((cobranca) =>
-          (cobranca.unidades_franqueadas?.nome_unidade || cobranca.cliente || '')
+          (
+            cobranca.unidades_franqueadas?.nome_unidade ||
+            cobranca.cliente ||
+            ""
+          )
             .toLowerCase()
             .includes(filtrosAvancados.nomeUnidade.toLowerCase())
         );
@@ -194,7 +217,7 @@ Entre em contato: (11) 99999-9999`,
 
       if (filtrosAvancados.codigo) {
         cobrancasFiltradas = cobrancasFiltradas.filter((cobranca) =>
-          (cobranca.unidades_franqueadas?.codigo_unidade || '')
+          (cobranca.unidades_franqueadas?.codigo_unidade || "")
             .toLowerCase()
             .includes(filtrosAvancados.codigo.toLowerCase())
         );
@@ -207,7 +230,7 @@ Entre em contato: (11) 99999-9999`,
       }
 
       setCobrancas(cobrancasFiltradas);
-      
+
       // Precarrega nomes/códigos das unidades em lote
       try {
         const cnpjs = cobrancasFiltradas
@@ -221,13 +244,23 @@ Entre em contato: (11) 99999-9999`,
       }
     } catch (error) {
       console.error("Erro ao carregar cobranças:", error);
-      // Em caso de erro, a lista vai ser limpa e mostrar uma mensagem
-      alert("Erro ao carregar cobranças. Tente novamente mais tarde.");
+      // Em caso de erro, a lista vai ser limpa e mostrar um toast
+      toast.error("Erro ao carregar cobranças. Tente novamente mais tarde.", {
+        style: { background: "#b91c1c", color: "#fff" },
+      });
       setCobrancas([]);
     } finally {
       setCarregando(false);
     }
-  }, [ filtros, filtrosAvancados, colunaOrdenacao, direcaoOrdenacao, mostrarApenasInadimplentes, unidadesService, cnpjKey,]);
+  }, [
+    filtros,
+    filtrosAvancados,
+    colunaOrdenacao,
+    direcaoOrdenacao,
+    //mostrarApenasInadimplentes,
+    unidadesService,
+    cnpjKey,
+  ]);
 
   // Função para aplicar filtros
   const aplicarFiltros = () => {
@@ -326,7 +359,7 @@ Entre em contato: (11) 99999-9999`,
    */
   const abrirModalAcoes = async (cobranca: CobrancaFranqueado) => {
     setCobrancaSelecionada(cobranca);
-    setAbaAcoes("acoes_rapidas");
+    setAbaAcoes(cobranca.status === "quitado" ? "detalhes" : "acoes_rapidas");
     setSimulacaoAtual(null);
     setFormSimulacao({
       quantidade_parcelas: 3,
@@ -340,24 +373,50 @@ Entre em contato: (11) 99999-9999`,
       canal: "whatsapp",
     });
 
-    // Primeiro tenta via cache
-    const cached = unidadesPorCnpj[cnpjKey(cobranca.cnpj)];
-    if (cached) {
-      setUnidadeSelecionada(cached);
-    } else {
-      try {
-        const unidade = await unidadesService.buscarUnidadePorCnpj(
-          cobranca.cnpj
-        );
-        setUnidadeSelecionada(unidade);
-      } catch (e) {
-        console.warn("Não foi possível carregar dados da unidade", e);
-        setUnidadeSelecionada(null);
+    // Carrega a unidade priorizando a FK da cobrança
+    try {
+      if (cobranca.unidade_id_fk) {
+        const unidade = await unidadesService.buscarUnidadePorId(cobranca.unidade_id_fk);
+        if (unidade) {
+          setUnidadeSelecionada(unidade);
+        } else {
+          // Fallback para cache/consulta por CNPJ
+          const cached = unidadesPorCnpj[cnpjKey(cobranca.cnpj)];
+          if (cached) {
+            setUnidadeSelecionada(cached);
+          } else {
+            const un = await unidadesService.buscarUnidadePorCnpj(cobranca.cnpj);
+            setUnidadeSelecionada(un);
+          }
+        }
+      } else {
+        // Fallback quando a cobrança não vier com unidade_id_fk tipado
+        const cached = unidadesPorCnpj[cnpjKey(cobranca.cnpj)];
+        if (cached) {
+          setUnidadeSelecionada(cached);
+        } else {
+          const un = await unidadesService.buscarUnidadePorCnpj(cobranca.cnpj);
+          setUnidadeSelecionada(un);
+        }
       }
+    } catch (e) {
+      console.warn("Não foi possível carregar dados da unidade", e);
+      setUnidadeSelecionada(null);
     }
 
     setModalAberto("acoes");
   };
+
+  // Garante que, se a cobrança estiver quitada, a aba ativa seja sempre "detalhes"
+  useEffect(() => {
+    if (
+      modalAberto === "acoes" &&
+      cobrancaSelecionada?.status === "quitado" &&
+      abaAcoes !== "detalhes"
+    ) {
+      setAbaAcoes("detalhes");
+    }
+  }, [modalAberto, cobrancaSelecionada?.status, abaAcoes]);
 
   /**
    * Função para fechar o modal e limpar os dados do formulário
@@ -388,10 +447,24 @@ Entre em contato: (11) 99999-9999`,
    */
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     // Verifica se o usuário selecionou algum arquivo
-    if (event.target.files && event.target.files[0]) {
-      const arquivo = event.target.files[0];
-      setArquivoSelecionado(arquivo); // Guarda o arquivo no estado
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const nome = file.name.toLowerCase();
+    const isXlsx = /\.xlsx$/i.test(nome);
+
+    if (!isXlsx) {
+      // Reseta seleção e avisa via toast chamativo
+      setArquivoSelecionado(null);
+      event.target.value = "";
+      toast.error(
+        "Arquivo inválido. Envie uma planilha .xlsx.\nO sistema ainda não está pronto para outros formatos!",
+        { duration: 6000 }
+      );
+      return;
     }
+
+    setArquivoSelecionado(file); // Guarda o arquivo válido no estado
   };
 
   /**
@@ -399,7 +472,9 @@ Entre em contato: (11) 99999-9999`,
    */
   const handleCompararPlanilha = async () => {
     if (!arquivoSelecionado) {
-      alert("Por favor, selecione um arquivo primeiro.");
+      toast.error("Por favor, selecione um arquivo primeiro.", {
+        style: { background: "#b91c1c", color: "#fff" },
+      });
       return;
     }
 
@@ -413,10 +488,13 @@ Entre em contato: (11) 99999-9999`,
       // Processa o arquivo selecionado
       if (arquivoSelecionado.name.toLowerCase().endsWith(".xlsx")) {
         dadosDaPlanilha = await processarPlanilhaExcel(arquivoSelecionado);
-      } else if (arquivoSelecionado.name.toLowerCase().endsWith(".csv")) {
-        dadosDaPlanilha = await processarPlanilhaXML(arquivoSelecionado);
       } else {
-        throw new Error("Formato de arquivo não suportado. Use .xlsx ou .csv");
+        toast.error(
+          "Arquivo inválido. Envie uma planilha .xlsx.\nO sistema ainda não está pronto para outros formatos!",
+          { duration: 6000 }
+        );
+        setProcessando(false);
+        return;
       }
 
       if (!dadosDaPlanilha) {
@@ -436,7 +514,7 @@ Entre em contato: (11) 99999-9999`,
       setModalComparacaoAberto(true);
     } catch (error: any) {
       console.error("ERRO ao comparar planilhas:", error);
-      alert(`Erro ao comparar planilhas: ${error.message}`);
+      toast.error(`Erro ao comparar planilhas: ${error.message || error}`);
     } finally {
       setProcessando(false);
     }
@@ -448,6 +526,16 @@ Entre em contato: (11) 99999-9999`,
   const handleProcessarPlanilha = async () => {
     if (!arquivoSelecionado) {
       mostrarMensagem("erro", "Por favor, selecione um arquivo primeiro.");
+      return;
+    }
+
+    // Trava extra: só .xlsx
+    if (!/\.xlsx$/i.test(arquivoSelecionado.name)) {
+      toast.error(
+        "Arquivo inválido. Envie uma planilha .xlsx.\nO sistema ainda não está pronto para outros formatos (ex.: .csv).",
+        { duration: 6000 }
+      );
+      LimparArquivo();
       return;
     }
 
@@ -628,13 +716,25 @@ Entre em contato: (11) 99999-9999`,
       return formMensagem.mensagem_personalizada;
     }
     // Para preview, usa o nome do cliente como fallback (não pode ser async em preview)
-    const template = templatesPadrao[formMensagem.template as keyof typeof templatesPadrao];
+    const template =
+      templatesPadrao[formMensagem.template as keyof typeof templatesPadrao];
     const variaveis: Record<string, string> = {
       "{{cliente}}": cobrancaSelecionada?.cliente || "Cliente",
-      "{{codigo_unidade}}": (unidadeSelecionada as any)?.codigo_unidade || cobrancaSelecionada?.cnpj || "Código",
-      "{{valor_original}}": formatarMoeda(cobrancaSelecionada?.valor_original || 0),
-      "{{valor_atualizado}}": formatarMoeda(cobrancaSelecionada?.valor_atualizado || cobrancaSelecionada?.valor_original || 0),
-      "{{data_vencimento}}": formatarData(cobrancaSelecionada?.data_vencimento || new Date().toISOString()),
+      "{{codigo_unidade}}":
+        (unidadeSelecionada as any)?.codigo_unidade ||
+        cobrancaSelecionada?.cnpj ||
+        "Código",
+      "{{valor_original}}": formatarMoeda(
+        cobrancaSelecionada?.valor_original || 0
+      ),
+      "{{valor_atualizado}}": formatarMoeda(
+        cobrancaSelecionada?.valor_atualizado ||
+          cobrancaSelecionada?.valor_original ||
+          0
+      ),
+      "{{data_vencimento}}": formatarData(
+        cobrancaSelecionada?.data_vencimento || new Date().toISOString()
+      ),
       "{{dias_atraso}}": (cobrancaSelecionada?.dias_em_atraso || 0).toString(),
     };
 
@@ -732,7 +832,9 @@ Entre em contato: (11) 99999-9999`,
 
   const simularParcelamento = async () => {
     if (!cobrancaSelecionada || !formSimulacao.data_primeira_parcela) {
-      alert("Data da primeira parcela é obrigatória");
+      toast.error("Data da primeira parcela é obrigatória", {
+        style: { background: "#b91c1c", color: "#fff" },
+      });
       return;
     }
     setProcessando(true);
@@ -746,7 +848,9 @@ Entre em contato: (11) 99999-9999`,
       setSimulacaoAtual(simulacao);
       mostrarMensagem("sucesso", "Simulação realizada com sucesso.");
     } catch (error) {
-      alert(`Erro na simulação: ${error}`);
+      toast.error(`Erro na simulação: ${error}`, {
+        style: { background: "#b91c1c", color: "#fff" },
+      });
     } finally {
       setProcessando(false);
     }
@@ -775,11 +879,15 @@ Entre em contato: (11) 99999-9999`,
         resultados.push(`Email: ${ok ? "Enviado" : "Falha"}`);
       }
 
-      alert(`Proposta gerada e enviada!\n${resultados.join("\n")}`);
+      toast.success(`Proposta gerada e enviada!\n${resultados.join("\n")}`,
+        { style: { background: "#047857", color: "#fff" } }
+      );
       fecharModal();
       carregarCobrancas();
     } catch (error) {
-      alert(`Erro ao gerar proposta: ${error}`);
+      toast.error(`Erro ao gerar proposta: ${error}`, {
+        style: { background: "#b91c1c", color: "#fff" },
+      });
     } finally {
       setProcessando(false);
     }
@@ -1056,8 +1164,10 @@ Entre em contato: (11) 99999-9999`,
         if (cobrancaSelecionada.telefone && resultado.isQuitacaoTotal) {
           try {
             // Busca nome do franqueado para personalização
-            const nomeFranqueado = await buscarNomeFranqueado(cobrancaSelecionada.cnpj);
-            
+            const nomeFranqueado = await buscarNomeFranqueado(
+              cobrancaSelecionada.cnpj
+            );
+
             const valorFormatado = new Intl.NumberFormat("pt-BR", {
               style: "currency",
               currency: "BRL",
@@ -1135,7 +1245,7 @@ Entre em contato: (11) 99999-9999`,
           try {
             // Busca nome do franqueado para personalização
             const nomeFranqueado = await buscarNomeFranqueado(cobranca.cnpj);
-            
+
             const valorFormatado = new Intl.NumberFormat("pt-BR", {
               style: "currency",
               currency: "BRL",
@@ -1281,7 +1391,9 @@ Entre em contato: (11) 99999-9999`,
                 onClick={() => setShowFiltrosAvancados(!showFiltrosAvancados)}
                 className="text-sm text-blue-600 hover:text-blue-800"
               >
-                {showFiltrosAvancados ? 'Ocultar Filtros Avançados' : 'Mostrar Filtros Avançados'}
+                {showFiltrosAvancados
+                  ? "Ocultar Filtros Avançados"
+                  : "Mostrar Filtros Avançados"}
               </button>
               <button
                 onClick={aplicarFiltros}
@@ -1316,7 +1428,9 @@ Entre em contato: (11) 99999-9999`,
               <option value="ignorado">Ignorado</option>
               <option value="notificacao_formal">Notificação Formal</option>
               <option value="escalado_juridico">Escalado Jurídico</option>
-              <option value="inadimplencia_critica">Inadimplência Crítica</option>
+              <option value="inadimplencia_critica">
+                Inadimplência Crítica
+              </option>
             </select>
             <input
               type="text"
@@ -1366,13 +1480,18 @@ Entre em contato: (11) 99999-9999`,
           {/* Filtros Avançados */}
           {showFiltrosAvancados && (
             <div className="mt-4 pt-4 border-t border-gray-200">
-              <h4 className="text-md font-medium text-gray-700 mb-3">Filtros Avançados</h4>
+              <h4 className="text-md font-medium text-gray-700 mb-3">
+                Filtros Avançados
+              </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 <input
                   type="text"
                   value={filtrosAvancados.nomeUnidade}
                   onChange={(e) =>
-                    setFiltrosAvancados({ ...filtrosAvancados, nomeUnidade: e.target.value })
+                    setFiltrosAvancados({
+                      ...filtrosAvancados,
+                      nomeUnidade: e.target.value,
+                    })
                   }
                   placeholder="Nome da Unidade"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -1381,7 +1500,10 @@ Entre em contato: (11) 99999-9999`,
                   type="text"
                   value={filtrosAvancados.cnpj}
                   onChange={(e) =>
-                    setFiltrosAvancados({ ...filtrosAvancados, cnpj: e.target.value })
+                    setFiltrosAvancados({
+                      ...filtrosAvancados,
+                      cnpj: e.target.value,
+                    })
                   }
                   placeholder="CNPJ"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -1390,7 +1512,10 @@ Entre em contato: (11) 99999-9999`,
                   type="text"
                   value={filtrosAvancados.codigo}
                   onChange={(e) =>
-                    setFiltrosAvancados({ ...filtrosAvancados, codigo: e.target.value })
+                    setFiltrosAvancados({
+                      ...filtrosAvancados,
+                      codigo: e.target.value,
+                    })
                   }
                   placeholder="Código da Unidade"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -1398,7 +1523,10 @@ Entre em contato: (11) 99999-9999`,
                 <select
                   value={filtrosAvancados.statusCobranca}
                   onChange={(e) =>
-                    setFiltrosAvancados({ ...filtrosAvancados, statusCobranca: e.target.value })
+                    setFiltrosAvancados({
+                      ...filtrosAvancados,
+                      statusCobranca: e.target.value,
+                    })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
@@ -1407,19 +1535,26 @@ Entre em contato: (11) 99999-9999`,
                   <option value="notificado">Notificado</option>
                   <option value="em_negociacao">Em Negociação</option>
                   <option value="proposta_enviada">Proposta Enviada</option>
-                  <option value="aguardando_pagamento">Aguardando Pagamento</option>
+                  <option value="aguardando_pagamento">
+                    Aguardando Pagamento
+                  </option>
                   <option value="pagamento_parcial">Pagamento Parcial</option>
                   <option value="quitado">Quitado</option>
                   <option value="ignorado">Ignorado</option>
                   <option value="notificacao_formal">Notificação Formal</option>
                   <option value="escalado_juridico">Escalado Jurídico</option>
-                  <option value="inadimplencia_critica">Inadimplência Crítica</option>
+                  <option value="inadimplencia_critica">
+                    Inadimplência Crítica
+                  </option>
                 </select>
                 <input
                   type="number"
                   value={filtrosAvancados.valorMin}
                   onChange={(e) =>
-                    setFiltrosAvancados({ ...filtrosAvancados, valorMin: e.target.value })
+                    setFiltrosAvancados({
+                      ...filtrosAvancados,
+                      valorMin: e.target.value,
+                    })
                   }
                   placeholder="Valor mínimo (avançado)"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -1428,7 +1563,10 @@ Entre em contato: (11) 99999-9999`,
                   type="number"
                   value={filtrosAvancados.valorMax}
                   onChange={(e) =>
-                    setFiltrosAvancados({ ...filtrosAvancados, valorMax: e.target.value })
+                    setFiltrosAvancados({
+                      ...filtrosAvancados,
+                      valorMax: e.target.value,
+                    })
                   }
                   placeholder="Valor máximo (avançado)"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -1436,7 +1574,10 @@ Entre em contato: (11) 99999-9999`,
                 <select
                   value={filtrosAvancados.tipoCobranca}
                   onChange={(e) =>
-                    setFiltrosAvancados({ ...filtrosAvancados, tipoCobranca: e.target.value })
+                    setFiltrosAvancados({
+                      ...filtrosAvancados,
+                      tipoCobranca: e.target.value,
+                    })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
@@ -1452,7 +1593,7 @@ Entre em contato: (11) 99999-9999`,
             </div>
           )}
 
-          <div className="mt-4 ml-1 flex items-center">
+          {/* <div className="mt-4 ml-1 flex items-center">
             <input
               type="checkbox"
               id="inadimplentes-checkbox"
@@ -1466,30 +1607,10 @@ Entre em contato: (11) 99999-9999`,
             >
               Mostrar apenas cobranças inadimplentes
             </label>
-          </div>
-        </div>
+          </div> */}
+        </div> {/*FIM da DIV de filtros*/}
 
-        {/* Mensagem de feedback */}
-        {mensagemFeedback && (
-          <div
-            className={`mb-6 p-4 rounded-lg flex items-center ${
-              mensagemFeedback.tipo === "sucesso"
-                ? "bg-green-50 border border-green-200 text-green-800"
-                : mensagemFeedback.tipo === "erro"
-                ? "bg-red-50 border border-red-200 text-red-800"
-                : "bg-blue-50 border border-blue-200 text-blue-800"
-            }`}
-          >
-            {mensagemFeedback.tipo === "sucesso" ? (
-              <CheckCircle className="w-5 h-5 mr-2" />
-            ) : mensagemFeedback.tipo === "erro" ? (
-              <AlertTriangle className="w-5 h-5 mr-2" />
-            ) : (
-              <Info className="w-5 h-5 mr-2" />
-            )}
-            {mensagemFeedback.texto}
-          </div>
-        )}
+  {/* Feedback visual via toast - bloco antigo removido */}
 
         {/* Alternância de visualização */}
         <div className="flex items-center justify-between mb-4">
@@ -1547,10 +1668,9 @@ Entre em contato: (11) 99999-9999`,
                     <div className="flex-1 min-w-0">
                       <div
                         className="font-bold text-gray-800 text-sm truncate"
-                        title={c.cliente}
+                        title={c.unidades_franqueadas?.nome_unidade || c.cliente}
                       >
-                        {unidadesPorCnpj[cnpjKey(c.cnpj)]?.nome_franqueado ||
-                          c.cliente}
+                        {c.unidades_franqueadas?.nome_unidade || c.cliente}
                       </div>
                       <div className="text-xs text-gray-500">
                         {unidadesPorCnpj[cnpjKey(c.cnpj)]?.codigo_unidade ||
@@ -1701,8 +1821,7 @@ Entre em contato: (11) 99999-9999`,
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
                           <div className="text-sm font-medium text-gray-900">
-                            {unidadesPorCnpj[cnpjKey(cobranca.cnpj)]
-                              ?.nome_franqueado || cobranca.cliente}
+                            {cobranca.unidades_franqueadas?.nome_unidade || cobranca.cliente}
                           </div>
                           <div className="text-sm text-gray-500">
                             {unidadesPorCnpj[cnpjKey(cobranca.cnpj)]
@@ -2062,13 +2181,13 @@ Entre em contato: (11) 99999-9999`,
                       Arraste o arquivo aqui ou clique para selecionar
                     </p>
                     <p className="text-sm text-gray-500 mt-2">
-                      Formatos aceitos: .xlsx, .csv
+                      Formato aceito: .xlsx
                     </p>
                   </>
                 )}
                 <input
                   type="file"
-                  accept=".xlsx,.csv"
+                  accept=".xlsx"
                   className="hidden"
                   id="file-upload"
                   onChange={handleFileChange} // Linha adicionada para lidar com o upload de arquivo
@@ -2535,7 +2654,7 @@ Entre em contato: (11) 99999-9999`,
         </div>
       )}
 
-      {/* Modal Unificado de Ações */}
+  {/* Modal Unificado de Ações */}
       {modalAberto === "acoes" && cobrancaSelecionada && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-0 max-w-5xl w-full max-h-[95vh] overflow-y-auto shadow-2xl border border-gray-200">
@@ -2572,15 +2691,31 @@ Entre em contato: (11) 99999-9999`,
               </button>
             </div>
 
+            {/* Aviso de cobrança quitada */}
+            {cobrancaSelecionada.status === "quitado" && (
+              <div className="px-8 pt-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+                  <div>
+                    <div className="font-semibold text-green-800">Cobrança quitada</div>
+                    <p className="text-sm text-green-700">
+                      Esta cobrança está quitada. Ações estão desabilitadas. Para realizar novas ações, altere o status para "Em Aberto".
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Abas */}
             <div className="flex border-b px-6">
-              {(
-                [
-                  { k: "acoes_rapidas", label: "Ações rápidas" },
-                  { k: "simulacao", label: "Simular parcelamento" },
-                  { k: "mensagem", label: "Enviar mensagem" },
-                  { k: "detalhes", label: "Detalhes" },
-                ] as const
+              {(cobrancaSelecionada.status === "quitado"
+                ? ([{ k: "detalhes", label: "Detalhes" }] as const)
+                : ([
+                    { k: "acoes_rapidas", label: "Ações rápidas" },
+                    { k: "simulacao", label: "Simular parcelamento" },
+                    { k: "mensagem", label: "Enviar mensagem" },
+                    { k: "detalhes", label: "Detalhes" },
+                  ] as const)
               ).map((aba) => (
                 <button
                   key={aba.k}
@@ -2598,7 +2733,7 @@ Entre em contato: (11) 99999-9999`,
 
             <div className="px-8 py-6">
               {/* Ações rápidas */}
-              {abaAcoes === "acoes_rapidas" && (
+              {abaAcoes === "acoes_rapidas" && cobrancaSelecionada.status !== "quitado" && (
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <button
@@ -2676,7 +2811,7 @@ Entre em contato: (11) 99999-9999`,
               )}
 
               {/* Simulação de parcelamento */}
-              {abaAcoes === "simulacao" && (
+              {abaAcoes === "simulacao" && cobrancaSelecionada.status !== "quitado" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <h4 className="font-medium text-gray-800">
@@ -2894,7 +3029,7 @@ Entre em contato: (11) 99999-9999`,
               )}
 
               {/* Enviar mensagem */}
-              {abaAcoes === "mensagem" && (
+              {abaAcoes === "mensagem" && cobrancaSelecionada.status !== "quitado" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div>

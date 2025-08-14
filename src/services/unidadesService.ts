@@ -1,7 +1,82 @@
 import { supabase } from "./databaseService";
 import { UnidadeFranqueada, FiltrosUnidades } from "../types/unidades";
 
+type Franqueado = {
+  id: string;
+  nome_completo?: string;
+  email?: string;
+  telefone?: string;
+  cidade?: string;
+  estado?: string;
+  uf?: string;
+};
+
+type Vinculo = {
+  ativo?: boolean;
+  tipo_vinculo?: string | null;
+  franqueado_id?: string;
+  franqueados?: Franqueado | null;
+};
+
+type UnidadeApi = UnidadeFranqueada & {
+  franqueado_unidades?: Vinculo[] | null;
+};
+
 export class UnidadesService {
+  private mapearFranqueadoTopLevel(u: UnidadeApi) {
+    try {
+      const vinculos = (u?.franqueado_unidades || []) as Vinculo[];
+      // prioriza vínculo ativo; se não houver, pega o primeiro
+      const principal =
+        vinculos.find((v) => v?.ativo !== false) || vinculos[0] || null;
+      const fr = principal?.franqueados || null;
+      if (fr) {
+        u.nome_franqueado = fr.nome_completo ?? u.nome_franqueado;
+        u.email_franqueado = fr.email ?? u.email_franqueado;
+        u.telefone_franqueado = fr.telefone ?? u.telefone_franqueado;
+        // Preenche cidade/estado da unidade se ausentes com dados do franqueado
+        if (!u.cidade && fr.cidade) u.cidade = fr.cidade;
+        if (!u.estado && (fr.uf || fr.estado)) u.estado = fr.uf || fr.estado;
+      }
+    } catch {
+      // ignora mapeamento se estrutura não estiver presente
+    }
+    return u;
+  }
+  
+  /**
+   * Busca unidade por ID com relacionamentos e mapeia dados do franqueado
+   */
+  async buscarUnidadePorId(id: string): Promise<UnidadeFranqueada | null> {
+    try {
+      const { data, error } = await supabase
+        .from("unidades_franqueadas")
+        .select(
+          `
+          *,
+          franqueado_unidades!left (
+            ativo,
+            tipo_vinculo,
+            franqueado_id,
+            franqueados!left (
+              id, nome_completo, email, telefone, cidade, estado, uf
+            )
+          )
+        `
+        )
+        .eq("id", id)
+        .single();
+
+      if (error && error.code !== "PGRST116") {
+        throw new Error(`Erro ao buscar unidade por ID: ${error.message}`);
+      }
+
+      return data ? (this.mapearFranqueadoTopLevel(data as UnidadeApi) as UnidadeFranqueada) : null;
+    } catch (error) {
+      console.error("Erro ao buscar unidade por ID:", error);
+      throw error;
+    }
+  }
   /**
    * Busca todas as unidades com filtros
    */
@@ -12,10 +87,12 @@ export class UnidadesService {
         .select(
           `
           *,
-          franqueado_unidades (
+          franqueado_unidades!left (
+            ativo,
+            tipo_vinculo,
             franqueado_id,
-            franqueados (
-              id, nome_completo, email, telefone
+            franqueados!left (
+              id, nome_completo, email, telefone, cidade, estado, uf
             )
           )
         `
@@ -40,12 +117,14 @@ export class UnidadesService {
         );
       }
 
-      const { data, error } = await query;
+  const { data, error } = await query;
       if (error) {
         throw new Error(`Erro ao buscar unidades: ${error.message}`);
       }
-
-      return data || [];
+      const lista = (data as UnidadeApi[] | null)?.map((u) =>
+        this.mapearFranqueadoTopLevel(u)
+      ) || [];
+  return lista;
     } catch (error) {
       console.error("Erro ao buscar unidades:", error);
       throw error;
@@ -64,10 +143,12 @@ export class UnidadesService {
         .select(
           `
           *,
-          franqueado_unidades (
+          franqueado_unidades!left (
+            ativo,
+            tipo_vinculo,
             franqueado_id,
-            franqueados (
-              id, nome_completo, email, telefone
+            franqueados!left (
+              id, nome_completo, email, telefone, cidade, estado, uf
             )
           )
         `
@@ -78,8 +159,7 @@ export class UnidadesService {
       if (error && error.code !== "PGRST116") {
         throw new Error(`Erro ao buscar unidade: ${error.message}`);
       }
-
-      return data;
+  return data ? (this.mapearFranqueadoTopLevel(data as UnidadeApi) as UnidadeFranqueada) : data;
     } catch (error) {
       console.error("Erro ao buscar unidade por código:", error);
       throw error;
@@ -92,15 +172,17 @@ export class UnidadesService {
   async buscarUnidadePorCnpj(cnpj: string): Promise<UnidadeFranqueada | null> {
     try {
       const cnpjLimpo = cnpj.replace(/\D/g, "");
-      const { data, error } = await supabase
+  const { data, error } = await supabase
         .from("unidades_franqueadas")
         .select(
           `
           *,
-          franqueado_unidades (
+          franqueado_unidades!left (
+            ativo,
+            tipo_vinculo,
             franqueado_id,
-            franqueados (
-              id, nome_completo, email, telefone
+            franqueados!left (
+              id, nome_completo, email, telefone, cidade, estado, uf
             )
           )
         `
@@ -111,8 +193,31 @@ export class UnidadesService {
       if (error) {
         throw new Error(`Erro ao buscar unidade por CNPJ: ${error.message}`);
       }
-
-      return data;
+      // Fallback: caso não encontre por CNPJ limpo, tenta com o CNPJ no formato original (com máscara)
+  let resultado = data as UnidadeApi | null;
+  if (!resultado) {
+        const alt = await supabase
+          .from("unidades_franqueadas")
+          .select(
+            `
+            *,
+            franqueado_unidades (
+              ativo,
+              tipo_vinculo,
+              franqueado_id,
+              franqueados (
+                id, nome_completo, email, telefone, cidade, estado, uf
+              )
+            )
+          `
+          )
+          .eq("codigo_interno", cnpj)
+          .maybeSingle();
+        if (!alt.error && alt.data) {
+          resultado = alt.data as UnidadeApi;
+        }
+      }
+      return resultado ? (this.mapearFranqueadoTopLevel(resultado as UnidadeApi) as UnidadeFranqueada) : null;
     } catch (error) {
       console.error("Erro ao buscar unidade por CNPJ:", error);
       throw error;
@@ -127,7 +232,7 @@ export class UnidadesService {
   ): Promise<Record<string, UnidadeFranqueada>> {
     try {
       type UnidadeComCnpj = UnidadeFranqueada & { codigo_interno?: string };
-      const limpos = Array.from(
+  const limpos = Array.from(
         new Set(
           (cnpjs || [])
             .filter(Boolean)
@@ -135,8 +240,10 @@ export class UnidadesService {
             .filter((c) => c.length > 0)
         )
       );
+  const originais = Array.from(new Set((cnpjs || []).filter(Boolean)));
+  const candidatos = Array.from(new Set([...limpos, ...originais]));
 
-      if (limpos.length === 0) return {};
+  if (candidatos.length === 0) return {};
 
       const { data, error } = await supabase
         .from("unidades_franqueadas")
@@ -144,22 +251,26 @@ export class UnidadesService {
           `
           *,
           franqueado_unidades (
+            ativo,
+            tipo_vinculo,
             franqueado_id,
             franqueados (
-              id, nome_completo, email, telefone
+              id, nome_completo, email, telefone, cidade, estado, uf
             )
           )
         `
         )
-        .in("codigo_interno", limpos);
+  .in("codigo_interno", candidatos);
 
       if (error) {
         throw new Error(`Erro ao buscar unidades por CNPJs: ${error.message}`);
       }
 
       const mapa: Record<string, UnidadeFranqueada> = {};
-      (data as UnidadeComCnpj[] | null)?.forEach((u) => {
-        const chave = u && (u as UnidadeComCnpj).codigo_interno;
+      (data as (UnidadeComCnpj & UnidadeApi)[] | null)?.forEach((ud) => {
+        const u = this.mapearFranqueadoTopLevel(ud as UnidadeApi);
+        const chaveRaw = u && (u as UnidadeComCnpj).codigo_interno;
+        const chave = chaveRaw ? chaveRaw.replace(/\D/g, "") : undefined;
         if (chave) {
           mapa[chave] = u as UnidadeFranqueada;
         }
