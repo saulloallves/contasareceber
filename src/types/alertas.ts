@@ -1,13 +1,12 @@
 export interface Alerta {
-  id: number;
+  id: string; // uuid
+  cnpj_unidade?: string | null;
   tipo_alerta: string;
-  titulo_id: number;
+  titulo: string;
   descricao: string;
-  nivel_urgencia: "baixa" | "media" | "alta";
-  status: "novo" | "em_andamento" | "resolvido";
-  data_criacao: string;
-  cobranca?: {
-    cliente: string;
-    valor_atualizado: number;
-  };
+  nivel_urgencia: "baixa" | "media" | "alta" | "critica";
+  resolvido: boolean;
+  data_criacao?: string | null; // timestamp com tz (ISO string)
+  data_resolucao?: string | null;
+  created_at?: string | null;
 }

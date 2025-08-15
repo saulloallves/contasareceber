@@ -1,4 +1,4 @@
-//import { Bell, Maximize } from "lucide-react";
+import { Bell } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Alerta } from "../../types/alertas";
 import { alertasService } from "../../services/alertasService";
@@ -43,6 +43,10 @@ export function Header({ user }: HeaderProps) {
     // Busca os alertas iniciais ao carregar
     fetchAlertas();
 
+  // Também ouvimos um evento global para forçar refresh (ex.: quando o watcher detecta a conclusão)
+  const onAtualizar = () => fetchAlertas();
+  window.addEventListener("cobrancasAtualizadas", onAtualizar as EventListener);
+
     // Cria a "escuta" em tempo real na tabela de alertas
     const channel = supabase
       .channel("alertas_sistema_realtime")
@@ -73,6 +77,7 @@ export function Header({ user }: HeaderProps) {
     // Função de limpeza para remover a "escuta" quando o usuário sai da página
     return () => {
       supabase.removeChannel(channel);
+  window.removeEventListener("cobrancasAtualizadas", onAtualizar as EventListener);
     };
   }, []); // O array vazio garante que isso rode apenas uma vez
 
@@ -82,7 +87,7 @@ export function Header({ user }: HeaderProps) {
     if (!resultadoImportacao || !user) return;
     try {
       // Marcar o alerta como resolvido para não aparecer de novo
-      await alertasService.marcarComoResolvido(resultadoImportacao.id, user.id);
+  await alertasService.marcarComoResolvido(resultadoImportacao.id);
       // Limpa o estado para fechar o modal
       setResultadoImportacao(null);
       // Atualiza a lista de alertas (remove o que acabamos de resolver)
@@ -110,8 +115,12 @@ export function Header({ user }: HeaderProps) {
 
         <div className="flex items-center space-x-2">
           {/* Notifications */}
-          {/* <button
-            onClick={() => setShowNotifications((v) => !v)}
+          <button
+            onClick={async () => {
+              // Abre/fecha o dropdown e força atualização para refletir novos inserts
+              setShowNotifications((v) => !v);
+              await fetchAlertas();
+            }}
             className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
             title="Notificações"
           >
@@ -121,7 +130,7 @@ export function Header({ user }: HeaderProps) {
                 {alertas.length > 9 ? "9+" : alertas.length}
               </span>
             )}
-          </button> */}
+          </button>
 
           {showNotifications && (
             <NotificationsDropdown
@@ -131,8 +140,8 @@ export function Header({ user }: HeaderProps) {
             />
           )}
 
-          {/* User Account Dropdown - border-l border-gray-200  */}
-          <div className="pl-4 flex flex-col items-end">
+          {/* User Account Dropdown */}
+          <div className="pl-4 flex flex-col items-end border-l border-gray-200">
             {user ? (
               <UserAccountDropdown user={user} />
             ) : (

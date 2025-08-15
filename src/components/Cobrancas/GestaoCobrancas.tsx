@@ -10,7 +10,6 @@ import { toast } from "react-hot-toast";
 import { CobrancaFranqueado } from "../../types/cobranca";
 import { cobrancaService } from "../../services/cobrancaService";
 import { n8nService, N8nService } from "../../services/n8nService";
-import { processarPlanilhaExcel } from "../../utils/planilhaProcessor";
 import type { ResultadoComparacao } from "../../services/comparacaoPlanilhaService";
 import { comparacaoPlanilhaService } from "../../services/comparacaoPlanilhaService";
 import { formatarCNPJCPF, formatarMoeda, formatarData, } from "../../utils/formatters";
@@ -19,6 +18,7 @@ import { UnidadesService } from "../../services/unidadesService";
 import type { UnidadeFranqueada } from "../../types/unidades";
 import { emailService } from "../../services/emailService";
 import { supabase } from "../../services/databaseService";
+import { ImportacaoWatcher } from "../../services/importacaoWatcher";
 
 export function GestaoCobrancas() {
   const [cobrancas, setCobrancas] = useState<CobrancaFranqueado[]>([]);
@@ -27,7 +27,7 @@ export function GestaoCobrancas() {
   const [cobrancaSelecionada, setCobrancaSelecionada] = useState<CobrancaFranqueado | null>(null);
   const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null); //Linha adicionada para 'guardar' o arquivo selecionado
   const [processando, setProcessando] = useState(false); // Linha adicionada para controlar o estado de processamento do upload
-  const [resultadoComparacao, setResultadoComparacao] = useState<ResultadoComparacao | null>(null);
+  const [resultadoComparacao] = useState<ResultadoComparacao | null>(null);
   const [modalComparacaoAberto, setModalComparacaoAberto] = useState(false);
   const [usuario] = useState("admin"); // Em produção, pegar do contexto de autenticação
   const [formData, setFormData] = useState<Partial<CobrancaFranqueado>>({});
@@ -501,54 +501,6 @@ Entre em contato: (11) 99999-9999`,
       });
       return;
     }
-
-    if (!arquivoSelecionado) {
-      toast.error("Por favor, selecione um arquivo primeiro.", {
-        style: { background: "#b91c1c", color: "#fff" },
-      });
-      return;
-    }
-
-    setProcessando(true);
-    setResultadoComparacao(null);
-
-    try {
-      console.log("Iniciando comparação com última planilha...");
-      let dadosDaPlanilha;
-
-      // Processa o arquivo selecionado
-      if (arquivoSelecionado.name.toLowerCase().endsWith(".xlsx")) {
-        dadosDaPlanilha = await processarPlanilhaExcel(arquivoSelecionado);
-      } else {
-        toast.error(
-          "Arquivo inválido. Envie uma planilha .xlsx.\nO sistema ainda não está pronto para outros formatos!",
-          { duration: 6000 }
-        );
-        setProcessando(false);
-        return;
-      }
-
-      if (!dadosDaPlanilha) {
-        throw new Error("Não foi possível extrair dados da planilha.");
-      }
-
-      console.log(
-        `${dadosDaPlanilha.length} registros extraídos. Comparando...`
-      );
-
-      // Chama o serviço de comparação
-      const resultadoComp =
-        await comparacaoPlanilhaService.compararComUltimaPlanilha(
-          dadosDaPlanilha
-        );
-      setResultadoComparacao(resultadoComp);
-      setModalComparacaoAberto(true);
-    } catch (error: any) {
-      console.error("ERRO ao comparar planilhas:", error);
-      toast.error(`Erro ao comparar planilhas: ${error.message || error}`);
-    } finally {
-      setProcessando(false);
-    }
   };
 
   /**
@@ -612,8 +564,27 @@ Entre em contato: (11) 99999-9999`,
       fecharModal(); // Fecha o modal de upload
       mostrarMensagem(
         "sucesso",
-        "Planilha recebida! O processamento foi iniciado em segundo plano. Você será notificado pelo WhatsApp quando terminar."
+        "Planilha recebida! O processamento foi iniciado em segundo plano. Você será notificado aqui no sistema quando terminar."
       );
+
+      // Inicia o agente automático que verifica a conclusão da importação a cada 10s
+      const watcherStart = new Date().toISOString();
+      ImportacaoWatcher.start({
+        startTime: watcherStart,
+        origem: "alertas", // por padrão ouvimos alertas_sistema.tipo_alerta = 'importacao_concluida'
+        intervaloMs: 10000,
+  onComplete: () => {
+          // Notifica usuário (toast chamativo)
+          toast.success("Importação concluída! As cobranças foram atualizadas.", {
+            style: { background: "#065f46", color: "#fff" },
+          });
+          // Dispara evento global para todas as telas ouvirem e recarregarem
+          window.dispatchEvent(new CustomEvent("cobrancasAtualizadas"));
+        },
+        onError: (err) => {
+          console.warn("Watcher de importação falhou:", err);
+        },
+      });
     } catch (error: any) {
       clearTimeout(timeoutId);
       setProcessando(false);

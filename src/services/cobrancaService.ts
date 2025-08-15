@@ -2,14 +2,12 @@
 import { supabase } from "../lib/supabaseClient";
 import {
   CobrancaFranqueado,
-  ResultadoImportacao,
   QuitacaoCobranca,
   ResultadoQuitacao,
   TrativativaCobranca,
   EnvioMensagem,
   ResultadoEnvioCobranca,
 } from "../types/cobranca";
-import { gerarReferenciaLinha } from "../utils/planilhaProcessor";
 
 // Tipo auxiliar para histórico de envios (whatsapp/email)
 type HistoricoEnvio = {
@@ -116,106 +114,6 @@ export class CobrancaService {
     }
 
     return novaUnidade.id;
-  }
-
-  async processarImportacaoPlanilha(
-    dadosDaPlanilha: CobrancaFranqueado[],
-    nomeArquivo: string,
-    usuario: string
-  ): Promise<ResultadoImportacao> {
-  const erros: string[] = [];
-  const referenciasNovaPlanilha = new Set<string>();
-  const cobrancasParaInserir: Array<Partial<CobrancaFranqueado> & { unidade_id_fk: string; referencia_importacao: string }> = [];
-    const cobrancasParaAtualizar: CobrancaFranqueado[] = [];
-    const cobrancasQuitadas: string[] = [];
-
-    for (const [index, dados] of dadosDaPlanilha.entries()) {
-      try {
-        if (!dados.cnpj || !dados.valor_original || !dados.data_vencimento) {
-          throw new Error(
-            "Dados essenciais (CNPJ, Valor, Vencimento) faltando na linha."
-          );
-        }
-
-        const referenciaLinha = gerarReferenciaLinha(dados);
-        referenciasNovaPlanilha.add(referenciaLinha);
-
-  const unidadeId = await this.buscarOuCriarUnidadePorCNPJ(dados.cnpj);
-
-        const cobrancaExistente = await this.buscarCobrancaExistente(
-          referenciaLinha
-        );
-
-        if (cobrancaExistente) {
-          if (cobrancaExistente.status === "quitado") {
-            cobrancasQuitadas.push(cobrancaExistente.id!);
-          } else {
-            cobrancasParaAtualizar.push({ ...cobrancaExistente, ...dados });
-          }
-        } else {
-          cobrancasParaInserir.push({
-            ...dados,
-            unidade_id_fk: unidadeId,
-            referencia_importacao: referenciaLinha,
-          });
-        }
-      } catch (error: unknown) {
-        console.error(`Erro na linha ${index + 2}:`, error);
-        const msg = error instanceof Error ? error.message : String(error);
-        erros.push(`Linha ${index + 2}: ${msg}`);
-      }
-    }
-
-    if (erros.length > 0) {
-      return {
-        sucesso: false,
-        importacao_id: "",
-        estatisticas: {
-          total_registros: dadosDaPlanilha.length,
-          novos_registros: 0,
-          registros_atualizados: 0,
-          registros_quitados: cobrancasQuitadas.length,
-        },
-        erros: erros,
-      };
-    }
-
-    const { data: importacao, error: importacaoError } = await supabase
-      .from("importacoes")
-      .insert({
-        nome_arquivo: nomeArquivo,
-        usuario: usuario,
-        data_importacao: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (importacaoError || !importacao) {
-      throw new Error(
-        `Erro ao registrar importação: ${importacaoError?.message}`
-      );
-    }
-
-    await this.inserirNovasCobrancas(cobrancasParaInserir, importacao.id);
-    await this.atualizarCobrancasExistentes(cobrancasParaAtualizar);
-    await this.marcarCobrancasComoQuitadas(cobrancasQuitadas);
-
-    const cobrancasAntigas = await this.buscarCobrancasAntigas(
-      referenciasNovaPlanilha
-    );
-    await this.marcarCobrancasComoInativas(cobrancasAntigas);
-
-    return {
-      sucesso: true,
-      importacao_id: importacao.id,
-      estatisticas: {
-        total_registros: dadosDaPlanilha.length,
-        novos_registros: cobrancasParaInserir.length,
-        registros_atualizados: cobrancasParaAtualizar.length,
-        registros_quitados: cobrancasQuitadas.length,
-      },
-      erros: [],
-    };
   }
 
   private async buscarCobrancaExistente(

@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabaseClient";
-import { Alerta } from "../types/alertas"; // Criaremos este tipo a seguir
+import { Alerta } from "../types/alertas";
 
 export const alertasService = {
   async getAlertasAtivos(): Promise<Alerta[]> {
@@ -13,9 +13,9 @@ export const alertasService = {
         titulo,
         descricao,
         nivel_urgencia,
-        resolvido,
+  resolvido,
         data_criacao,
-        data_resolucao
+  data_resolucao
       `
       )
       .eq("resolvido", false)
@@ -29,7 +29,8 @@ export const alertasService = {
     return data as Alerta[];
   },
 
-  async marcarComoResolvido(id: number, alertaId: string): Promise<void> {
+  // Marca um alerta como resolvido pelo seu id (uuid)
+  async marcarComoResolvido(alertaId: string): Promise<void> {
     const { error } = await supabase
       .from("alertas_sistema")
       .update({

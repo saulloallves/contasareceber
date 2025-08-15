@@ -1,9 +1,10 @@
 import { Bell, CheckCircle, X } from "lucide-react";
 import { Alerta } from "../../types/alertas";
-import { formatarMoeda, formatarData } from "../../utils/formatters"; // Supondo que você tenha formatters
+import { formatarCNPJCPF } from "../../utils/formatters";
 import { useAuth } from "../Auth/AuthProvider";
-import { alertasService } from "../../services/alertasService.ts";
-import { useState } from "react";
+import { alertasService } from "../../services/alertasService";
+import { useMemo, useState } from "react";
+import toast from "react-hot-toast";
 
 interface NotificationsDropdownProps {
   alertas: Alerta[];
@@ -18,25 +19,45 @@ export function NotificationsDropdown({
 }: NotificationsDropdownProps) {
   const { user } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [localResolved, setLocalResolved] = useState<Set<string>>(new Set());
 
-  const handleMarcarComoResolvido = async (alertaId: number) => {
+  // Normaliza datas no formato M/D/YYYY dentro de um texto para DD/MM/YYYY
+  const normalizeUsDateInText = (text: string) => {
+    if (!text) return text;
+    return text.replace(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/g, (_m, mm: string, dd: string, yyyy: string) => {
+      const d = dd.padStart(2, "0");
+      const m = mm.padStart(2, "0");
+      return `${d}/${m}/${yyyy}`;
+    });
+  };
+
+  const alertasVisiveis = useMemo(() => {
+    return alertas.filter((a) => !localResolved.has(a.id));
+  }, [alertas, localResolved]);
+
+  const handleMarcarComoResolvido = async (alertaId: string) => {
     if (!user) return;
     setIsUpdating(true);
     try {
-      await alertasService.marcarComoResolvido(alertaId, user.id);
+      await alertasService.marcarComoResolvido(alertaId);
+      // Otimista: esconde imediatamente
+      setLocalResolved((prev) => new Set(prev).add(alertaId));
+      toast.success("Notificação marcada como resolvida.");
       onUpdate(); // Atualiza a lista de alertas no Header
     } catch (error) {
       console.error("Falha ao resolver alerta:", error);
-      // Adicionar um toast de erro aqui seria uma boa prática
+      toast.error("Não foi possível marcar como resolvida. Verifique permissões RLS.");
     } finally {
       setIsUpdating(false);
     }
   };
 
-  const getUrgencyColor = (urgency: "baixa" | "media" | "alta") => {
+  const getUrgencyColor = (urgency: "baixa" | "media" | "alta" | "critica") => {
     switch (urgency) {
       case "alta":
         return "bg-red-500";
+      case "critica":
+        return "bg-red-700";
       case "media":
         return "bg-yellow-500";
       case "baixa":
@@ -58,7 +79,7 @@ export function NotificationsDropdown({
         </button>
       </div>
       <div className="max-h-96 overflow-y-auto">
-        {alertas.length === 0 ? (
+    {alertasVisiveis.length === 0 ? (
           <div className="text-center py-10">
             <Bell className="w-12 h-12 mx-auto text-gray-300" />
             <p className="mt-2 text-sm text-gray-500">
@@ -67,7 +88,7 @@ export function NotificationsDropdown({
           </div>
         ) : (
           <ul>
-            {alertas.map((alerta) => (
+      {alertasVisiveis.map((alerta) => (
               <li
                 key={alerta.id}
                 className="p-3 border-b border-gray-100 hover:bg-gray-50"
@@ -79,14 +100,26 @@ export function NotificationsDropdown({
                     )}`}
                   ></div>
                   <div className="flex-1">
-                    <p className="text-sm text-gray-700">{alerta.descricao}</p>
+                    <p className="text-sm text-gray-800 font-medium">{alerta.titulo}</p>
+                    <p className="text-sm text-gray-700 mt-0.5">{normalizeUsDateInText(alerta.descricao)}</p>
                     <div className="text-xs text-gray-500 mt-1 space-y-1">
-                      <p>Cliente: {alerta.cobranca?.cliente || "N/A"}</p>
                       <p>
-                        Valor:{" "}
-                        {formatarMoeda(alerta.cobranca?.valor_atualizado || 0)}
+                        CNPJ:{" "}
+                        {alerta.cnpj_unidade
+                          ? formatarCNPJCPF(alerta.cnpj_unidade)
+                          : "N/A"}
                       </p>
-                      <p>Data: {formatarData(alerta.data_criacao)}</p>
+                      <p>
+                        Data:{" "}
+                        {(() => {
+                          const d = alerta.data_criacao || alerta.created_at;
+                          if (!d) return "N/A";
+                          const dt = new Date(d);
+                          return isNaN(dt.getTime())
+                            ? "N/A"
+                            : dt.toLocaleDateString("pt-BR");
+                        })()}
+                      </p>
                     </div>
                   </div>
                   <button
