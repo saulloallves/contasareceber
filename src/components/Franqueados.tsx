@@ -8,9 +8,6 @@ import {
   Phone,
   MapPin,
   Info,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
 } from "lucide-react";
 import { supabase } from "../services/databaseService";
 
@@ -22,7 +19,7 @@ function truncateText(text: string, max: number) {
 function getTipoBadge(tipo: string | undefined) {
   if (!tipo) {
     return {
-      label: "sem status",
+      label: "Sem Tipo",
       className: "bg-gray-100 text-gray-500 border border-gray-300",
     };
   }
@@ -52,7 +49,6 @@ export function Franqueados() {
   const [formData, setFormData] = useState<any>({});
   const [salvando, setSalvando] = useState(false);
   const [busca, setBusca] = useState("");
-  const [showFiltros, setShowFiltros] = useState(false);
 
   useEffect(() => {
     carregarFranqueados();
@@ -97,7 +93,6 @@ export function Franqueados() {
       cidade: "",
       estado: "",
       endereco: "",
-      status: "",
       observacoes: "",
     });
     setModalAberto(true);
@@ -248,25 +243,6 @@ export function Franqueados() {
               placeholder="Buscar por nome, CPF ou cidade..."
               className="flex-1 bg-transparent outline-none text-gray-800"
             />
-            <button
-              className="ml-2 text-gray-500 hover:text-blue-600"
-              onClick={() => setShowFiltros((v) => !v)}
-              title="Filtros"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707l-7 7V21a1 1 0 01-2 0v-7.293l-7-7A1 1 0 013 6V4z"
-                ></path>
-              </svg>
-            </button>
           </div>
           <button
             onClick={abrirModalNovo}
@@ -275,13 +251,6 @@ export function Franqueados() {
             + Novo Franqueado
           </button>
         </div>
-        {showFiltros && (
-          <div className="mt-3 bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-wrap gap-3">
-            <span className="text-xs text-gray-500">
-              Filtros avançados em breve...
-            </span>
-          </div>
-        )}
         <div className="mt-2 text-xs text-gray-500">
           Mostrando {franqueadosFiltrados.length} de {franqueados.length}{" "}
           franqueados
@@ -433,7 +402,6 @@ export function Franqueados() {
                       onChange={handleInputChange}
                       className="bg-white border border-gray-300 rounded-md px-3 py-2 text-base font-medium text-gray-800 focus:border-blue-500 focus:ring-blue-500"
                     >
-                      <option value="">Sem Status</option>
                       <option value="principal">Principal</option>
                       <option value="socio">Sócio</option>
                       <option value="operador">Operador</option>
@@ -512,32 +480,6 @@ export function Franqueados() {
                   />
                 </div>
               </section>
-
-              {/* Status */}
-              <section>
-                <div className="flex items-center gap-2 mb-2">
-                  <Settings className="w-5 h-5 text-gray-500" />
-                  <h4 className="font-semibold text-lg text-gray-800">
-                    Status
-                  </h4>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-4 flex flex-col max-w-xs">
-                  <label className="text-xs text-gray-500 font-semibold mb-1">
-                    Status do Franqueado
-                  </label>
-                  <select
-                    name="status"
-                    value={formData.status || ""}
-                    onChange={handleInputChange}
-                    className="bg-white border border-gray-300 rounded-md px-3 py-2 text-base font-medium text-gray-800 focus:border-blue-500 focus:ring-blue-500"
-                  >
-                    <option value="">Sem Status</option>
-                    <option value="ativo">Ativo</option>
-                    <option value="inativo">Inativo</option>
-                  </select>
-                </div>
-              </section>
-
               {/* Botões de ação */}
               <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 mt-8">
                 <button
