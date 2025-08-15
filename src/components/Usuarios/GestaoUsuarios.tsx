@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
-  Users, Plus, Edit, Trash2, Eye, EyeOff, Shield, 
-  Mail, Phone, Calendar, CheckCircle, XCircle, Filter,
-  Search, RefreshCw, Lock, Unlock, AlertTriangle, Settings,
+  Users, Plus, Edit, Eye, Shield,
+  CheckCircle, XCircle, Filter,
+  RefreshCw, Lock, Unlock, AlertTriangle, Settings,
   Globe, MapPin, Building2, BarChart3, Download
 } from 'lucide-react';
 import { ConfiguracaoService } from '../../services/configuracaoService';
-import { Usuario, PermissaoUsuario, EstatisticasUsuarios, FiltrosUsuarios, LogSeguranca } from '../../types/configuracao';
+import { Usuario, EstatisticasUsuarios, FiltrosUsuarios, LogSeguranca } from '../../types/configuracao';
 
 export function GestaoUsuarios() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -19,13 +19,9 @@ export function GestaoUsuarios() {
   const [filtros, setFiltros] = useState<FiltrosUsuarios>({});
   const [abaSelecionada, setAbaSelecionada] = useState<'usuarios' | 'logs' | 'estatisticas'>('usuarios');
 
-  const configuracaoService = new ConfiguracaoService();
+  const configuracaoService = useMemo(() => new ConfiguracaoService(), []);
 
-  useEffect(() => {
-    carregarDados();
-  }, [filtros, abaSelecionada]);
-
-  const carregarDados = async () => {
+  const carregarDados = useCallback(async () => {
     setCarregando(true);
     try {
       const [usuariosData, statsData] = await Promise.all([
@@ -44,12 +40,18 @@ export function GestaoUsuarios() {
         });
         setLogsSeguranca(logsData);
       }
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+    } catch (e) {
+      console.error('Erro ao carregar dados:', e);
     } finally {
       setCarregando(false);
     }
-  };
+  }, [abaSelecionada, configuracaoService, filtros]);
+
+  useEffect(() => {
+    carregarDados();
+  }, [carregarDados]);
+
+  // removido: usamos a versão memoizada acima
 
   const abrirModalCriar = () => {
     setFormData({
@@ -96,7 +98,21 @@ export function GestaoUsuarios() {
 
     try {
       if (modalAberto === 'criar') {
-        await configuracaoService.criarUsuario(formData as Omit<Usuario, 'id' | 'created_at' | 'updated_at'>);
+        // Pergunta se deseja enviar convite por e-mail (sem senha)
+        const usarConvite = confirm('Deseja enviar um convite por e-mail para o usuário definir a senha? (OK = convite, Cancelar = definir senha agora)');
+        let password: string | undefined = undefined;
+        if (!usarConvite) {
+          const pwd = prompt('Digite uma senha inicial (mín. 8 caracteres):') || '';
+          if (pwd.length < 8) {
+            alert('Senha muito curta. Tente novamente.');
+            return;
+          }
+          password = pwd;
+        }
+        await configuracaoService.criarUsuarioAdmin({
+          ...(formData as Omit<Usuario, 'id' | 'created_at' | 'updated_at'>),
+          password,
+        });
       } else if (modalAberto === 'editar' && usuarioSelecionado) {
         await configuracaoService.atualizarUsuario(
           usuarioSelecionado.id!,
@@ -107,8 +123,8 @@ export function GestaoUsuarios() {
       
       fecharModal();
       carregarDados();
-    } catch (error) {
-      alert(`Erro ao salvar usuário: ${error}`);
+    } catch (e) {
+      alert(`Erro ao salvar usuário: ${e}`);
     }
   };
 
@@ -120,8 +136,8 @@ export function GestaoUsuarios() {
         'usuario_atual'
       );
       carregarDados();
-    } catch (error) {
-      alert(`Erro ao alterar status: ${error}`);
+    } catch (e) {
+      alert(`Erro ao alterar status: ${e}`);
     }
   };
 
@@ -164,7 +180,7 @@ export function GestaoUsuarios() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (error) {
+  } catch {
       alert('Erro ao exportar dados');
     }
   };
@@ -250,7 +266,7 @@ export function GestaoUsuarios() {
             return (
               <button
                 key={aba.id}
-                onClick={() => setAbaSelecionada(aba.id as any)}
+                onClick={() => setAbaSelecionada(aba.id as 'usuarios' | 'logs' | 'estatisticas')}
                 className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
                   abaSelecionada === aba.id
                     ? 'border-blue-500 text-blue-600'
@@ -522,7 +538,7 @@ export function GestaoUsuarios() {
                       {formatarData(log.data_evento)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {(log as any).usuarios_sistema?.nome_completo || log.email_tentativa}
+                      {((log as unknown) as { usuarios_sistema?: { nome_completo?: string } }).usuarios_sistema?.nome_completo || log.email_tentativa}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getTipoEventoColor(log.tipo_evento)}`}>
@@ -638,7 +654,7 @@ export function GestaoUsuarios() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nível de Permissão *</label>
                 <select
                   value={formData.nivel_permissao || 'observador'}
-                  onChange={(e) => setFormData({...formData, nivel_permissao: e.target.value as any})}
+                  onChange={(e) => setFormData({...formData, nivel_permissao: e.target.value as Usuario['nivel_permissao']})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="observador">Observador</option>
@@ -655,7 +671,7 @@ export function GestaoUsuarios() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Área de Atuação</label>
                 <select
                   value={formData.area_atuacao || 'global'}
-                  onChange={(e) => setFormData({...formData, area_atuacao: e.target.value as any})}
+                  onChange={(e) => setFormData({...formData, area_atuacao: e.target.value as Usuario['area_atuacao']})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="global">Global</option>

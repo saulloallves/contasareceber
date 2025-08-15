@@ -4,6 +4,54 @@ import { ConfiguracaoCobranca, ValidacaoConfiguracao, Usuario, LogSistema, Confi
 
 export class ConfiguracaoService {
   /**
+   * Cria usuário no Auth (via Edge Function) e upsert em usuarios_sistema.
+   * Requer que o usuário logado seja admin_master.
+   */
+  async criarUsuarioAdmin(
+    payload: Omit<Usuario, 'id' | 'created_at' | 'updated_at'> & { password?: string }
+  ): Promise<{ id: string; invited: boolean }>
+  {
+    try {
+      // Validações rápidas no front
+      if (!payload.nome_completo || !payload.email || !payload.cargo || !payload.nivel_permissao) {
+        throw new Error('Preencha nome, email, cargo e nível de permissão');
+      }
+
+      // Evitar duplicidade básica pelo email na tabela local
+      const { data: existente } = await supabase
+        .from('usuarios_sistema')
+        .select('id')
+        .eq('email', payload.email)
+        .maybeSingle();
+      if (existente?.id) {
+        throw new Error('Email já cadastrado no sistema');
+      }
+
+      const { data, error } = await (supabase as any).functions.invoke('admin-create-user', {
+        body: {
+          email: payload.email,
+          password: payload.password,
+          nome_completo: payload.nome_completo,
+          telefone: payload.telefone,
+          cargo: payload.cargo,
+          nivel_permissao: payload.nivel_permissao,
+          ativo: payload.ativo ?? true,
+          area_atuacao: payload.area_atuacao ?? 'global',
+          codigo_unidade_vinculada: payload.codigo_unidade_vinculada,
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Erro ao criar usuário');
+      }
+
+      return { id: data.id, invited: Boolean(data.invited) };
+    } catch (err) {
+      console.error('Erro ao criar usuário (admin):', err);
+      throw err;
+    }
+  }
+  /**
    * Busca a configuração atual do sistema
    */
   async buscarConfiguracao(): Promise<ConfiguracaoCobranca | null> {
@@ -37,7 +85,7 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
           link_base_agendamento: 'https://calendly.com/sua-empresa/negociacao',
           canal_envio: 'whatsapp',
           modo_debug: false,
-          ultima_data_importacao: null,
+          // ultima_data_importacao omitida até primeira importação
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
