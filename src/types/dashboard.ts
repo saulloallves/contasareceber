@@ -50,6 +50,8 @@ export interface IndicadoresMensais {
   unidades_inadimplentes: number;
   ticket_medio_dividas: number;
   percentual_recuperacao: number;
+  // Variação percentual de unidades inadimplentes (mês atual vs anterior)
+  variacao_unidades?: number;
   comparativo_mes_anterior: {
     variacao_em_aberto: number;
     variacao_pago: number;

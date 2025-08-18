@@ -8,6 +8,9 @@ type Cobranca = {
   valor_recebido?: number | null;
   cnpj?: string | null;
   dias_em_atraso?: number | null;
+  data_vencimento?: string | null;
+  data_ultima_atualizacao?: string | null;
+  created_at?: string | null;
 };
 
 export class DashboardService {
@@ -16,7 +19,7 @@ export class DashboardService {
       // Buscar dados de cobranças
       const { data: cobrancas, error: cobrancasError } = await supabase
         .from('cobrancas_franqueados')
-        .select('*');
+  .select('*');
 
       if (cobrancasError) throw cobrancasError;
 
@@ -51,22 +54,73 @@ export class DashboardService {
       const percentualInadimplencia = totalBase > 0 ? (totalEmAberto / totalBase) * 100 : 0;
       const percentualRecuperacao = totalBase > 0 ? (totalQuitado / totalBase) * 100 : 0;
 
-      // Calcular variações (simuladas por enquanto - você pode implementar lógica real)
-      const variacaoEmAberto = Math.random() * 20 - 10; // -10% a +10%
-      const variacaoQuitado = Math.random() * 15 - 5; // -5% a +15%
-      const variacaoNegociando = Math.random() * 10 - 5; // -5% a +10%
-  // const variacaoUnidades = Math.random() * 8 - 4; // -4% a +8%
+      // ===== Cálculo real de variações mês a mês =====
+      // Definição de mês por data_vencimento; para quitados usamos data_ultima_atualizacao ou created_at como aproximação.
+      const now = new Date();
+      const currStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const nextStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+      const parseDate = (s?: string | null) => {
+        if (!s) return null;
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? null : d;
+      };
+
+      const inRange = (d: Date | null, start: Date, end: Date) => {
+        if (!d) return false;
+        return d >= start && d < end;
+      };
+
+      const OPEN_STATUSES = ['em_aberto', 'em_atraso', 'negociando', 'cobrado', 'em_tratativa_juridica', 'em_tratativa_critica'];
+      const NEGOTIATING_STATUSES = ['negociando', 'cobrado', 'em_tratativa_juridica', 'em_tratativa_critica'];
+
+      const currByVenc = (cobrancas as Cobranca[] | null)?.filter(c => inRange(parseDate(c.data_vencimento || null), currStart, nextStart)) || [];
+      const prevByVenc = (cobrancas as Cobranca[] | null)?.filter(c => inRange(parseDate(c.data_vencimento || null), prevStart, currStart)) || [];
+
+      const sum = (arr: Cobranca[], pick: (c: Cobranca) => number) => arr.reduce((acc, c) => acc + pick(c), 0);
+
+      // Em aberto (atualizado) por mês de vencimento
+      const currEmAberto = sum(currByVenc.filter(c => OPEN_STATUSES.includes(c.status)), c => Number(c.valor_atualizado ?? c.valor_original) || 0);
+      const prevEmAberto = sum(prevByVenc.filter(c => OPEN_STATUSES.includes(c.status)), c => Number(c.valor_atualizado ?? c.valor_original) || 0);
+
+      // Quitado por "data da quitação" aproximada (data_ultima_atualizacao || created_at)
+      const getQuitDate = (c: Cobranca) => parseDate(c.data_ultima_atualizacao || c.created_at || null);
+      const currQuitados = (cobrancas as Cobranca[] | null)?.filter(c => c.status === 'quitado' && inRange(getQuitDate(c), currStart, nextStart)) || [];
+      const prevQuitados = (cobrancas as Cobranca[] | null)?.filter(c => c.status === 'quitado' && inRange(getQuitDate(c), prevStart, currStart)) || [];
+      const currQuitadoVal = sum(currQuitados, c => Number(c.valor_recebido) || Number(c.valor_original) || 0);
+      const prevQuitadoVal = sum(prevQuitados, c => Number(c.valor_recebido) || Number(c.valor_original) || 0);
+
+      // Negociando por mês de vencimento
+      const currNegociando = sum(currByVenc.filter(c => NEGOTIATING_STATUSES.includes(c.status)), c => Number(c.valor_atualizado) || Number(c.valor_original) || 0);
+      const prevNegociando = sum(prevByVenc.filter(c => NEGOTIATING_STATUSES.includes(c.status)), c => Number(c.valor_atualizado) || Number(c.valor_original) || 0);
+
+      // Unidades inadimplentes por mês (distintas por CNPJ) usando mês de vencimento para status em aberto
+      const currUnidades = new Set(currByVenc.filter(c => OPEN_STATUSES.includes(c.status)).map(c => c.cnpj || '')).size;
+      const prevUnidades = new Set(prevByVenc.filter(c => OPEN_STATUSES.includes(c.status)).map(c => c.cnpj || '')).size;
+
+      const pctChange = (curr: number, prev: number) => {
+        if (!prev && !curr) return 0;
+        if (!prev) return 100; // crescimento a partir de zero
+        return ((curr - prev) / prev) * 100;
+      };
+
+      const variacaoEmAberto = pctChange(currEmAberto, prevEmAberto);
+      const variacaoQuitado = pctChange(currQuitadoVal, prevQuitadoVal);
+      const variacaoNegociando = pctChange(currNegociando, prevNegociando);
+      const variacaoUnidades = pctChange(currUnidades, prevUnidades);
 
       return {
-  total_em_aberto_mes: totalEmAberto,
-  total_em_aberto_original_mes: totalEmAbertoOriginal,
-  total_em_aberto_atualizado_mes: totalEmAbertoAtualizado,
+        total_em_aberto_mes: totalEmAberto,
+        total_em_aberto_original_mes: totalEmAbertoOriginal,
+        total_em_aberto_atualizado_mes: totalEmAbertoAtualizado,
         total_pago_mes: totalQuitado,
         total_negociando_mes: totalNegociando,
         percentual_inadimplencia: percentualInadimplencia,
         unidades_inadimplentes: unidadesInadimplentes,
         ticket_medio_dividas: ticketMedio,
-        percentual_recuperacao: percentualRecuperacao,
+  percentual_recuperacao: percentualRecuperacao,
+  variacao_unidades: variacaoUnidades,
         comparativo_mes_anterior: {
           variacao_em_aberto: variacaoEmAberto,
           variacao_pago: variacaoQuitado,

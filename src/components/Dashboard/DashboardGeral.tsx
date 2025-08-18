@@ -212,9 +212,9 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
     return null;
   };
 
-  const getVariacaoColor = (valor: number) => {
-    if (valor > 0) return "text-green-600";
-    if (valor < 0) return "text-red-600";
+  const getVariacaoColor = (valor: number, positiveIsGood: boolean = true) => {
+    if (valor > 0) return positiveIsGood ? "text-green-600" : "text-red-600";
+    if (valor < 0) return positiveIsGood ? "text-red-600" : "text-green-600";
     return "text-gray-600";
   };
 
@@ -305,7 +305,8 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
               <div className="mt-2 flex items-center text-sm">
                 <span
                   className={`font-semibold ${getVariacaoColor(
-                    indicadores.variacaoEmAberto
+                    indicadores.variacaoEmAberto,
+                    false // aumento de em aberto é ruim (vermelho)
                   )}`}
                 >
                   {getVariacaoIcon(indicadores.variacaoEmAberto)}
@@ -413,7 +414,8 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
               <div className="mt-2 flex items-center text-sm">
                 <span
                   className={`font-semibold ${getVariacaoColor(
-                    indicadores.variacaoUnidades
+                    indicadores.variacaoUnidades,
+                    false // aumento de unidades inadimplentes é ruim
                   )}`}
                 >
                   {getVariacaoIcon(indicadores.variacaoUnidades)}
