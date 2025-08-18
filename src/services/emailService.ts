@@ -44,8 +44,7 @@ export interface ResultadoEnvio {
 
 export class EmailService {
   /**
-   * Envia email chamando uma Supabase Edge Function.
-   * A função agora espera receber o corpo completo do e-mail.
+   * Envia email pelo n8n
    */
   async enviarEmail(dados: DadosEmail): Promise<ResultadoEnvio> {
     try {
@@ -113,7 +112,7 @@ export class EmailService {
       (await this.buscarConfiguracao()).email_padrao;
 
     // Aplica tratamento de nome também aqui  
-    const nomeFranqueado = dadosUnidade.nome_franqueado;
+    const nomeFranqueado = dadosUnidade?.nome_franqueado;
     let nomeDestinatario;
     
     if (nomeFranqueado && nomeFranqueado !== "Sem nome cadastrado") {
@@ -121,7 +120,7 @@ export class EmailService {
     } else if (nomeFranqueado === "Sem nome cadastrado") {
       nomeDestinatario = "Franqueado(a)";
     } else {
-      nomeDestinatario = dadosCobranca.cliente || "Franqueado(a)";
+      nomeDestinatario = dadosCobranca?.cliente || "Franqueado(a)";
     }
 
     const dadosEmail: DadosEmail = {
@@ -160,7 +159,7 @@ export class EmailService {
       corpo_html = this.converterTextoParaHTML(mensagemPersonalizada);
       template = {
         assunto: `Mensagem sobre pendência - ${
-          dadosUnidade.codigo_unidade || dadosCobranca.cnpj
+          dadosUnidade?.codigo_unidade || dadosCobranca?.cpf || dadosCobranca?.cnpj || "Documento"
         }`,
         corpo_html: corpo_html,
         corpo_texto: corpo_texto,
@@ -174,8 +173,8 @@ export class EmailService {
       );
     }
 
-    // Aplica tratamento de nome também aqui
-    const nomeFranqueado = dadosUnidade.nome_franqueado;
+  // Aplica tratamento de nome também aqui
+  const nomeFranqueado = dadosUnidade?.nome_franqueado;
     let nomeDestinatario;
     
     if (nomeFranqueado && nomeFranqueado !== "Sem nome cadastrado") {
@@ -251,22 +250,6 @@ export class EmailService {
   }
 
   /**
-   * Testa configuração de email
-   */
-  async testarConfiguracao(emailTeste: string): Promise<ResultadoEnvio> {
-    const dadosEmail: DadosEmail = {
-      destinatario: emailTeste,
-      nome_destinatario: "Usuário Teste",
-      assunto: "Teste de Configuração de Email",
-      corpo_html:
-        "<h1>Teste de Email</h1><p>Se você recebeu este email, a configuração está funcionando corretamente.</p>",
-      corpo_texto:
-        "Teste de Email: Se você recebeu este email, a configuração está funcionando corretamente.",
-    };
-    return this.enviarEmail(dadosEmail);
-  }
-
-  /**
    * Gera template para proposta de parcelamento
    */
   public gerarTemplatePropostaParcelamento(
@@ -275,7 +258,7 @@ export class EmailService {
     dadosCobranca: any
   ): EmailTemplate {
     // Prioriza APENAS o nome do franqueado - nunca usar nome da unidade
-    const nomeFranqueado = dadosUnidade.franqueado_unidades?.[0]?.franqueados?.nome_completo;
+    const nomeFranqueado = dadosUnidade?.franqueado_unidades?.[0]?.franqueados?.nome_completo;
     
     let nomeCliente;
     if (nomeFranqueado && nomeFranqueado !== "Sem nome cadastrado") {
@@ -284,8 +267,10 @@ export class EmailService {
       // Para TODOS os outros casos, sempre usa "Franqueado(a)"
       nomeCliente = "Franqueado(a)";
     }
-  const codigoUnidade = dadosUnidade.codigo_unidade || dadosCobranca.cnpj;
-  const nomeUnidade = dadosUnidade.nome_unidade || dadosCobranca?.cliente || codigoUnidade;
+  // Documento exibível quando não há unidade: CPF > CNPJ
+  const documento = dadosCobranca?.cpf || dadosCobranca?.cnpj || "Documento";
+  const codigoUnidade = dadosUnidade?.codigo_unidade || documento;
+  const nomeUnidade = dadosUnidade?.nome_unidade || dadosCobranca?.cliente || codigoUnidade;
 
   // Assunto sem código/unidade, conforme solicitado
   const assunto = `Proposta de Parcelamento`;
@@ -295,12 +280,12 @@ export class EmailService {
         <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
           <div style="text-align: center; margin-bottom: 30px;">
             <h1 style="color: #3B82F6; margin: 0;">Proposta de Parcelamento</h1>
-            <p style="color: #666; margin: 10px 0 0 0;">Cresci e Perdi - Departamento Financeiro</p>
+            <p style="color: #666; margin: 10px 0 0 0;">Cresci e Perdi - Contas a Receber</p>
           </div>
           
           <p>Prezado(a) <strong>${nomeCliente}</strong>,</p>
           
-          <p>Temos uma proposta especial para regularizar o débito da unidade <strong>${nomeUnidade}</strong>.</p>
+          <p>Temos uma proposta especial para regularizar o seu débito <strong>${nomeUnidade}</strong>.</p>
           
           <div style="background-color: #EBF8FF; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="color: #2563EB; margin-top: 0;">📋 Detalhes da Proposta:</h3>
@@ -401,7 +386,7 @@ export class EmailService {
           <div style="text-align: center; margin: 30px 0;">
             <div style="background-color: #3B82F6; color: white; padding: 15px; border-radius: 8px; display: inline-block;">
               <p style="margin: 0; font-weight: bold;">📞 Contato para Dúvidas:</p>
-              <p style="margin: 5px 0 0 0;">financeiro@crescieperdi.com | (11) 99999-9999</p>
+              <p style="margin: 5px 0 0 0;">(19) 99595-7880</p>
             </div>
           </div>
           
@@ -469,7 +454,7 @@ IMPORTANTE: Esta proposta é válida por 7 dias corridos.
 
 Para aceitar, responda este email confirmando ou entre em contato:
 📧 financeiro@crescieperdi.com
-📞 (11) 99999-9999
+📞 (19) 99595-7880
 
 Atenciosamente,
 Equipe Financeira - Cresci e Perdi
@@ -492,7 +477,7 @@ Equipe Financeira - Cresci e Perdi
     dadosCobranca: any
   ): EmailTemplate {
     // Aplica a mesma lógica de tratamento de nome para cobranças
-    const nomeFranqueado = dadosUnidade.nome_franqueado;
+  const nomeFranqueado = dadosUnidade?.nome_franqueado;
     let nomeCliente;
     
     if (nomeFranqueado && nomeFranqueado !== "Sem nome cadastrado") {
@@ -501,19 +486,18 @@ Equipe Financeira - Cresci e Perdi
       // Para TODOS os outros casos, sempre usa "Franqueado(a)"
       nomeCliente = "Franqueado(a)";
     }
-    const codigoUnidade = dadosUnidade.codigo_unidade || dadosCobranca.cnpj;
     const valorAtualizado =
       dadosCobranca.valor_atualizado || dadosCobranca.valor_original;
     const diasAtraso = dadosCobranca.dias_em_atraso || 0;
 
     const templates = {
       padrao: {
-        assunto: `Cobrança Pendente - ${codigoUnidade}`,
+        assunto: `Cobrança Pendente`,
         corpo_html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <h2 style="color: #3B82F6;">Cobrança Pendente</h2>
             <p>Olá, <strong>${nomeCliente}</strong>!</p>
-            <p>Consta um débito da sua unidade <strong>${codigoUnidade}</strong>, vencido em <strong>${this.formatarData(
+            <p>Consta um débito da sua unidad, vencido em <strong>${this.formatarData(
           dadosCobranca.data_vencimento
         )}</strong>.</p>
             <p>Valor atualizado até hoje: <strong style="color: #DC2626;">${this.formatarMoeda(
@@ -525,23 +509,24 @@ Equipe Financeira - Cresci e Perdi
                 : ""
             }
             <p>Para regularizar ou esclarecer dúvidas, entre em contato conosco.</p>
+            <p>Telefone para regularizar: (19) 99595-7880</p>
             <hr>
             <p style="font-size: 12px; color: #666;">Esta é uma mensagem automática do sistema de cobrança.</p>
           </div>
         `,
-        corpo_texto: `Olá, ${nomeCliente}!\n\nConsta um débito da sua unidade ${codigoUnidade}, vencido em ${this.formatarData(
+        corpo_texto: `Olá, ${nomeCliente}!\n\nConsta um débito da sua unidade, vencido em ${this.formatarData(
           dadosCobranca.data_vencimento
         )}.\nValor atualizado: ${this.formatarMoeda(valorAtualizado)}\n${
           diasAtraso > 0 ? `Dias em atraso: ${diasAtraso} dias\n` : ""
         }Para regularizar, entre em contato conosco.\n\nEquipe Financeira`,
       },
       formal: {
-        assunto: `Notificação de Pendência Financeira - ${codigoUnidade}`,
+        assunto: `Notificação de Pendência Financeira`,
         corpo_html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <h2 style="color: #DC2626;">Notificação de Pendência Financeira</h2>
             <p>Prezado(a) <strong>${nomeCliente}</strong>,</p>
-            <p>Identificamos pendência financeira em aberto referente à sua unidade <strong>${codigoUnidade}</strong>.</p>
+            <p>Identificamos pendência financeira em aberto referente à sua unidade.</p>
             <div style="background-color: #FEF2F2; padding: 15px; border-radius: 5px; margin: 20px 0;">
               <h3 style="color: #DC2626; margin-top: 0;">Dados da Pendência:</h3>
               <ul>
@@ -558,23 +543,24 @@ Equipe Financeira - Cresci e Perdi
               </ul>
             </div>
             <p><strong>Solicitamos regularização no prazo de 5 dias úteis.</strong></p>
+            <p>Telefone para regularizar: (19) 99595-7880</p>
             <hr>
             <p>Atenciosamente,<br><strong>Equipe Financeira - Cresci e Perdi</strong></p>
           </div>
         `,
-        corpo_texto: `Prezado(a) ${nomeCliente},\n\nIdentificamos pendência financeira da unidade ${codigoUnidade}.\n\nDados:\n- Valor: ${this.formatarMoeda(
+        corpo_texto: `Prezado(a) ${nomeCliente},\n\nIdentificamos pendência financeira da unidade .\n\nDados:\n- Valor: ${this.formatarMoeda(
           valorAtualizado
         )}\n- Vencimento: ${this.formatarData(
           dadosCobranca.data_vencimento
         )}\n- Atraso: ${diasAtraso} dias\n\nSolicitamos regularização em 5 dias úteis.\n\nEquipe Financeira`,
       },
       urgente: {
-        assunto: `🚨 URGENTE - Débito Vencido ${codigoUnidade}`,
+        assunto: `🚨 URGENTE - Débito Vencido`,
         corpo_html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="background-color: #FEE2E2; border: 2px solid #DC2626; padding: 20px; border-radius: 10px;">
               <h2 style="color: #DC2626; margin-top: 0;">🚨 ATENÇÃO ${nomeCliente}</h2>
-              <p>Sua unidade <strong>${codigoUnidade}</strong> possui débito VENCIDO há <strong>${diasAtraso} dias</strong>.</p>
+              <p>Sua unidade possui débito VENCIDO há <strong>${diasAtraso} dias</strong>.</p>
               <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
                 <p style="margin: 0;"><strong>💰 Valor:</strong> ${this.formatarMoeda(
                   valorAtualizado
@@ -584,15 +570,15 @@ Equipe Financeira - Cresci e Perdi
                 )}</p>
               </div>
               <p style="font-size: 18px; color: #DC2626;"><strong>⚠️ Regularize HOJE para evitar bloqueios!</strong></p>
-              <p>Entre em contato: <strong>(11) 99999-9999</strong></p>
+              <p>Entre em contato: <strong>(19) 99595-7880</strong></p>
             </div>
           </div>
         `,
-        corpo_texto: `🚨 ATENÇÃO ${nomeCliente}\n\nSua unidade ${codigoUnidade} possui débito VENCIDO há ${diasAtraso} dias.\n\n💰 Valor: ${this.formatarMoeda(
+        corpo_texto: `🚨 ATENÇÃO ${nomeCliente}\n\nSua unidade possui débito VENCIDO há ${diasAtraso} dias.\n\n💰 Valor: ${this.formatarMoeda(
           valorAtualizado
         )}\n📅 Vencimento: ${this.formatarData(
           dadosCobranca.data_vencimento
-        )}\n\n⚠️ Regularize HOJE para evitar bloqueios!\n\nContato: (11) 99999-9999`,
+        )}\n\n⚠️ Regularize HOJE para evitar bloqueios!\n\nContato: (19) 99595-7880`,
       },
     };
 

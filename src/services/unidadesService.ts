@@ -171,7 +171,12 @@ export class UnidadesService {
    */
   async buscarUnidadePorCnpj(cnpj: string): Promise<UnidadeFranqueada | null> {
     try {
+      // Proteção: se o CNPJ vier vazio/"0"/inválido (caso de cobranças por CPF), não consulta
+      if (!cnpj) return null;
       const cnpjLimpo = cnpj.replace(/\D/g, "");
+      if (!cnpjLimpo || cnpjLimpo === "0") {
+        return null;
+      }
   const { data, error } = await supabase
         .from("unidades_franqueadas")
         .select(

@@ -109,19 +109,31 @@ export class CobrancaService {
     }
 
     if (filtros.cnpj) {
-      query = query.eq("cnpj", filtros.cnpj);
+      const cnpjFiltro = String(filtros.cnpj);
+      const cnpjNumerico = cnpjFiltro.replace(/\D/g, "");
+      // Aplica filtro exato apenas quando CNPJ completo (14 dígitos)
+      if (cnpjNumerico.length === 14) {
+        query = query.eq("cnpj", cnpjNumerico);
+      }
+      // Para valores parciais, não filtra no banco (o front aplica includes em dígitos)
     }
     if ((filtros as any).cpf) {
-      query = query.eq("cpf", (filtros as any).cpf);
+      const cpfFiltro = String((filtros as any).cpf);
+      const cpfNumerico = cpfFiltro.replace(/\D/g, "");
+      // Aplica filtro exato apenas quando CPF completo (11 dígitos)
+      if (cpfNumerico.length === 11) {
+        query = query.eq("cpf", cpfNumerico);
+      }
+      // Para valores parciais, não filtra no banco (o front aplica includes em dígitos)
     }
 
     // Filtro por tipo de documento (cpf/cnpj)
     if ((filtros as any).tipoDocumento === "cpf") {
-      // Considera como CPF quando a coluna cpf não é nula
-      query = query.not("cpf", "is", null);
+      // CPF válido: coluna 'cpf' NÃO nula e NÃO vazia
+      query = query.not("cpf", "is", null).neq("cpf", "");
     } else if ((filtros as any).tipoDocumento === "cnpj") {
-      // Considera como CNPJ quando a coluna cpf é nula (prioriza novo modelo)
-      query = query.is("cpf", null);
+      // CNPJ: registros onde 'cpf' é nulo OU vazio (dados antigos podem ter "")
+      query = query.or("cpf.is.null,cpf.eq.");
     }
 
     // Filtros de valor

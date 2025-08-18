@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "./databaseService";
+import { formatarCNPJCPF } from "../utils/formatters";
 import {
   SimulacaoParcelamento,
   ParcelaSimulacao,
@@ -127,7 +128,8 @@ export class SimulacaoParcelamentoService {
 
       const simulacao: SimulacaoParcelamento = {
         titulo_id: tituloId,
-        cnpj_unidade: cobranca.cnpj,
+        // Para cobranças por CPF, preservamos o documento disponível (CPF ou CNPJ)
+        cnpj_unidade: (cobranca as any).cnpj || (cobranca as any).cpf,
         valor_original: cobranca.valor_original,
         valor_atualizado: valorAtualizado,
         quantidade_parcelas: quantidadeParcelas,
@@ -211,8 +213,8 @@ export class SimulacaoParcelamentoService {
 
       const config = await this.buscarConfiguracao();
       const cobranca = (simulacao as any).cobrancas_franqueados;
-      const unidade = cobranca.unidades_franqueadas;
-      const franqueado = unidade.franqueado_unidades?.[0]?.franqueados;
+      const unidade = cobranca?.unidades_franqueadas || null;
+      const franqueado = unidade?.franqueado_unidades?.[0]?.franqueados || null;
 
       // Gera mensagem personalizada
       const mensagem = this.gerarMensagemProposta(
@@ -283,6 +285,7 @@ export class SimulacaoParcelamentoService {
           `
           *,
           cobrancas_franqueados!left (
+            telefone,
             unidades_franqueadas!left (
               telefone_unidade,
               franqueado_unidades!left (
@@ -301,9 +304,10 @@ export class SimulacaoParcelamentoService {
         throw new Error("Proposta não encontrada");
       }
 
-      const unidade = (proposta as any).cobrancas_franqueados
-        ?.unidades_franqueadas;
+      const cobranca = (proposta as any).cobrancas_franqueados;
+      const unidade = cobranca?.unidades_franqueadas;
       const telefone =
+        cobranca?.telefone ||
         unidade?.telefone_unidade ||
         unidade?.franqueado_unidades?.[0]?.franqueados?.telefone;
 
@@ -406,6 +410,7 @@ export class SimulacaoParcelamentoService {
           simulacoes_parcelamento!left(*),
           cobrancas_franqueados!left (
             cliente,
+            email_cobranca,
             unidades_franqueadas!left (
               email_unidade,
               codigo_unidade,
@@ -427,11 +432,12 @@ export class SimulacaoParcelamentoService {
         throw new Error(`Proposta não encontrada: ${propostaError?.message}`);
       }
 
-      const unidade = (proposta as any).cobrancas_franqueados
-        .unidades_franqueadas;
+      const cobranca = (proposta as any).cobrancas_franqueados;
+      const unidade = cobranca?.unidades_franqueadas;
       const email =
-        unidade.email_unidade ||
-        unidade.franqueado_unidades?.[0]?.franqueados?.email;
+        cobranca?.email_cobranca ||
+        unidade?.email_unidade ||
+        unidade?.franqueado_unidades?.[0]?.franqueados?.email;
 
       if (!email) {
         throw new Error("Email não cadastrado para a unidade.");
@@ -447,8 +453,9 @@ export class SimulacaoParcelamentoService {
       const dadosEmail = {
         destinatario: email,
         nome_destinatario:
-          unidade.franqueado_unidades?.[0]?.franqueados?.nome_completo ||
-          unidade.nome_unidade,
+          unidade?.franqueado_unidades?.[0]?.franqueados?.nome_completo ||
+          cobranca?.cliente ||
+          unidade?.nome_unidade,
         assunto: template.assunto,
         corpo_html: template.corpo_html,
         corpo_texto: template.corpo_texto,
@@ -459,7 +466,8 @@ export class SimulacaoParcelamentoService {
           cobrancaId: proposta.titulo_id, // ID da cobrança original (FK válida)
           propostaId: propostaId, // ID da proposta (para referência)
           cliente:
-            unidade.franqueado_unidades?.[0]?.franqueados?.nome_completo ||
+            unidade?.franqueado_unidades?.[0]?.franqueados?.nome_completo ||
+            cobranca?.cliente ||
             "Franqueado(a)",
         },
       };
@@ -637,7 +645,7 @@ export class SimulacaoParcelamentoService {
       const stats: EstatisticasParcelamento = {
         total_simulacoes: simulacoes?.length || 0,
         propostas_enviadas: propostas?.length || 0,
-  propostas_aceitas: aceites?.length || 0,
+        propostas_aceitas: aceites?.length || 0,
         propostas_recusadas:
           propostas?.filter((p) => p.status_proposta === "recusada").length ||
           0,
@@ -765,13 +773,23 @@ Equipe Financeira`,
   ): string {
     const template = config.template_whatsapp;
 
+    // Nome do destinatário: prioriza franqueado válido; caso contrário, usa o cliente da cobrança
+    const nomeCliente =
+      franqueado?.nome_completo &&
+      franqueado.nome_completo !== "Sem nome cadastrado"
+        ? franqueado.nome_completo
+        : _cobranca?.cliente || "Franqueado(a)";
+
+    // Documento exibível: CPF > CNPJ; fallback para código da unidade; por fim, rótulo genérico
+    const documentoExibivel = _cobranca?.cpf
+      ? formatarCNPJCPF(String(_cobranca.cpf))
+      : _cobranca?.cnpj
+      ? formatarCNPJCPF(String(_cobranca.cnpj))
+      : unidade?.codigo_unidade || "Documento";
+
     const variaveis = {
-      "{{cliente}}":
-        franqueado?.nome_completo &&
-        franqueado.nome_completo !== "Sem nome cadastrado"
-          ? franqueado.nome_completo
-          : "Franqueado(a)", // SEMPRE usar "Franqueado(a)" quando não há franqueado válido
-      "{{codigo_unidade}}": unidade?.codigo_unidade || "N/A",
+      "{{cliente}}": nomeCliente,
+      "{{codigo_unidade}}": documentoExibivel,
       "{{valor_original}}": this.formatarMoeda(simulacao.valor_original),
       "{{valor_atualizado}}": this.formatarMoeda(simulacao.valor_atualizado),
       "{{valor_entrada}}": simulacao.valor_entrada

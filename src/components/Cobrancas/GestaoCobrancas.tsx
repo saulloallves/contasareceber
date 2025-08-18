@@ -31,10 +31,25 @@ export function GestaoCobrancas() {
   const [modalComparacaoAberto, setModalComparacaoAberto] = useState(false);
   const [usuario] = useState("admin"); // Em produção, pegar do contexto de autenticação
   const [formData, setFormData] = useState<Partial<CobrancaFranqueado>>({});
-  const [formQuitacao, setFormQuitacao] = useState({valorPago: 0, formaPagamento: "", observacoes: "", dataRecebimento: new Date().toISOString().split("T")[0],});
-  const [filtros, setFiltros] = useState({status: "", busca: "", dataInicio: "", dataFim: "", valorMin: "", valorMax: "", tipoCobranca: "", tipoDocumento: "" as "" | "cpf" | "cnpj",});
-  const [filtrosAvancados, setFiltrosAvancados] = useState({ nomeUnidade: "", cnpj: "", cpf: "", codigo: "", statusCobranca: "", valorMin: "", valorMax: "", tipoCobranca: "", });
-  const [showFiltrosAvancados, setShowFiltrosAvancados] = useState(false);
+  const [formQuitacao, setFormQuitacao] = useState({
+    valorPago: 0,
+    formaPagamento: "",
+    observacoes: "",
+    dataRecebimento: new Date().toISOString().split("T")[0],
+  });
+  // Filtros unificados (antes chamados de "avançados")
+  const [filtrosAvancados, setFiltrosAvancados] = useState({
+    nomeUnidade: "",
+    cnpj: "",
+    cpf: "",
+    codigo: "",
+    statusCobranca: "",
+    valorMin: "",
+    valorMax: "",
+    tipoDocumento: "" as "" | "cpf" | "cnpj",
+    dataInicio: "",
+    dataFim: "",
+  });
   const [colunaOrdenacao, setColunaOrdenacao] = useState("data_vencimento"); // Coluna padrão
   const [direcaoOrdenacao, setDirecaoOrdenacao] = useState("desc"); // Ordenação 'asc' ou 'desc'
   //const [mostrarApenasInadimplentes, setMostrarApenasInadimplentes] = useState(false); // Controlar a exibição de inadimplentes
@@ -134,11 +149,13 @@ Valor atualizado até hoje: *{{valor_atualizado}}*
 
 Deseja regularizar? Entre em contato conosco.
 
-_Esta é uma mensagem do sistema de cobrança._`,
+Telefone: (19) 99595-7880
+
+_Mensagem Automática Sistema de Cobrança_`,
 
     formal: `Prezado(a) {{cliente}},
 
-Identificamos pendência financeira em aberto referente à sua unidade {{codigo_unidade}}.
+Identificamos pendência financeira em aberto referente à sua unidade.
 
 Dados da pendência:
 - Valor original: {{valor_original}}
@@ -148,19 +165,20 @@ Dados da pendência:
 
 Solicitamos regularização no prazo de 5 dias úteis.
 
-Atenciosamente,
-Equipe Financeira`,
+Entre em contato conosco, telefone: (19) 99595-7880
+
+_Mensagem Automática Sistema de Cobrança_`,
 
     urgente: `🚨 ATENÇÃO {{cliente}}
 
-Sua unidade {{codigo_unidade}} possui débito VENCIDO há {{dias_atraso}} dias.
+Consta um débito VENCIDO há {{dias_atraso}} dias, referente a sua unidade.
 
 💰 Valor: {{valor_atualizado}}
 📅 Vencimento: {{data_vencimento}}
 
-⚠️ Regularize HOJE para evitar bloqueios!
+*⚠️ Regularize HOJE para evitar bloqueios!*
 
-Entre em contato: (11) 99999-9999`,
+Entre em contato conosco, telefone: (19) 99595-7880`,
   } as const;
 
   const mostrarMensagem = (
@@ -190,32 +208,41 @@ Entre em contato: (11) 99999-9999`,
   const carregarCobrancas = useCallback(async () => {
     setCarregando(true);
     try {
-      // Converte filtros avançados para o formato esperado pelo serviço
-      const filtrosServico = { ...filtros };
-
-  if (filtrosAvancados.tipoCobranca) {
-        filtrosServico.tipoCobranca = filtrosAvancados.tipoCobranca;
-      }
-
-      if (filtrosAvancados.valorMin) {
+      // Monta filtros para o serviço a partir do conjunto unificado
+      const filtrosServico: Record<string, unknown> = {};
+      if (filtrosAvancados.statusCobranca)
+        filtrosServico.status = filtrosAvancados.statusCobranca;
+      if (filtrosAvancados.valorMin)
         filtrosServico.valorMin = filtrosAvancados.valorMin;
-      }
-
-      if (filtrosAvancados.valorMax) {
+      if (filtrosAvancados.valorMax)
         filtrosServico.valorMax = filtrosAvancados.valorMax;
-      }
+      if (filtrosAvancados.dataInicio)
+        filtrosServico.dataInicio = filtrosAvancados.dataInicio;
+      if (filtrosAvancados.dataFim)
+        filtrosServico.dataFim = filtrosAvancados.dataFim;
 
       const dadosReaisDoBanco = await cobrancaService.buscarCobrancas({
         ...filtrosServico,
         cpf: filtrosAvancados.cpf?.replace(/\D/g, "") || undefined,
-        tipoDocumento: filtros.tipoDocumento || undefined,
+        tipoDocumento: filtrosAvancados.tipoDocumento || undefined,
         colunaOrdenacao,
         direcaoOrdenacao,
-        //apenasInadimplentes: mostrarApenasInadimplentes, // Linha adicionada para filtrar apenas inadimplentes
+        //apenasInadimplentes: mostrarApenasInadimplentes,
       });
 
       // Aplica filtros locais que não são suportados pelo serviço
       let cobrancasFiltradas = dadosReaisDoBanco;
+
+      // Filtro local complementar por tipo de documento (fallback de segurança)
+      if (filtrosAvancados.tipoDocumento === "cpf") {
+        cobrancasFiltradas = cobrancasFiltradas.filter(
+          (c) => !!c.cpf && c.cpf.trim() !== ""
+        );
+      } else if (filtrosAvancados.tipoDocumento === "cnpj") {
+        cobrancasFiltradas = cobrancasFiltradas.filter(
+          (c) => !c.cpf || c.cpf.trim() === ""
+        );
+      }
 
       if (filtrosAvancados.nomeUnidade) {
         cobrancasFiltradas = cobrancasFiltradas.filter((cobranca) =>
@@ -230,8 +257,9 @@ Entre em contato: (11) 99999-9999`,
       }
 
       if (filtrosAvancados.cnpj) {
+        const cnpjBusca = filtrosAvancados.cnpj.replace(/\D/g, "");
         cobrancasFiltradas = cobrancasFiltradas.filter((cobranca) =>
-          cobranca.cnpj.includes(filtrosAvancados.cnpj)
+          (cobranca.cnpj || "").replace(/\D/g, "").includes(cnpjBusca)
         );
       }
 
@@ -280,7 +308,6 @@ Entre em contato: (11) 99999-9999`,
       setCarregando(false);
     }
   }, [
-    filtros,
     filtrosAvancados,
     colunaOrdenacao,
     direcaoOrdenacao,
@@ -288,11 +315,6 @@ Entre em contato: (11) 99999-9999`,
     unidadesService,
     cnpjKey,
   ]);
-
-  // Função para aplicar filtros
-  const aplicarFiltros = () => {
-    carregarCobrancas();
-  };
 
   // Função para limpar filtros
   const limparFiltros = () => {
@@ -304,17 +326,9 @@ Entre em contato: (11) 99999-9999`,
       statusCobranca: "",
       valorMin: "",
       valorMax: "",
-      tipoCobranca: "",
-    });
-    setFiltros({
-      status: "",
-      busca: "",
+      tipoDocumento: "",
       dataInicio: "",
       dataFim: "",
-      valorMin: "",
-      valorMax: "",
-  tipoCobranca: "",
-  tipoDocumento: "",
     });
     carregarCobrancas();
   };
@@ -404,7 +418,14 @@ Entre em contato: (11) 99999-9999`,
 
     // Carrega a unidade priorizando a FK da cobrança
     try {
-      if (cobranca.unidade_id_fk) {
+      // Se a cobrança é de CPF (sem CNPJ válido), não tente buscar unidade por CNPJ
+      const isCobrancaCPF =
+        !!cobranca.cpf &&
+        (!cobranca.cnpj || cobranca.cnpj.replace(/\D/g, "") === "0");
+
+      if (isCobrancaCPF) {
+        setUnidadeSelecionada(null);
+      } else if (cobranca.unidade_id_fk) {
         const unidade = await unidadesService.buscarUnidadePorId(
           cobranca.unidade_id_fk
         );
@@ -424,12 +445,16 @@ Entre em contato: (11) 99999-9999`,
         }
       } else {
         // Fallback quando a cobrança não vier com unidade_id_fk tipado
-        const cached = unidadesPorCnpj[cnpjKey(cobranca.cnpj)];
+        const cached = cobranca.cnpj
+          ? unidadesPorCnpj[cnpjKey(cobranca.cnpj)]
+          : undefined;
         if (cached) {
           setUnidadeSelecionada(cached);
-        } else {
+        } else if (cobranca.cnpj) {
           const un = await unidadesService.buscarUnidadePorCnpj(cobranca.cnpj);
           setUnidadeSelecionada(un);
+        } else {
+          setUnidadeSelecionada(null);
         }
       }
     } catch (e) {
@@ -483,15 +508,15 @@ Entre em contato: (11) 99999-9999`,
     const file = event.target.files?.[0];
     if (!file) return;
 
-  const nome = file.name.toLowerCase();
-  const isExcel = /\.(xlsx|xls)$/i.test(nome);
+    const nome = file.name.toLowerCase();
+    const isExcel = /\.(xlsx|xls)$/i.test(nome);
 
-  if (!isExcel) {
+    if (!isExcel) {
       // Reseta seleção e avisa via toast chamativo
       setArquivoSelecionado(null);
       event.target.value = "";
       toast.error(
-    "Arquivo inválido. Envie uma planilha .xlsx ou .xls.\nO sistema ainda não está pronto para outros formatos!",
+        "Arquivo inválido. Envie uma planilha .xlsx ou .xls.\nO sistema ainda não está pronto para outros formatos!",
         { duration: 6000 }
       );
       return;
@@ -523,10 +548,10 @@ Entre em contato: (11) 99999-9999`,
       return;
     }
 
-  // Trava extra: apenas Excel (.xlsx ou .xls)
-  if (!/\.(xlsx|xls)$/i.test(arquivoSelecionado.name)) {
+    // Trava extra: apenas Excel (.xlsx ou .xls)
+    if (!/\.(xlsx|xls)$/i.test(arquivoSelecionado.name)) {
       toast.error(
-    "Arquivo inválido. Envie uma planilha .xlsx ou .xls.\nO sistema ainda não está pronto para outros formatos (ex.: .csv).",
+        "Arquivo inválido. Envie uma planilha .xlsx ou .xls.\nO sistema ainda não está pronto para outros formatos (ex.: .csv).",
         { duration: 6000 }
       );
       LimparArquivo();
@@ -584,11 +609,14 @@ Entre em contato: (11) 99999-9999`,
         startTime: watcherStart,
         origem: "alertas", // por padrão ouvimos alertas_sistema.tipo_alerta = 'importacao_concluida'
         intervaloMs: 10000,
-  onComplete: () => {
+        onComplete: () => {
           // Notifica usuário (toast chamativo)
-          toast.success("Importação concluída! As cobranças foram atualizadas.", {
-            style: { background: "#065f46", color: "#fff" },
-          });
+          toast.success(
+            "Importação concluída! As cobranças foram atualizadas.",
+            {
+              style: { background: "#065f46", color: "#fff" },
+            }
+          );
           // Dispara evento global para todas as telas ouvirem e recarregarem
           window.dispatchEvent(new CustomEvent("cobrancasAtualizadas"));
         },
@@ -699,12 +727,19 @@ Entre em contato: (11) 99999-9999`,
     if (!cobrancaSelecionada) return template;
 
     // Busca nome do franqueado para personalização
-    const nomeFranqueado = await buscarNomeFranqueado(cobrancaSelecionada.cnpj);
+    const nomeFranqueado = cobrancaSelecionada.cpf
+      ? cobrancaSelecionada.cliente || "Franqueado(a)"
+      : await buscarNomeFranqueado(cobrancaSelecionada.cnpj);
+
+    const documentoFormatado = cobrancaSelecionada.cpf
+      ? formatarCNPJCPF(cobrancaSelecionada.cpf)
+      : formatarCNPJCPF(cobrancaSelecionada.cnpj);
 
     const variaveis: Record<string, string> = {
       "{{cliente}}": nomeFranqueado,
-      "{{codigo_unidade}}":
-        (unidadeSelecionada as any)?.codigo_unidade || cobrancaSelecionada.cnpj,
+      // Mantemos a variável por compatibilidade, mas usamos o documento exibível
+      // Em cobranças de CPF, não exibimos código; usamos o CPF/CNPJ formatado
+      "{{codigo_unidade}}": documentoFormatado,
       "{{valor_original}}": formatarMoeda(cobrancaSelecionada.valor_original),
       "{{valor_atualizado}}": formatarMoeda(
         cobrancaSelecionada.valor_atualizado ||
@@ -731,12 +766,13 @@ Entre em contato: (11) 99999-9999`,
     // Para preview, usa o nome do cliente como fallback (não pode ser async em preview)
     const template =
       templatesPadrao[formMensagem.template as keyof typeof templatesPadrao];
+    const documentoFormatado = cobrancaSelecionada?.cpf
+      ? formatarCNPJCPF(cobrancaSelecionada?.cpf)
+      : formatarCNPJCPF(cobrancaSelecionada?.cnpj || "");
     const variaveis: Record<string, string> = {
       "{{cliente}}": cobrancaSelecionada?.cliente || "Cliente",
-      "{{codigo_unidade}}":
-        (unidadeSelecionada as any)?.codigo_unidade ||
-        cobrancaSelecionada?.cnpj ||
-        "Código",
+      // Para preview, usa o documento formatado; em CPF não mostramos código
+      "{{codigo_unidade}}": documentoFormatado || "Documento",
       "{{valor_original}}": formatarMoeda(
         cobrancaSelecionada?.valor_original || 0
       ),
@@ -911,10 +947,13 @@ Entre em contato: (11) 99999-9999`,
    */
   const salvarCobranca = async () => {
     // Validação para garantir que os campos obrigatórios estão preenchidos
-    if (!formData.cnpj || !formData.cliente || !formData.valor_original) {
+    const temDocumento =
+      !!(formData.cnpj && formData.cnpj.trim() !== "") ||
+      !!(formData.cpf && formData.cpf.trim() !== "");
+    if (!temDocumento || !formData.cliente || !formData.valor_original) {
       mostrarMensagem(
         "erro",
-        "CNPJ, cliente e valor original são obrigatórios."
+        "Documento (CPF ou CNPJ), cliente e valor original são obrigatórios."
       );
       return;
     }
@@ -942,7 +981,9 @@ Entre em contato: (11) 99999-9999`,
         const dadosAtualizacao: Partial<CobrancaFranqueado> = {
           ...(formData as Partial<CobrancaFranqueado>),
         };
+        // Documento não é editável neste modal
         delete (dadosAtualizacao as Partial<CobrancaFranqueado>).cnpj;
+        delete (dadosAtualizacao as Partial<CobrancaFranqueado>).cpf;
         delete (dadosAtualizacao as Partial<CobrancaFranqueado>).cliente;
         await cobrancaService.atualizarCobranca(
           cobrancaSelecionada.id,
@@ -1020,7 +1061,12 @@ Entre em contato: (11) 99999-9999`,
       );
 
       // Busca nome do franqueado para personalização
-      const nomeFranqueado = await buscarNomeFranqueado(cobranca.cnpj);
+      // Para cobranças por CPF (sem CNPJ válido), usa o nome do cliente
+      const isCobrancaCPF =
+        !!cobranca.cpf && (!cobranca.cnpj || cobranca.cnpj.replace(/\D/g, "") === "0");
+      const nomeFranqueado = isCobrancaCPF
+        ? cobranca.cliente || "Franqueado(a)"
+        : await buscarNomeFranqueado(cobranca.cnpj);
 
       // Monta a mensagem personalizada
       let mensagem = `Olá, ${nomeFranqueado}! 👋\n\n`;
@@ -1042,8 +1088,8 @@ Entre em contato: (11) 99999-9999`,
       }
 
       mensagem += `Para dúvidas ou negociação, entre em contato conosco.\n\n`;
-      mensagem += `Atenciosamente,\n`;
-      mensagem += `Equipe de Cobrança`;
+
+      mensagem += `_Mensagem Automática Sistema de Cbrança_`;
 
       console.log("Enviando cobrança via WhatsApp:", {
         cliente: cobranca.cliente,
@@ -1181,9 +1227,13 @@ Entre em contato: (11) 99999-9999`,
         if (cobrancaSelecionada.telefone && resultado.isQuitacaoTotal) {
           try {
             // Busca nome do franqueado para personalização
-            const nomeFranqueado = await buscarNomeFranqueado(
-              cobrancaSelecionada.cnpj
-            );
+            const isCobrancaCPF =
+              !!cobrancaSelecionada.cpf &&
+              (!cobrancaSelecionada.cnpj ||
+                cobrancaSelecionada.cnpj.replace(/\D/g, "") === "0");
+            const nomeFranqueado = isCobrancaCPF
+              ? cobrancaSelecionada.cliente || "Franqueado(a)"
+              : await buscarNomeFranqueado(cobrancaSelecionada.cnpj);
 
             const valorFormatado = new Intl.NumberFormat("pt-BR", {
               style: "currency",
@@ -1261,7 +1311,11 @@ Entre em contato: (11) 99999-9999`,
         if (cobranca.telefone && resultado.isQuitacaoTotal) {
           try {
             // Busca nome do franqueado para personalização
-            const nomeFranqueado = await buscarNomeFranqueado(cobranca.cnpj);
+            const isCobrancaCPF =
+              !!cobranca.cpf && (!cobranca.cnpj || cobranca.cnpj.replace(/\D/g, "") === "0");
+            const nomeFranqueado = isCobrancaCPF
+              ? cobranca.cliente || "Franqueado(a)"
+              : await buscarNomeFranqueado(cobranca.cnpj);
 
             const valorFormatado = new Intl.NumberFormat("pt-BR", {
               style: "currency",
@@ -1405,20 +1459,6 @@ Entre em contato: (11) 99999-9999`,
             </div>
             <div className="flex items-center space-x-3">
               <button
-                onClick={() => setShowFiltrosAvancados(!showFiltrosAvancados)}
-                className="text-sm text-blue-600 hover:text-blue-800"
-              >
-                {showFiltrosAvancados
-                  ? "Ocultar Filtros Avançados"
-                  : "Mostrar Filtros Avançados"}
-              </button>
-              <button
-                onClick={aplicarFiltros}
-                className="px-4 py-2 bg-[#ffc31a] text-white rounded-lg hover:bg-[#ff9923] text-sm transition-colors duration-300"
-              >
-                Aplicar
-              </button>
-              <button
                 onClick={limparFiltros}
                 className="px-4 py-2 bg-[#6b3a10] text-white rounded-lg hover:bg-[#a35919] text-sm transition-colors duration-300"
               >
@@ -1428,9 +1468,12 @@ Entre em contato: (11) 99999-9999`,
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             <select
-              value={filtros.status}
+              value={filtrosAvancados.statusCobranca}
               onChange={(e) =>
-                setFiltros({ ...filtros, status: e.target.value })
+                setFiltrosAvancados({
+                  ...filtrosAvancados,
+                  statusCobranca: e.target.value,
+                })
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
@@ -1449,19 +1492,13 @@ Entre em contato: (11) 99999-9999`,
                 Inadimplência Crítica
               </option>
             </select>
-            <input
-              type="text"
-              value={filtros.busca}
-              onChange={(e) =>
-                setFiltros({ ...filtros, busca: e.target.value })
-              }
-              placeholder="Buscar cliente/CNPJ/CPF"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
             <select
-              value={filtros.tipoDocumento}
+              value={filtrosAvancados.tipoDocumento}
               onChange={(e) =>
-                setFiltros({ ...filtros, tipoDocumento: e.target.value as any })
+                setFiltrosAvancados({
+                  ...filtrosAvancados,
+                  tipoDocumento: e.target.value as any,
+                })
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
@@ -1471,174 +1508,90 @@ Entre em contato: (11) 99999-9999`,
             </select>
             <input
               type="date"
-              value={filtros.dataInicio}
+              value={filtrosAvancados.dataInicio}
               onChange={(e) =>
-                setFiltros({ ...filtros, dataInicio: e.target.value })
+                setFiltrosAvancados({
+                  ...filtrosAvancados,
+                  dataInicio: e.target.value,
+                })
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
             <input
               type="date"
-              value={filtros.dataFim}
+              value={filtrosAvancados.dataFim}
               onChange={(e) =>
-                setFiltros({ ...filtros, dataFim: e.target.value })
+                setFiltrosAvancados({
+                  ...filtrosAvancados,
+                  dataFim: e.target.value,
+                })
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
             <input
               type="number"
-              value={filtros.valorMin}
+              value={filtrosAvancados.valorMin}
               onChange={(e) =>
-                setFiltros({ ...filtros, valorMin: e.target.value })
+                setFiltrosAvancados({
+                  ...filtrosAvancados,
+                  valorMin: e.target.value,
+                })
               }
               placeholder="Valor mínimo"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
             <input
               type="number"
-              value={filtros.valorMax}
+              value={filtrosAvancados.valorMax}
               onChange={(e) =>
-                setFiltros({ ...filtros, valorMax: e.target.value })
+                setFiltrosAvancados({
+                  ...filtrosAvancados,
+                  valorMax: e.target.value,
+                })
               }
               placeholder="Valor máximo"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
-          </div>
-
-          {/* Filtros Avançados */}
-          {showFiltrosAvancados && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <h4 className="text-md font-medium text-gray-700 mb-3">
-                Filtros Avançados
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                <input
-                  type="text"
-                  value={filtrosAvancados.nomeUnidade}
-                  onChange={(e) =>
-                    setFiltrosAvancados({
-                      ...filtrosAvancados,
-                      nomeUnidade: e.target.value,
-                    })
-                  }
-                  placeholder="Nome da Unidade"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-                <input
-                  type="text"
-                  value={filtrosAvancados.cnpj}
-                  onChange={(e) =>
-                    setFiltrosAvancados({
-                      ...filtrosAvancados,
-                      cnpj: e.target.value,
-                    })
-                  }
-                  placeholder="CNPJ"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-                <input
-                  type="text"
-                  value={filtrosAvancados.codigo}
-                  onChange={(e) =>
-                    setFiltrosAvancados({
-                      ...filtrosAvancados,
-                      codigo: e.target.value,
-                    })
-                  }
-                  placeholder="Código da Unidade"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-                <select
-                  value={filtrosAvancados.statusCobranca}
-                  onChange={(e) =>
-                    setFiltrosAvancados({
-                      ...filtrosAvancados,
-                      statusCobranca: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Status da Cobrança</option>
-                  <option value="em_aberto">Em Aberto</option>
-                  <option value="notificado">Notificado</option>
-                  <option value="em_negociacao">Em Negociação</option>
-                  <option value="proposta_enviada">Proposta Enviada</option>
-                  <option value="aguardando_pagamento">
-                    Aguardando Pagamento
-                  </option>
-                  <option value="pagamento_parcial">Pagamento Parcial</option>
-                  <option value="quitado">Quitado</option>
-                  <option value="ignorado">Ignorado</option>
-                  <option value="notificacao_formal">Notificação Formal</option>
-                  <option value="escalado_juridico">Escalado Jurídico</option>
-                  <option value="inadimplencia_critica">
-                    Inadimplência Crítica
-                  </option>
-                </select>
-                <input
-                  type="number"
-                  value={filtrosAvancados.valorMin}
-                  onChange={(e) =>
-                    setFiltrosAvancados({
-                      ...filtrosAvancados,
-                      valorMin: e.target.value,
-                    })
-                  }
-                  placeholder="Valor mínimo (avançado)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-                <input
-                  type="number"
-                  value={filtrosAvancados.valorMax}
-                  onChange={(e) =>
-                    setFiltrosAvancados({
-                      ...filtrosAvancados,
-                      valorMax: e.target.value,
-                    })
-                  }
-                  placeholder="Valor máximo (avançado)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-                <select
-                  value={filtrosAvancados.tipoCobranca}
-                  onChange={(e) =>
-                    setFiltrosAvancados({
-                      ...filtrosAvancados,
-                      tipoCobranca: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Tipo de Cobrança</option>
-                  <option value="royalties">Royalties</option>
-                  <option value="insumos">Insumos</option>
-                  <option value="aluguel">Aluguel</option>
-                  <option value="multa">Multa</option>
-                  <option value="taxa">Taxa</option>
-                  <option value="outros">Outros</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          {/* <div className="mt-4 ml-1 flex items-center">
+            {/* Campos adicionais trazidos dos filtros avançados */}
             <input
-              type="checkbox"
-              id="inadimplentes-checkbox"
-              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              checked={mostrarApenasInadimplentes}
-              onChange={(e) => setMostrarApenasInadimplentes(e.target.checked)}
+              type="text"
+              value={filtrosAvancados.nomeUnidade}
+              onChange={(e) =>
+                setFiltrosAvancados({
+                  ...filtrosAvancados,
+                  nomeUnidade: e.target.value,
+                })
+              }
+              placeholder="Franqueado/Unidade"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
-            <label
-              htmlFor="inadimplentes-checkbox"
-              className="ml-2 block text-sm text-gray-900"
-            >
-              Mostrar apenas cobranças inadimplentes
-            </label>
-          </div> */}
+            <input
+              type="text"
+              value={filtrosAvancados.cnpj}
+              onChange={(e) =>
+                setFiltrosAvancados({
+                  ...filtrosAvancados,
+                  cnpj: e.target.value,
+                })
+              }
+              placeholder="CNPJ"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              type="text"
+              value={filtrosAvancados.cpf}
+              onChange={(e) =>
+                setFiltrosAvancados({
+                  ...filtrosAvancados,
+                  cpf: e.target.value,
+                })
+              }
+              placeholder="CPF"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          {/* Fim filtros unificados */}
         </div>{" "}
-        {/*FIM da DIV de filtros*/}
-        {/* Feedback visual via toast - bloco antigo removido */}
         {/* Alternância de visualização */}
         <div className="flex items-center justify-between mb-4">
           <div className="text-sm text-gray-600">
@@ -1701,7 +1654,9 @@ Entre em contato: (11) 99999-9999`,
                         {c.unidades_franqueadas?.nome_unidade || c.cliente}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {c.cpf ? `${formatarCNPJCPF(c.cpf)} • CPF` : `${formatarCNPJCPF(c.cnpj)} • CNPJ`}
+                        {c.cpf
+                          ? `${formatarCNPJCPF(c.cpf)} • CPF`
+                          : `${formatarCNPJCPF(c.cnpj)} • CNPJ`}
                       </div>
                     </div>
                   </div>
@@ -1851,7 +1806,9 @@ Entre em contato: (11) 99999-9999`,
                               cobranca.cliente}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {cobranca.cpf ? `${formatarCNPJCPF(cobranca.cpf)} • CPF` : `${formatarCNPJCPF(cobranca.cnpj)} • CNPJ`}
+                            {cobranca.cpf
+                              ? `${formatarCNPJCPF(cobranca.cpf)} • CPF`
+                              : `${formatarCNPJCPF(cobranca.cnpj)} • CNPJ`}
                           </div>
                         </div>
                       </td>
@@ -1916,26 +1873,49 @@ Entre em contato: (11) 99999-9999`,
                 <div className="flex items-start p-3 rounded-md bg-yellow-50 border border-yellow-200 text-yellow-800">
                   <AlertTriangle className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
                   <p className="text-sm">
-                    Por segurança, os campos <strong>CNPJ</strong> e <strong>Cliente</strong> não podem ser editados neste modal.
-                    Caso precise corrigir a vinculação, ajuste os dados da unidade/franqueado.
+                    Por segurança, os campos{" "}
+                    <strong>Documento (CPF/CNPJ)</strong> e{" "}
+                    <strong>Cliente</strong> não podem ser editados neste modal.
+                    Caso precise corrigir a vinculação, ajuste os dados da
+                    unidade/franqueado.
                   </p>
                 </div>
               )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  CNPJ *
-                </label>
-                <input
-                  type="text"
-                  value={formData.cnpj || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cnpj: e.target.value })
-                  }
-                  disabled={modalAberto === "editar"}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="00.000.000/0000-00"
-                />
-              </div>
+              {(() => {
+                const isEditCpf =
+                  modalAberto === "editar" &&
+                  !!cobrancaSelecionada?.cpf &&
+                  (!cobrancaSelecionada?.cnpj ||
+                    cobrancaSelecionada?.cnpj.replace(/\D/g, "") === "0");
+                const label = isEditCpf ? "CPF *" : "CNPJ *";
+                const placeholder = isEditCpf
+                  ? "000.000.000-00"
+                  : "00.000.000/0000-00";
+
+                return (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {label}
+                    </label>
+                    <input
+                      type="text"
+                      value={
+                        isEditCpf ? formData.cpf || "" : formData.cnpj || ""
+                      }
+                      onChange={(e) =>
+                        setFormData(
+                          isEditCpf
+                            ? { ...formData, cpf: e.target.value }
+                            : { ...formData, cnpj: e.target.value }
+                        )
+                      }
+                      disabled={modalAberto === "editar"}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder={placeholder}
+                    />
+                  </div>
+                );
+              })()}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2054,12 +2034,17 @@ Entre em contato: (11) 99999-9999`,
             <div className="flex space-x-3 mt-6">
               <button
                 onClick={salvarCobranca}
-                disabled={
-                  !formData.cnpj ||
-                  !formData.cliente ||
-                  !formData.valor_original ||
-                  (formData.status === "quitado" && !formData.valor_recebido)
-                }
+                disabled={(() => {
+                  const temDocumento =
+                    !!(formData.cnpj && formData.cnpj.trim() !== "") ||
+                    !!(formData.cpf && formData.cpf.trim() !== "");
+                  return (
+                    !temDocumento ||
+                    !formData.cliente ||
+                    !formData.valor_original ||
+                    (formData.status === "quitado" && !formData.valor_recebido)
+                  );
+                })()}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 {modalAberto === "criar"
@@ -2102,7 +2087,10 @@ Entre em contato: (11) 99999-9999`,
                   Cliente: {cobrancaSelecionada.cliente}
                 </p>
                 <p className="text-sm text-gray-600">
-                  Documento: {cobrancaSelecionada.cpf ? formatarCNPJCPF(cobrancaSelecionada.cpf) : formatarCNPJCPF(cobrancaSelecionada.cnpj)}
+                  Documento:{" "}
+                  {cobrancaSelecionada.cpf
+                    ? formatarCNPJCPF(cobrancaSelecionada.cpf)
+                    : formatarCNPJCPF(cobrancaSelecionada.cnpj)}
                 </p>
                 <p className="text-sm text-gray-600">
                   Valor:{" "}
@@ -2702,11 +2690,15 @@ Entre em contato: (11) 99999-9999`,
                 </div>
                 <div>
                   <div className="text-xl font-bold text-gray-800 leading-tight">
-                    {unidadesPorCnpj[cnpjKey(cobrancaSelecionada.cnpj)]
-                      ?.nome_franqueado || cobrancaSelecionada.cliente}
+                    {unidadeSelecionada?.nome_franqueado ||
+                      cobrancaSelecionada.cliente}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {cobrancaSelecionada.cpf ? `${formatarCNPJCPF(cobrancaSelecionada.cpf)} • CPF` : `${formatarCNPJCPF(cobrancaSelecionada.cnpj)} • CNPJ`} {" "}
+                    {cobrancaSelecionada.cpf
+                      ? `${formatarCNPJCPF(cobrancaSelecionada.cpf)} • CPF`
+                      : `${formatarCNPJCPF(
+                          cobrancaSelecionada.cnpj
+                        )} • CNPJ`}{" "}
                     • Venc.: {formatarData(cobrancaSelecionada.data_vencimento)}{" "}
                     • Valor:{" "}
                     {formatarMoeda(
@@ -3153,9 +3145,6 @@ Entre em contato: (11) 99999-9999`,
                             {"{{"}cliente{"}}"} - Nome do cliente
                           </div>
                           <div>
-                            {"{{"}codigo_unidade{"}}"} - Código da unidade
-                          </div>
-                          <div>
                             {"{{"}valor_original{"}}"} - Valor original
                           </div>
                           <div>
@@ -3211,10 +3200,12 @@ Entre em contato: (11) 99999-9999`,
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
-                          CNPJ
+                          Documento
                         </label>
                         <p className="mt-1 text-sm text-gray-900">
-                          {formatarCNPJCPF(cobrancaSelecionada.cnpj)}
+                          {cobrancaSelecionada.cpf
+                            ? `${formatarCNPJCPF(cobrancaSelecionada.cpf)} • CPF`
+                            : `${formatarCNPJCPF(cobrancaSelecionada.cnpj)} • CNPJ`}
                         </p>
                       </div>
                       <div>
