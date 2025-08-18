@@ -40,6 +40,10 @@ export interface DashboardData {
 
 export interface IndicadoresMensais {
   total_em_aberto_mes: number;
+  // Soma do valor_original das cobranças não quitadas
+  total_em_aberto_original_mes?: number;
+  // Soma do valor_atualizado (ou original) das cobranças não quitadas
+  total_em_aberto_atualizado_mes?: number;
   total_pago_mes: number;
   total_negociando_mes: number;
   percentual_inadimplencia: number;

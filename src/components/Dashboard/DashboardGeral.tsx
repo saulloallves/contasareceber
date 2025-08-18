@@ -49,6 +49,17 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
         data?.total_em_aberto,
         data?.total_em_aberto_mes
       ),
+      totalEmAbertoOriginal: pickNum(
+        data?.totalEmAbertoOriginal,
+        data?.total_em_aberto_original,
+        data?.total_em_aberto_original_mes
+      ),
+      totalEmAbertoAtualizado: pickNum(
+        data?.totalEmAbertoAtualizado,
+        data?.total_em_aberto_atualizado,
+        data?.total_em_aberto_atualizado_mes,
+        data?.totalEmAberto // fallback final para compat
+      ),
       totalQuitado: pickNum(
         data?.totalQuitado,
         data?.total_quitado,
@@ -279,17 +290,18 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
       </div>
 
       {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl shadow-lg p-6 border border-red-200">
           <div className="flex items-start space-x-4 min-h-[80px]">
             <div className="p-2 bg-red-500 rounded-full flex-shrink-0">
               <TrendingUp className="w-4 h-4 text-white" />
             </div>
             <div className="monetary-container">
-              <p className="text-sm font-medium text-red-700">
-                Total Inadimplentes
-              </p>
-              {renderMonetaryValue(indicadores.totalEmAberto, "text-red-600")}
+              <p className="text-sm font-medium text-red-700">Valor com Juros e Multa</p>
+              {renderMonetaryValue(
+                indicadores.totalEmAbertoAtualizado ?? indicadores.totalEmAberto,
+                "text-red-600"
+              )}
               <div className="mt-2 flex items-center text-sm">
                 <span
                   className={`font-semibold ${getVariacaoColor(
@@ -300,6 +312,24 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
                   {formatarPercentual(Math.abs(indicadores.variacaoEmAberto))}
                 </span>
                 <span className="text-gray-500 ml-2">vs. mês anterior</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl shadow-lg p-6 border border-emerald-200">
+          <div className="flex items-start space-x-4 min-h-[80px]">
+            <div className="p-2 bg-emerald-500 rounded-full flex-shrink-0">
+              <TrendingUp className="w-4 h-4 text-white" />
+            </div>
+            <div className="monetary-container">
+              <p className="text-sm font-medium text-emerald-700">Valor Original (Sem Juros/Multa)</p>
+              {renderMonetaryValue(
+                indicadores.totalEmAbertoOriginal ?? indicadores.totalEmAberto,
+                "text-emerald-600"
+              )}
+              <div className="mt-2 text-xs text-emerald-700">
+                Soma dos valores originais das cobranças em aberto e negociando
               </div>
             </div>
           </div>

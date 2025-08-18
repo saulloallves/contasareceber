@@ -63,6 +63,11 @@ export interface EstatisticasKanban {
   cards_parados: number;
   tempo_medio_resolucao: number;
   valor_total_fluxo: number;
+  // Novos campos para clarificar totais
+  // Soma do valor_original de todas as cobranças com status diferente de 'quitado'
+  valor_total_original_aberto?: number;
+  // Soma do valor_atualizado (ou valor_original se não houver atualizado) das cobranças em aberto
+  valor_total_atualizado_aberto?: number;
   distribuicao_por_status: Record<string, number>;
   tempo_medio_por_etapa: Record<string, number>;
 }

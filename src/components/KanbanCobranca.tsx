@@ -1861,9 +1861,12 @@ _Mensagem Automática do Sistema_
             </div>
             <div className="bg-green-50 rounded-lg p-4">
               <div className="text-2xl font-bold text-green-600">
-                {formatarMoeda(estatisticas.valor_total_fluxo)}
+                {formatarMoeda(
+                  estatisticas.valor_total_original_aberto ??
+                    estatisticas.valor_total_fluxo
+                )}
               </div>
-              <div className="text-sm text-green-800">Valor Total</div>
+              <div className="text-sm text-green-800">Valor Total em Aberto (Original)</div>
             </div>
           </div>
         )}

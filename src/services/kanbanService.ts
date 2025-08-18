@@ -439,17 +439,41 @@ export class KanbanService {
    * Busca estatísticas do Kanban
    */
   async buscarEstatisticas(
-    agrupadoPorUnidade: boolean = false
+    _agruparPorUnidade?: boolean
   ): Promise<EstatisticasKanban> {
     try {
-      const cards = await this.buscarCards({}, agrupadoPorUnidade);
+  // Marca o parâmetro como utilizado (mantém compatibilidade da assinatura)
+  void _agruparPorUnidade;
+      // Para estatísticas de valores, preferimos trabalhar no nível individual
+      // para evitar dupla contagem ao agrupar por unidade. Portanto, carregamos
+      // sempre como individual aqui.
+      const cards = await this.buscarCards({}, false);
+
+      // Busca valores diretamente do banco para maior precisão (original vs atualizado)
+      const { data: brutas } = await supabase
+        .from("cobrancas_franqueados")
+        .select("valor_original, valor_atualizado, status");
+
+      const abertas = (brutas || []).filter((c: any) => c.status !== "quitado");
+      const totalOriginalAberto = abertas.reduce(
+        (sum: number, c: any) => sum + (Number(c.valor_original) || 0),
+        0
+      );
+      const totalAtualizadoAberto = abertas.reduce(
+        (sum: number, c: any) =>
+          sum + (Number(c.valor_atualizado ?? c.valor_original) || 0),
+        0
+      );
 
       const stats: EstatisticasKanban = {
         total_cards: cards.length,
         cards_criticos: cards.filter((c) => c.criticidade === "critica").length,
         cards_parados: cards.filter((c) => c.dias_parado > 7).length,
         tempo_medio_resolucao: this.calcularTempoMedioResolucao(cards),
+        // Mantém compatibilidade: este campo continuava somando valor_total (que era atualizado)
         valor_total_fluxo: cards.reduce((sum, c) => sum + c.valor_total, 0),
+        valor_total_original_aberto: totalOriginalAberto,
+        valor_total_atualizado_aberto: totalAtualizadoAberto,
         distribuicao_por_status: {},
         tempo_medio_por_etapa: {},
       };

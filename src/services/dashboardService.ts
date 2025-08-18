@@ -21,9 +21,17 @@ export class DashboardService {
       if (cobrancasError) throw cobrancasError;
 
       // Calcular indicadores
-      const totalEmAberto = (cobrancas as Cobranca[] | null)
-        ?.filter(c => ['em_aberto', 'em_atraso'].includes(c.status))
-        ?.reduce((sum, c) => sum + (Number(c.valor_atualizado) || Number(c.valor_original) || 0), 0) || 0;
+      const abertas = (cobrancas as Cobranca[] | null)
+        ?.filter(c => ['em_aberto', 'em_atraso', 'negociando', 'cobrado', 'em_tratativa_juridica', 'em_tratativa_critica'].includes(c.status)) || [];
+
+      const totalEmAbertoOriginal = abertas
+        .reduce((sum, c) => sum + (Number(c.valor_original) || 0), 0);
+
+      const totalEmAbertoAtualizado = abertas
+        .reduce((sum, c) => sum + (Number(c.valor_atualizado ?? c.valor_original) || 0), 0);
+
+      // Mantém campo legado (totalEmAberto) como ATUALIZADO para compatibilidade visual anterior
+      const totalEmAberto = totalEmAbertoAtualizado;
 
       const totalQuitado = (cobrancas as Cobranca[] | null)
         ?.filter(c => c.status === 'quitado')
@@ -34,7 +42,7 @@ export class DashboardService {
         ?.reduce((sum, c) => sum + (Number(c.valor_atualizado) || Number(c.valor_original) || 0), 0) || 0;
 
       const unidadesInadimplentes = new Set(
-        (cobrancas as Cobranca[] | null)?.filter(c => ['em_aberto', 'em_atraso', 'negociando'].includes(c.status))?.map(c => c.cnpj || '')
+  (cobrancas as Cobranca[] | null)?.filter(c => ['em_aberto', 'em_atraso', 'negociando', 'cobrado', 'em_tratativa_juridica', 'em_tratativa_critica'].includes(c.status))?.map(c => c.cnpj || '')
       ).size;
 
       const ticketMedio = unidadesInadimplentes > 0 ? totalEmAberto / unidadesInadimplentes : 0;
@@ -50,7 +58,9 @@ export class DashboardService {
   // const variacaoUnidades = Math.random() * 8 - 4; // -4% a +8%
 
       return {
-        total_em_aberto_mes: totalEmAberto,
+  total_em_aberto_mes: totalEmAberto,
+  total_em_aberto_original_mes: totalEmAbertoOriginal,
+  total_em_aberto_atualizado_mes: totalEmAbertoAtualizado,
         total_pago_mes: totalQuitado,
         total_negociando_mes: totalNegociando,
         percentual_inadimplencia: percentualInadimplencia,
