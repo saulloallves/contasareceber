@@ -54,8 +54,6 @@ export function CadastroUnidades() {
   // Mescla manual
   const [destinoManualId, setDestinoManualId] = useState<string>("");
   const [mesclandoManual, setMesclandoManual] = useState(false);
-  // Exibição de CPF na aba "Sem nome"
-  const [mostrarComCPF, setMostrarComCPF] = useState(false);
 
   useEffect(() => {
     carregarDados();
@@ -276,14 +274,6 @@ export function CadastroUnidades() {
         u?.nome_unidade === null || String(u?.nome_unidade || "").trim() === ""
       ) && String(u?.status_unidade || "").trim().toUpperCase() !== "INATIVA"
     )
-    .filter((u) => {
-      // Se a opção NÃO estiver marcada, ocultar unidades com CPF (11 dígitos)
-      if (!mostrarComCPF) {
-        return soDigitos(u?.codigo_interno).length !== 11;
-      }
-      // Se marcada, mostrar todas (com ou sem CPF)
-      return true;
-    });
   const unidadesComNome = unidades.filter(
     (u) => u?.nome_unidade !== null && String(u?.nome_unidade || "").trim() !== ""
   );
@@ -434,17 +424,6 @@ export function CadastroUnidades() {
               placeholder="Buscar por nome, código, CNPJ ou cidade..."
               className="flex-1 bg-transparent outline-none text-gray-800"
             />
-            {aba === "semNome" && (
-              <label className="ml-4 flex items-center gap-2 text-sm text-gray-700 select-none" title="Exibir unidades com CPF cadastrado">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4"
-                  checked={mostrarComCPF}
-                  onChange={(e) => setMostrarComCPF(e.target.checked)}
-                />
-                Exibir com CPF
-              </label>
-            )}
           </div>
       <div className="flex items-center gap-2">
         <button

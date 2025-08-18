@@ -32,8 +32,8 @@ export function GestaoCobrancas() {
   const [usuario] = useState("admin"); // Em produção, pegar do contexto de autenticação
   const [formData, setFormData] = useState<Partial<CobrancaFranqueado>>({});
   const [formQuitacao, setFormQuitacao] = useState({valorPago: 0, formaPagamento: "", observacoes: "", dataRecebimento: new Date().toISOString().split("T")[0],});
-  const [filtros, setFiltros] = useState({status: "", busca: "", dataInicio: "", dataFim: "", valorMin: "", valorMax: "", tipoCobranca: "",});
-  const [filtrosAvancados, setFiltrosAvancados] = useState({ nomeUnidade: "", cnpj: "", codigo: "", statusCobranca: "", valorMin: "", valorMax: "", tipoCobranca: "", });
+  const [filtros, setFiltros] = useState({status: "", busca: "", dataInicio: "", dataFim: "", valorMin: "", valorMax: "", tipoCobranca: "", tipoDocumento: "" as "" | "cpf" | "cnpj",});
+  const [filtrosAvancados, setFiltrosAvancados] = useState({ nomeUnidade: "", cnpj: "", cpf: "", codigo: "", statusCobranca: "", valorMin: "", valorMax: "", tipoCobranca: "", });
   const [showFiltrosAvancados, setShowFiltrosAvancados] = useState(false);
   const [colunaOrdenacao, setColunaOrdenacao] = useState("data_vencimento"); // Coluna padrão
   const [direcaoOrdenacao, setDirecaoOrdenacao] = useState("desc"); // Ordenação 'asc' ou 'desc'
@@ -193,7 +193,7 @@ Entre em contato: (11) 99999-9999`,
       // Converte filtros avançados para o formato esperado pelo serviço
       const filtrosServico = { ...filtros };
 
-      if (filtrosAvancados.tipoCobranca) {
+  if (filtrosAvancados.tipoCobranca) {
         filtrosServico.tipoCobranca = filtrosAvancados.tipoCobranca;
       }
 
@@ -207,6 +207,8 @@ Entre em contato: (11) 99999-9999`,
 
       const dadosReaisDoBanco = await cobrancaService.buscarCobrancas({
         ...filtrosServico,
+        cpf: filtrosAvancados.cpf?.replace(/\D/g, "") || undefined,
+        tipoDocumento: filtros.tipoDocumento || undefined,
         colunaOrdenacao,
         direcaoOrdenacao,
         //apenasInadimplentes: mostrarApenasInadimplentes, // Linha adicionada para filtrar apenas inadimplentes
@@ -230,6 +232,13 @@ Entre em contato: (11) 99999-9999`,
       if (filtrosAvancados.cnpj) {
         cobrancasFiltradas = cobrancasFiltradas.filter((cobranca) =>
           cobranca.cnpj.includes(filtrosAvancados.cnpj)
+        );
+      }
+
+      if (filtrosAvancados.cpf) {
+        const cpfBusca = filtrosAvancados.cpf.replace(/\D/g, "");
+        cobrancasFiltradas = cobrancasFiltradas.filter((cobranca) =>
+          (cobranca.cpf || "").replace(/\D/g, "").includes(cpfBusca)
         );
       }
 
@@ -290,6 +299,7 @@ Entre em contato: (11) 99999-9999`,
     setFiltrosAvancados({
       nomeUnidade: "",
       cnpj: "",
+      cpf: "",
       codigo: "",
       statusCobranca: "",
       valorMin: "",
@@ -303,7 +313,8 @@ Entre em contato: (11) 99999-9999`,
       dataFim: "",
       valorMin: "",
       valorMax: "",
-      tipoCobranca: "",
+  tipoCobranca: "",
+  tipoDocumento: "",
     });
     carregarCobrancas();
   };
@@ -472,15 +483,15 @@ Entre em contato: (11) 99999-9999`,
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const nome = file.name.toLowerCase();
-    const isXlsx = /\.xlsx$/i.test(nome);
+  const nome = file.name.toLowerCase();
+  const isExcel = /\.(xlsx|xls)$/i.test(nome);
 
-    if (!isXlsx) {
+  if (!isExcel) {
       // Reseta seleção e avisa via toast chamativo
       setArquivoSelecionado(null);
       event.target.value = "";
       toast.error(
-        "Arquivo inválido. Envie uma planilha .xlsx.\nO sistema ainda não está pronto para outros formatos!",
+    "Arquivo inválido. Envie uma planilha .xlsx ou .xls.\nO sistema ainda não está pronto para outros formatos!",
         { duration: 6000 }
       );
       return;
@@ -512,10 +523,10 @@ Entre em contato: (11) 99999-9999`,
       return;
     }
 
-    // Trava extra: só .xlsx
-    if (!/\.xlsx$/i.test(arquivoSelecionado.name)) {
+  // Trava extra: apenas Excel (.xlsx ou .xls)
+  if (!/\.(xlsx|xls)$/i.test(arquivoSelecionado.name)) {
       toast.error(
-        "Arquivo inválido. Envie uma planilha .xlsx.\nO sistema ainda não está pronto para outros formatos (ex.: .csv).",
+    "Arquivo inválido. Envie uma planilha .xlsx ou .xls.\nO sistema ainda não está pronto para outros formatos (ex.: .csv).",
         { duration: 6000 }
       );
       LimparArquivo();
@@ -1444,9 +1455,20 @@ Entre em contato: (11) 99999-9999`,
               onChange={(e) =>
                 setFiltros({ ...filtros, busca: e.target.value })
               }
-              placeholder="Buscar cliente/CNPJ"
+              placeholder="Buscar cliente/CNPJ/CPF"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
+            <select
+              value={filtros.tipoDocumento}
+              onChange={(e) =>
+                setFiltros({ ...filtros, tipoDocumento: e.target.value as any })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Documento: todos</option>
+              <option value="cnpj">CNPJ</option>
+              <option value="cpf">CPF</option>
+            </select>
             <input
               type="date"
               value={filtros.dataInicio}
@@ -1679,8 +1701,7 @@ Entre em contato: (11) 99999-9999`,
                         {c.unidades_franqueadas?.nome_unidade || c.cliente}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {unidadesPorCnpj[cnpjKey(c.cnpj)]?.codigo_unidade ||
-                          formatarCNPJCPF(c.cnpj)}
+                        {c.cpf ? `${formatarCNPJCPF(c.cpf)} • CPF` : `${formatarCNPJCPF(c.cnpj)} • CNPJ`}
                       </div>
                     </div>
                   </div>
@@ -1830,9 +1851,7 @@ Entre em contato: (11) 99999-9999`,
                               cobranca.cliente}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {unidadesPorCnpj[cnpjKey(cobranca.cnpj)]
-                              ?.codigo_unidade ||
-                              formatarCNPJCPF(cobranca.cnpj)}
+                            {cobranca.cpf ? `${formatarCNPJCPF(cobranca.cpf)} • CPF` : `${formatarCNPJCPF(cobranca.cnpj)} • CNPJ`}
                           </div>
                         </div>
                       </td>
@@ -2083,7 +2102,7 @@ Entre em contato: (11) 99999-9999`,
                   Cliente: {cobrancaSelecionada.cliente}
                 </p>
                 <p className="text-sm text-gray-600">
-                  CNPJ: {formatarCNPJCPF(cobrancaSelecionada.cnpj)}
+                  Documento: {cobrancaSelecionada.cpf ? formatarCNPJCPF(cobrancaSelecionada.cpf) : formatarCNPJCPF(cobrancaSelecionada.cnpj)}
                 </p>
                 <p className="text-sm text-gray-600">
                   Valor:{" "}
@@ -2198,13 +2217,13 @@ Entre em contato: (11) 99999-9999`,
                       Arraste o arquivo aqui ou clique para selecionar
                     </p>
                     <p className="text-sm text-gray-500 mt-2">
-                      Formato aceito: .xlsx
+                      Formatos aceitos: .xlsx, .xls
                     </p>
                   </>
                 )}
                 <input
                   type="file"
-                  accept=".xlsx"
+                  accept=".xlsx,.xls"
                   className="hidden"
                   id="file-upload"
                   onChange={handleFileChange} // Linha adicionada para lidar com o upload de arquivo
@@ -2687,9 +2706,7 @@ Entre em contato: (11) 99999-9999`,
                       ?.nome_franqueado || cobrancaSelecionada.cliente}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {unidadesPorCnpj[cnpjKey(cobrancaSelecionada.cnpj)]
-                      ?.codigo_unidade ||
-                      formatarCNPJCPF(cobrancaSelecionada.cnpj)}{" "}
+                    {cobrancaSelecionada.cpf ? `${formatarCNPJCPF(cobrancaSelecionada.cpf)} • CPF` : `${formatarCNPJCPF(cobrancaSelecionada.cnpj)} • CNPJ`} {" "}
                     • Venc.: {formatarData(cobrancaSelecionada.data_vencimento)}{" "}
                     • Valor:{" "}
                     {formatarMoeda(

@@ -1,6 +1,7 @@
 export interface CobrancaFranqueado {
   id?: string;
   cnpj: string;
+  cpf?: string;
   cliente: string;
   cliente_codigo?: string;
   tipo_cobranca?: string;
@@ -21,12 +22,20 @@ export interface CobrancaFranqueado {
   nivel_criticidade?: string;
   // FK para a unidade vinculada à cobrança (cobrancas_franqueados.unidade_id_fk)
   unidade_id_fk?: string;
+  // FK opcional para franqueado quando vínculo for via CPF
+  franqueado_id_fk?: string;
   unidades_franqueadas?: {
     id: string;
     codigo_unidade: string;
     nome_unidade: string;
     cidade: string;
     estado: string;
+  };
+  franqueados?: {
+    id: string;
+    nome_completo?: string;
+    email?: string;
+    telefone?: string;
   };
 }
 

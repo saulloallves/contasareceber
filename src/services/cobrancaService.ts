@@ -36,7 +36,8 @@ export class CobrancaService {
     if (!dados) return {};
     const {
       // id e unidades_franqueadas são ignorados propositalmente
-      cnpj,
+  cnpj,
+  cpf,
       cliente,
       cliente_codigo,
       tipo_cobranca,
@@ -53,11 +54,13 @@ export class CobrancaService {
       referencia_importacao,
       hash_titulo,
       nivel_criticidade,
-      unidade_id_fk,
+  unidade_id_fk,
+  franqueado_id_fk,
     } = dados as any;
 
     const payload: Record<string, unknown> = {
-      cnpj,
+  cnpj,
+  cpf,
       cliente,
       cliente_codigo,
       tipo_cobranca,
@@ -74,7 +77,8 @@ export class CobrancaService {
       referencia_importacao,
       hash_titulo,
       nivel_criticidade,
-      unidade_id_fk,
+  unidade_id_fk,
+  franqueado_id_fk,
     };
 
     // Remove chaves undefined para evitar updates nulos desnecessários
@@ -84,146 +88,12 @@ export class CobrancaService {
 
     return payload;
   }
-  private async buscarOuCriarUnidadePorCNPJ(cnpj: string): Promise<string> {
-    const cnpjLimpo = cnpj.replace(/\D/g, "");
-    const { data, error } = await supabase
-      .from("unidades_franqueadas")
-      .select("id")
-      .eq("codigo_interno", cnpjLimpo)
-      .maybeSingle();
-
-    if (error) {
-      throw new Error(`Erro ao buscar unidade: ${error.message}`);
-    }
-
-    if (data) {
-      return data.id;
-    }
-
-    const { data: novaUnidade, error: createError } = await supabase
-      .from("unidades_franqueadas")
-      .insert({
-        codigo_interno: cnpjLimpo,
-        status_unidade: "ativa",
-      })
-      .select()
-      .single();
-
-    if (createError) {
-      throw new Error(`Erro ao criar nova unidade: ${createError.message}`);
-    }
-
-    return novaUnidade.id;
-  }
-
-  private async buscarCobrancaExistente(
-    referencia: string
-  ): Promise<CobrancaFranqueado | null> {
-    const { data, error } = await supabase
-      .from("cobrancas_franqueados")
-      .select("*")
-      .eq("referencia_importacao", referencia)
-      .maybeSingle();
-
-    if (error) {
-      throw new Error(`Erro ao buscar cobrança existente: ${error.message}`);
-    }
-
-    return data;
-  }
-
-  private async inserirNovasCobrancas(
-    cobrancas: Array<Partial<CobrancaFranqueado> & { unidade_id?: string; referencia_importacao?: string }>,
-    importacaoId: string
-  ) {
-    const { error } = await supabase.from("cobrancas_franqueados").insert(
-      cobrancas.map((cobranca) => ({
-        ...cobranca,
-        importacao_id: importacaoId,
-        status: "pendente",
-      }))
-    );
-
-    if (error) {
-      throw new Error(`Erro ao inserir novas cobranças: ${error.message}`);
-    }
-  }
-
-  private async atualizarCobrancasExistentes(cobrancas: CobrancaFranqueado[]) {
-    for (const cobranca of cobrancas) {
-      const payload = this.sanitizeUpdatePayload(cobranca);
-      const { error } = await supabase
-        .from("cobrancas_franqueados")
-        .update(payload)
-        .eq("id", cobranca.id);
-
-      if (error) {
-        throw new Error(
-          `Erro ao atualizar cobrança ${cobranca.id}: ${error.message}`
-        );
-      }
-    }
-  }
-
-  private async marcarCobrancasComoQuitadas(ids: string[]) {
-    if (ids.length === 0) return;
-
-    const { error } = await supabase
-      .from("cobrancas_franqueados")
-      .update({ status: "quitado" })
-      .in("id", ids);
-
-    if (error) {
-      throw new Error(
-        `Erro ao marcar cobranças como quitadas: ${error.message}`
-      );
-    }
-  }
-
-  private async buscarCobrancasAntigas(
-    referenciasNovas: Set<string>
-  ): Promise<string[]> {
-    const { data, error } = await supabase
-      .from("cobrancas_franqueados")
-      .select("id, referencia_importacao")
-      .not("referencia_importacao", "in", Array.from(referenciasNovas))
-      .in("status", ["pendente", "em_negociacao"]);
-
-    if (error) {
-      throw new Error(`Erro ao buscar cobranças antigas: ${error.message}`);
-    }
-
-    return data?.map((cobranca) => cobranca.id) || [];
-  }
-
-  private async marcarCobrancasComoInativas(ids: string[]) {
-    if (ids.length === 0) return;
-
-    const { error } = await supabase
-      .from("cobrancas_franqueados")
-      .update({ status: "inativo" })
-      .in("id", ids);
-
-    if (error) {
-      throw new Error(
-        `Erro ao marcar cobranças como inativas: ${error.message}`
-      );
-    }
-  }
-
   async buscarCobrancas(
     filtros: Record<string, unknown> = {}
   ): Promise<CobrancaFranqueado[]> {
-    let query = supabase.from("cobrancas_franqueados").select(`
-      *,
-      unidades_franqueadas!unidade_id_fk (
-        id,
-        codigo_unidade,
-        nome_unidade,
-        cidade,
-        estado
-      )
-    `);
+  // Observação: joins embutidos removidos para evitar ambiguidade de relacionamentos no PostgREST
+  // Caso precise de dados de unidade/franqueado, a UI resolve via serviços dedicados após o fetch.
+  let query = supabase.from("cobrancas_franqueados").select("*");
 
     // Filtros básicos
     if (filtros.status) {
@@ -240,6 +110,18 @@ export class CobrancaService {
 
     if (filtros.cnpj) {
       query = query.eq("cnpj", filtros.cnpj);
+    }
+    if ((filtros as any).cpf) {
+      query = query.eq("cpf", (filtros as any).cpf);
+    }
+
+    // Filtro por tipo de documento (cpf/cnpj)
+    if ((filtros as any).tipoDocumento === "cpf") {
+      // Considera como CPF quando a coluna cpf não é nula
+      query = query.not("cpf", "is", null);
+    } else if ((filtros as any).tipoDocumento === "cnpj") {
+      // Considera como CNPJ quando a coluna cpf é nula (prioriza novo modelo)
+      query = query.is("cpf", null);
     }
 
     // Filtros de valor
@@ -299,10 +181,12 @@ export class CobrancaService {
                             cobranca.cliente?.toLowerCase() || '';
         const codigoUnidade = cobranca.unidades_franqueadas?.codigo_unidade?.toLowerCase() || '';
         const cnpj = cobranca.cnpj?.replace(/\D/g, '') || '';
+        const cpf = cobranca.cpf?.replace(/\D/g, '') || '';
         
         return nomeUnidade.includes(termoBusca) ||
                codigoUnidade.includes(termoBusca) ||
-               cnpj.includes(termoBusca.replace(/\D/g, ''));
+               cnpj.includes(termoBusca.replace(/\D/g, '')) ||
+               cpf.includes(termoBusca.replace(/\D/g, ''));
       });
     }
 
