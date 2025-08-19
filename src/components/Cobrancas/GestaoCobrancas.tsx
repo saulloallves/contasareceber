@@ -516,7 +516,7 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
       setArquivoSelecionado(null);
       event.target.value = "";
       toast.error(
-        "Arquivo inválido. Envie uma planilha .xlsx ou .xls.\nO sistema ainda não está pronto para outros formatos!",
+        "Arquivo inválido. Envie uma planilha .xlsx \nO sistema ainda não está pronto para outros formatos!",
         { duration: 6000 }
       );
       return;
@@ -548,10 +548,10 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
       return;
     }
 
-    // Trava extra: apenas Excel (.xlsx ou .xls)
+    // Trava extra: apenas Excel (.xlsx)
     if (!/\.(xlsx|xls)$/i.test(arquivoSelecionado.name)) {
       toast.error(
-        "Arquivo inválido. Envie uma planilha .xlsx ou .xls.\nO sistema ainda não está pronto para outros formatos (ex.: .csv).",
+        "Arquivo inválido. Envie uma planilha .xlsx \nO sistema ainda não está pronto para outros formatos (ex.: .csv).",
         { duration: 6000 }
       );
       LimparArquivo();
@@ -2205,13 +2205,13 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                       Arraste o arquivo aqui ou clique para selecionar
                     </p>
                     <p className="text-sm text-gray-500 mt-2">
-                      Formatos aceitos: .xlsx, .xls
+                      Formato aceito: .xlsx
                     </p>
                   </>
                 )}
                 <input
                   type="file"
-                  accept=".xlsx,.xls"
+                  accept=".xlsx"
                   className="hidden"
                   id="file-upload"
                   onChange={handleFileChange} // Linha adicionada para lidar com o upload de arquivo
