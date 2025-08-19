@@ -56,6 +56,7 @@ export class CobrancaService {
       nivel_criticidade,
   unidade_id_fk,
   franqueado_id_fk,
+  importacao_id_fk, // FK para a tabela importacoes_planilha
     } = dados as any;
 
     const payload: Record<string, unknown> = {
@@ -79,6 +80,7 @@ export class CobrancaService {
       nivel_criticidade,
   unidade_id_fk,
   franqueado_id_fk,
+  importacao_id_fk,
     };
 
     // Remove chaves undefined para evitar updates nulos desnecessários

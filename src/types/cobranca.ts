@@ -20,10 +20,9 @@ export interface CobrancaFranqueado {
   telefone?: string;
   created_at?: string;
   nivel_criticidade?: string;
-  // FK para a unidade vinculada à cobrança (cobrancas_franqueados.unidade_id_fk)
-  unidade_id_fk?: string;
-  // FK opcional para franqueado quando vínculo for via CPF
-  franqueado_id_fk?: string;
+  unidade_id_fk?: string;    // FK para a unidade vinculada à cobrança
+  franqueado_id_fk?: string; // FK para franqueado quando vínculo for via CPF
+  importacao_id_fk?: string; // FK para a tabela importacoes_planilha
   unidades_franqueadas?: {
     id: string;
     codigo_unidade: string;
