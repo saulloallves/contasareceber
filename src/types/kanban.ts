@@ -22,6 +22,7 @@ export interface CardCobranca {
   quantidade_titulos?: number;
   created_at?: string;
   updated_at?: string;
+  valor_original?: number; // Valor sem juros/multa
 }
 
 export interface ColunaKanban {

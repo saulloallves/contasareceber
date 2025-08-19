@@ -121,7 +121,6 @@ export class KanbanService {
       .map((cobranca) => {
         const unidade = cobranca.unidades_franqueadas;
         const valorAtual = cobranca.valor_atualizado || cobranca.valor_original;
-
         const card: CardCobranca = {
           id: cobranca.id, // UUID direto do banco
           codigo_unidade: unidade?.codigo_unidade || cobranca.cnpj,
@@ -129,6 +128,7 @@ export class KanbanService {
           cnpj: cobranca.cnpj,
           tipo_debito: this.determinarTipoDebito([cobranca]),
           valor_total: valorAtual,
+          valor_original: cobranca.valor_original || 0, // <-- aqui
           data_vencimento_antiga: cobranca.data_vencimento,
           data_vencimento_recente: cobranca.data_vencimento,
           status_atual: this.determinarStatusKanban(cobranca.status),
@@ -143,12 +143,10 @@ export class KanbanService {
             cobranca.data_vencimento
           ),
           data_entrada_etapa: cobranca.created_at || new Date().toISOString(),
-          // Dados específicos da cobrança individual
           descricao_cobranca: cobranca.descricao,
           valor_recebido: cobranca.valor_recebido || 0,
           quantidade_titulos: 1,
         };
-
         return card;
       })
       .filter((card) => this.aplicarFiltrosCard(card, filtros));
@@ -162,13 +160,10 @@ export class KanbanService {
     filtros: FiltrosKanban
   ): CardCobranca[] {
     const cardsMap = new Map<string, CardCobranca>();
-
     cobrancas.forEach((cobranca) => {
       const cnpj = cobranca.cnpj;
-
       if (!cardsMap.has(cnpj)) {
         const unidade = cobranca.unidades_franqueadas;
-
         cardsMap.set(cnpj, {
           id: cnpj,
           codigo_unidade: unidade?.codigo_unidade || cnpj,
@@ -176,6 +171,7 @@ export class KanbanService {
           cnpj: cnpj,
           tipo_debito: "royalties",
           valor_total: 0,
+          valor_original: 0, // <-- inicializa
           data_vencimento_antiga: cobranca.data_vencimento,
           data_vencimento_recente: cobranca.data_vencimento,
           status_atual: "em_aberto",
@@ -188,43 +184,31 @@ export class KanbanService {
           quantidade_titulos: 0,
         });
       }
-
       const card = cardsMap.get(cnpj)!;
       const valorAtual = cobranca.valor_atualizado || cobranca.valor_original;
-
-      // Atualiza valores agregados
       card.valor_total += valorAtual;
+      card.valor_original = (card.valor_original || 0) + (cobranca.valor_original || 0); // <-- soma
       card.quantidade_titulos = (card.quantidade_titulos || 0) + 1;
-
-      // Atualiza datas de vencimento
       if (
-        new Date(cobranca.data_vencimento) <
-        new Date(card.data_vencimento_antiga)
+        new Date(cobranca.data_vencimento) < new Date(card.data_vencimento_antiga)
       ) {
         card.data_vencimento_antiga = cobranca.data_vencimento;
       }
       if (
-        new Date(cobranca.data_vencimento) >
-        new Date(card.data_vencimento_recente)
+        new Date(cobranca.data_vencimento) > new Date(card.data_vencimento_recente)
       ) {
         card.data_vencimento_recente = cobranca.data_vencimento;
       }
-
-      // Atualiza status baseado na cobrança mais crítica
       const statusAtual = this.determinarStatusKanban(cobranca.status);
       if (this.compararCriticidadeStatus(statusAtual, card.status_atual) > 0) {
         card.status_atual = statusAtual;
         card.responsavel_atual = this.determinarResponsavel(cobranca.status);
       }
-
-      // Atualiza última ação se for mais recente
       if (new Date(cobranca.created_at) > new Date(card.data_ultima_acao)) {
         card.data_ultima_acao = cobranca.created_at;
         card.ultima_acao = this.determinarUltimaAcao(cobranca);
       }
     });
-
-    // Finaliza processamento dos cards agrupados
     const cards = Array.from(cardsMap.values()).map((card) => ({
       ...card,
       tipo_debito: this.determinarTipoDebito(
@@ -233,7 +217,6 @@ export class KanbanService {
       dias_parado: this.calcularDiasParado(card.data_ultima_acao),
       criticidade: this.determinarCriticidade(card),
     }));
-
     return cards.filter((card) => this.aplicarFiltrosCard(card, filtros));
   }
 
