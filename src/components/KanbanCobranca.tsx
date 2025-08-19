@@ -661,6 +661,7 @@ export function KanbanCobranca() {
         "🔍 Buscando cobranças no banco para detectar status misto..."
       );
 
+      // ALTERAÇÃO: Buscar todas as cobranças, inclusive quitadas
       const { data: cobrancas, error } = await supabase
         .from("cobrancas_franqueados")
         .select(
@@ -672,8 +673,7 @@ export function KanbanCobranca() {
             nome_unidade
           )
         `
-        )
-        .neq("status", "quitado"); // Ignora quitados para análise
+        ); // Removido .neq("status", "quitado")
 
       if (error) {
         console.error("❌ Erro ao detectar status misto:", error);
@@ -681,7 +681,7 @@ export function KanbanCobranca() {
       }
 
       console.log(
-        `📊 Encontradas ${cobrancas?.length || 0} cobranças ativas no banco`
+        `📊 Encontradas ${cobrancas?.length || 0} cobranças no banco`
       );
 
       const unidadesMistas = new Set<string>();
@@ -1935,6 +1935,7 @@ _Mensagem Automática do Sistema_
             {movimentacaoIndividualFeita && (
               <div className="flex items-center px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg">
                 <AlertTriangle className="w-4 h-4 text-orange-600 mr-2" />
+
                 <span className="text-sm text-orange-800 font-medium">
                   Modo Individual Ativo - O modo de movimento de cobranças por unidade está desativado até todas as cobranças terem o mesmo status!
                 </span>
@@ -2208,33 +2209,8 @@ _Mensagem Automática do Sistema_
                       )}
                     </div>
                   </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-blue-800 text-sm font-medium mb-1">
-                      💡 Como resolver:
-                    </p>
-                    <ul className="text-blue-700 text-sm space-y-1">
-                      <li>
-                        • <strong>Modo Individual:</strong> Mova cada cobrança
-                        separadamente para padronizar o status
-                      </li>
-                      <li>
-                        • <strong>Verificação:</strong> Confirme se algumas
-                        cobranças foram quitadas parcialmente
-                      </li>
-                      <li>
-                        • <strong>Liberação automática:</strong> Sistema
-                        monitora e libera travas automaticamente quando status
-                        forem padronizados
-                      </li>
-                      <li>
-                        • <strong>Ação manual:</strong> Clique em "Atualizar" para limpar travas quando houver bloqueios
-                      </li>
-                    </ul>
-                  </div>
-
                   {monitoramentoAtivo && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-4">
                       <div className="flex items-center">
                         <div className="animate-pulse w-2 h-2 bg-green-600 rounded-full mr-2"></div>
                         <p className="text-green-800 text-sm font-medium">
@@ -2246,43 +2222,6 @@ _Mensagem Automática do Sistema_
                     </div>
                   )}
                 </div>
-              </div>
-
-              <div className="flex space-x-2 ml-4">
-                <button
-                  onClick={() => setAba("individual")}
-                  className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Modo Individual
-                </button>
-                <button
-                  onClick={async () => {
-                    console.log("🔍 Verificação manual solicitada...");
-                    await monitorarELiberarTravas();
-                  }}
-                  className="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-                  title="Verificar agora se as unidades podem ser liberadas"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        "🔄 Deseja re-detectar unidades com status misto?\n\n" +
-                          "Esta ação irá verificar novamente todas as unidades."
-                      )
-                    ) {
-                      detectarUnidadesComStatusMisto().then((resultado) => {
-                        setUnidadesComStatusMisto(resultado.unidadesMistas);
-                        setDetalhesStatusMisto(resultado.detalhes);
-                      });
-                    }
-                  }}
-                  className="px-3 py-2 bg-yellow-600 text-white text-sm rounded-lg hover:bg-yellow-700 transition-colors"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
               </div>
             </div>
           </div>
@@ -2390,7 +2329,7 @@ _Mensagem Automática do Sistema_
               return (
                 <div className="space-y-4 mb-6">
                   <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <h4 className="text-orange-800 font-semibold mb-2">
+                    <h4 className="text-orange-800 font-semibold mb-3">
                       📋 {detalhes?.nomeUnidade || "Unidade não identificada"}
                     </h4>
                     <p className="text-orange-700 text-sm mb-3">
