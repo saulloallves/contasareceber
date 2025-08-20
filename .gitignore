@@ -25,4 +25,6 @@ dist-ssr
 .env
 .env.development
 .env.production
-supabase/schema_backup.sql
+supabase/schema.sql
+supabase/data.sql
+.vscode
