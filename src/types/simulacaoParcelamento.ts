@@ -12,6 +12,17 @@ export interface ISimulacaoParcelamento {
   parcelas: ParcelaSimulacao[];
   valor_total_parcelamento: number;
   economia_total?: number;
+  metadados_consolidacao?: {
+    quantidade_cobrancas: number;
+    titulos_ids: string[];
+    descricao_cobrancas: Array<{
+      id: string;
+      descricao: string;
+      valor_original: number;
+      valor_atualizado: number;
+      data_vencimento: string;
+    }>;
+  };
   created_at?: string;
   updated_at?: string;
 }

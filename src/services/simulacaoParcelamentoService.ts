@@ -25,14 +25,14 @@ export class SimulacaoParcelamentoService {
    * Simula parcelamento com juros
    */
   async simularParcelamento(
-    tituloId: string,
+    titulosIds: string[],
     quantidadeParcelas: number,
     dataPrimeiraParcela: string,
     valorEntrada?: number
   ): Promise<ISimulacaoParcelamento> {
     try {
-      // Busca dados da cobrança
-      const { data: cobranca, error } = await supabase
+      // Busca dados das cobranças
+      const { data: cobrancas, error } = await supabase
         .from("cobrancas_franqueados")
         .select(
           `
@@ -52,22 +52,34 @@ export class SimulacaoParcelamentoService {
           )
         `
         )
-        .eq("id", tituloId)
-        .maybeSingle();
+        .in("id", titulosIds);
 
-      if (error || !cobranca) {
-        throw new Error("Cobrança não encontrada");
+      if (error || !cobrancas || cobrancas.length === 0) {
+        throw new Error("Cobranças não encontradas");
+      }
+
+      // Verifica se todas as cobranças são do mesmo CPF/CNPJ
+      const primeiroDocumento = cobrancas[0].cnpj || cobrancas[0].cpf;
+      const todosMesmoDocumento = cobrancas.every(c => 
+        (c.cnpj || c.cpf) === primeiroDocumento
+      );
+
+      if (!todosMesmoDocumento) {
+        throw new Error("Todas as cobranças devem ser do mesmo CPF/CNPJ");
       }
 
       // Busca configuração
       const config = await this.buscarConfiguracao();
 
+      // Calcula valores consolidados
+      const valorOriginalTotal = cobrancas.reduce((sum, c) => sum + c.valor_original, 0);
+      const valorAtualizadoTotal = cobrancas.reduce((sum, c) => sum + (c.valor_atualizado || c.valor_original), 0);
+
       // Validação de valor mínimo
-      const valorAtualizado =
-        cobranca.valor_atualizado || cobranca.valor_original;
-      if (valorAtualizado < 500) {
+      if (valorAtualizadoTotal < 500) {
         throw new Error("Valor mínimo para parcelamento é R$ 500,00");
       }
+
       // Valida parâmetros
       if (
         quantidadeParcelas < 2 ||
@@ -78,7 +90,7 @@ export class SimulacaoParcelamentoService {
         );
       }
 
-      const valorParcelar = valorAtualizado - (valorEntrada || 0);
+      const valorParcelar = valorAtualizadoTotal - (valorEntrada || 0);
 
       if (valorParcelar <= 0) {
         throw new Error("Valor a parcelar deve ser maior que zero");
@@ -127,11 +139,11 @@ export class SimulacaoParcelamentoService {
       }
 
       const simulacao: ISimulacaoParcelamento = {
-        titulo_id: tituloId,
+        titulo_id: titulosIds[0], // Usa o primeiro ID como referência principal
         // Para cobranças por CPF, preservamos o documento disponível (CPF ou CNPJ)
-        cnpj_unidade: (cobranca as any).cnpj || (cobranca as any).cpf,
-        valor_original: cobranca.valor_original,
-        valor_atualizado: valorAtualizado,
+        cnpj_unidade: cobrancas[0].cnpj || cobrancas[0].cpf,
+        valor_original: valorOriginalTotal,
+        valor_atualizado: valorAtualizadoTotal,
         quantidade_parcelas: quantidadeParcelas,
         valor_entrada: valorEntrada,
         percentual_multa: 10.0,
@@ -140,6 +152,18 @@ export class SimulacaoParcelamentoService {
         parcelas,
         valor_total_parcelamento: valorTotalParcelamento,
         economia_total: valorEntrada ? valorEntrada * 0.05 : 0, // 5% de desconto na entrada
+        // Adiciona metadados sobre as cobranças consolidadas
+        metadados_consolidacao: {
+          quantidade_cobrancas: cobrancas.length,
+          titulos_ids: titulosIds,
+          descricao_cobrancas: cobrancas.map(c => ({
+            id: c.id,
+            descricao: c.descricao || `Cobrança ${c.data_vencimento}`,
+            valor_original: c.valor_original,
+            valor_atualizado: c.valor_atualizado || c.valor_original,
+            data_vencimento: c.data_vencimento
+          }))
+        }
       };
 
       return simulacao;

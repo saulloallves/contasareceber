@@ -203,13 +203,17 @@ export function SimulacaoParcelamento() {
     setProcessando(true);
     try {
       const simulacaoResult = await simulacaoService.simularParcelamento(
-        cobrancasParaSimular.map(c => c.id),
+        cobrancasParaSimular.map(c => c.id), // Array de IDs
         formSimulacao.quantidade_parcelas,
         formSimulacao.data_primeira_parcela,
         formSimulacao.valor_entrada || undefined
       );
       setSimulacao(simulacaoResult);
-      toast.success("Simulação realizada com sucesso!");
+      toast.success(
+        cobrancasParaSimular.length > 1 
+          ? `Simulação consolidada realizada para ${cobrancasParaSimular.length} cobranças!`
+          : "Simulação realizada com sucesso!"
+      );
     } catch (error) {
       console.error("Erro na simulação:", error);
       toast.error(`Erro na simulação: ${error}`);
