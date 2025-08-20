@@ -71,10 +71,10 @@ export class SimulacaoParcelamentoService {
       // Valida parâmetros
       if (
         quantidadeParcelas < 2 ||
-        quantidadeParcelas > config.quantidade_maxima_parcelas
+        quantidadeParcelas > 42
       ) {
         throw new Error(
-          `Quantidade de parcelas deve estar entre 2 e ${config.quantidade_maxima_parcelas}`
+          `Quantidade de parcelas deve estar entre 2 e 42`
         );
       }
 
