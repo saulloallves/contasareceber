@@ -39,12 +39,13 @@ import toast from "react-hot-toast";
 export function SimulacaoParcelamento() {
   const [cobrancas, setCobrancas] = useState<any[]>([]);
   const [propostas, setPropostas] = useState<PropostaParcelamento[]>([]);
+  const [cobrancasSelecionadas, setCobrancasSelecionadas] = useState<Set<string>>(new Set());
   const [carregando, setCarregando] = useState(true);
   const [filtros, setFiltros] = useState<FiltrosSimulacao>({});
   const [modalAberto, setModalAberto] = useState<
     "simular" | "visualizar" | "enviar" | null
   >(null);
-  const [cobrancaSelecionada, setCobrancaSelecionada] = useState<any>(null);
+  const [cobrancasParaSimular, setCobrancasParaSimular] = useState<any[]>([]);
   const [simulacao, setSimulacao] = useState<ISimulacaoParcelamento | null>(
     null
   );
@@ -61,6 +62,7 @@ export function SimulacaoParcelamento() {
   const [enviandoEmail, setEnviandoEmail] = useState(false);
   const [visualizacao, setVisualizacao] = useState<"cards" | "lista">("cards");
   const [busca, setBusca] = useState("");
+  const [modoSelecao, setModoSelecao] = useState(false);
 
   const simulacaoService = new SimulacaoParcelamentoService();
 
@@ -91,8 +93,37 @@ export function SimulacaoParcelamento() {
     }
   };
 
-  const abrirModalSimular = (cobranca: any) => {
-    setCobrancaSelecionada(cobranca);
+  const toggleSelecaoCobranca = (cobranca: any) => {
+    if (!modoSelecao) {
+      // Se não está em modo seleção, abre modal diretamente
+      abrirModalSimular([cobranca]);
+      return;
+    }
+
+    const novaSelecao = new Set(cobrancasSelecionadas);
+    
+    if (novaSelecao.has(cobranca.id)) {
+      novaSelecao.delete(cobranca.id);
+    } else {
+      // Verifica se é do mesmo CPF/CNPJ das já selecionadas
+      if (novaSelecao.size > 0) {
+        const primeiraCobranca = cobrancas.find(c => novaSelecao.has(c.id));
+        const documentoPrimeira = primeiraCobranca?.cnpj || primeiraCobranca?.cpf;
+        const documentoAtual = cobranca.cnpj || cobranca.cpf;
+        
+        if (documentoPrimeira !== documentoAtual) {
+          toast.error("Só é possível selecionar cobranças do mesmo CPF/CNPJ");
+          return;
+        }
+      }
+      novaSelecao.add(cobranca.id);
+    }
+    
+    setCobrancasSelecionadas(novaSelecao);
+  };
+
+  const abrirModalSimular = (cobrancasList: any[]) => {
+    setCobrancasParaSimular(cobrancasList);
     const amanha = new Date();
     amanha.setDate(amanha.getDate() + 1);
     setFormSimulacao({
@@ -102,6 +133,26 @@ export function SimulacaoParcelamento() {
     });
     setSimulacao(null);
     setModalAberto("simular");
+  };
+
+  const simularCobrancasSelecionadas = () => {
+    if (cobrancasSelecionadas.size === 0) {
+      toast.error("Selecione pelo menos uma cobrança");
+      return;
+    }
+    
+    const cobrancasList = Array.from(cobrancasSelecionadas).map(id => 
+      cobrancas.find(c => c.id === id)
+    ).filter(Boolean);
+    
+    abrirModalSimular(cobrancasList);
+    setModoSelecao(false);
+    setCobrancasSelecionadas(new Set());
+  };
+
+  const cancelarSelecao = () => {
+    setModoSelecao(false);
+    setCobrancasSelecionadas(new Set());
   };
 
   const abrirModalVisualizar = (proposta: any) => {
@@ -116,7 +167,7 @@ export function SimulacaoParcelamento() {
 
   const fecharModal = () => {
     setModalAberto(null);
-    setCobrancaSelecionada(null);
+    setCobrancasParaSimular([]);
     setPropostaSelecionada(null);
     setSimulacao(null);
     setFormSimulacao({
@@ -139,7 +190,7 @@ export function SimulacaoParcelamento() {
   };
 
   const simularParcelamento = async () => {
-    if (!cobrancaSelecionada || !formSimulacao.data_primeira_parcela) {
+    if (cobrancasParaSimular.length === 0 || !formSimulacao.data_primeira_parcela) {
       toast.error("Cobrança e data da primeira parcela são obrigatórios");
       return;
     }
@@ -152,7 +203,7 @@ export function SimulacaoParcelamento() {
     setProcessando(true);
     try {
       const simulacaoResult = await simulacaoService.simularParcelamento(
-        cobrancaSelecionada.id,
+        cobrancasParaSimular.map(c => c.id),
         formSimulacao.quantidade_parcelas,
         formSimulacao.data_primeira_parcela,
         formSimulacao.valor_entrada || undefined
@@ -333,12 +384,28 @@ export function SimulacaoParcelamento() {
   const CardCobranca = ({ cobranca }: { cobranca: any }) => {
     const valorAtualizado = cobranca.valor_atualizado || cobranca.valor_original;
     const diasAtraso = cobranca.dias_em_atraso || 0;
+    const isSelected = cobrancasSelecionadas.has(cobranca.id);
     
     return (
       <div
-        className="bg-white rounded-lg shadow-md border border-gray-200 p-6 hover:shadow-lg transition-all duration-200 cursor-pointer"
-        onClick={() => abrirModalSimular(cobranca)}
+        className={`rounded-lg shadow-md border p-6 hover:shadow-lg transition-all duration-200 cursor-pointer ${
+          isSelected 
+            ? 'bg-green-50 border-green-300 ring-2 ring-green-200' 
+            : 'bg-white border-gray-200'
+        }`}
+        onClick={() => toggleSelecaoCobranca(cobranca)}
       >
+        {modoSelecao && (
+          <div className="absolute top-2 right-2">
+            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+              isSelected 
+                ? 'bg-green-500 border-green-500' 
+                : 'bg-white border-gray-300'
+            }`}>
+              {isSelected && <CheckCircle className="w-4 h-4 text-white" />}
+            </div>
+          </div>
+        )}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center">
             <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-md mr-4">
@@ -387,7 +454,7 @@ export function SimulacaoParcelamento() {
             </span>
           </div>
           <div className="text-sm text-gray-500">
-            Clique para simular
+            {modoSelecao ? 'Clique para selecionar' : 'Clique para simular'}
           </div>
         </div>
       </div>
@@ -397,12 +464,28 @@ export function SimulacaoParcelamento() {
   const LinhaCobranca = ({ cobranca }: { cobranca: any }) => {
     const valorAtualizado = cobranca.valor_atualizado || cobranca.valor_original;
     const diasAtraso = cobranca.dias_em_atraso || 0;
+    const isSelected = cobrancasSelecionadas.has(cobranca.id);
 
     return (
       <tr 
-        className="hover:bg-gray-50 cursor-pointer transition-colors"
-        onClick={() => abrirModalSimular(cobranca)}
+        className={`cursor-pointer transition-colors ${
+          isSelected 
+            ? 'bg-green-50 hover:bg-green-100' 
+            : 'hover:bg-gray-50'
+        }`}
+        onClick={() => toggleSelecaoCobranca(cobranca)}
       >
+        {modoSelecao && (
+          <td className="px-6 py-4 whitespace-nowrap">
+            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+              isSelected 
+                ? 'bg-green-500 border-green-500' 
+                : 'bg-white border-gray-300'
+            }`}>
+              {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
+            </div>
+          </td>
+        )}
         <td className="px-6 py-4 whitespace-nowrap">
           <div className="flex items-center">
             <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-md mr-3">
@@ -443,7 +526,7 @@ export function SimulacaoParcelamento() {
           </span>
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-          Clique para simular
+          {modoSelecao ? 'Clique para selecionar' : 'Clique para simular'}
         </td>
       </tr>
     );
