@@ -22,20 +22,15 @@ export class KanbanService {
    */
   async buscarColunas(): Promise<ColunaKanban[]> {
     try {
-      // Retorna colunas padrão do sistema
+      // Colunas do Kanban na ordem e nomes definidos pelo cliente
       return [
-        { id: "em_aberto", nome: "📥 Em Aberto", descricao: "Não notificado", cor: "#6B7280", ordem: 1, ativa: true, },
-        { id: "em_negociacao", nome: "🤝 Em Negociação", descricao: "Negociando acordo", cor: "#F59E0B", ordem: 2, ativa: true, },
-        { id: "notificado", nome: "📤 Notificado", descricao: "Aguardando resposta", cor: "#3B82F6", ordem: 3, ativa: true, limite_dias: 7, },
-        { id: "quitado", nome: "✅ Débito Quitado", descricao: "Totalmente quitado", cor: "#059669", ordem: 4, ativa: true, },
-        { id: "reuniao_agendada", nome: "📅 Reunião Agendada", descricao: "Reunião marcada", cor: "#8B5CF6", ordem: 5, ativa: true, },
-        { id: "proposta_enviada", nome: "📨 Proposta Enviada", descricao: "Aguardando aceite", cor: "#F97316", ordem: 6, ativa: true, limite_dias: 5, },
-        { id: "aguardando_pagamento", nome: "📌 Aguardando Pagamento", descricao: "Acordo aceito", cor: "#06B6D4", ordem: 7, ativa: true, },
-        { id: "pagamento_parcial", nome: "💰 Pagamento Parcial", descricao: "Pagamento em andamento", cor: "#10B981", ordem: 8, ativa: true, },
-        { id: "ignorado", nome: "⚠️ Ignorado", descricao: "Não respondeu", cor: "#DC2626", ordem: 9, ativa: true, },
-        { id: "notificacao_formal", nome: "📨 Notificação Formal", descricao: "Notificação enviada", cor: "#7C3AED", ordem: 10, ativa: true, },
-        { id: "escalado_juridico", nome: "📁 Escalado Jurídico", descricao: "Com o jurídico", cor: "#B91C1C", ordem: 11, ativa: true, },
-        { id: "inadimplencia_critica", nome: "❌ Inadimplência Crítica", descricao: "Situação crítica", cor: "#7F1D1D", ordem: 12, ativa: true, },
+        { id: "em_aberto", nome: "📥 Em Aberto", descricao: "Não notificado", cor: "#6B7280", ordem: 1, ativa: true },
+        { id: "em_negociacao", nome: "🤝 Em Negociação", descricao: "Negociando acordo", cor: "#F59E0B", ordem: 2, ativa: true },
+        { id: "parcelado", nome: "🗂️ Parcelado", descricao: "Cobrança parcelada", cor: "#6366F1", ordem: 3, ativa: true },
+        { id: "quitado", nome: "✅ Quitado", descricao: "Totalmente quitado", cor: "#059669", ordem: 4, ativa: true },
+        { id: "juridico", nome: "⚖️ Jurídico", descricao: "Cobrança no jurídico", cor: "#B91C1C", ordem: 5, ativa: true },
+        { id: "inadimplencia", nome: "❌ Inadimplência", descricao: "Situação crítica", cor: "#7F1D1D", ordem: 6, ativa: true },
+        { id: "perda", nome: "🚫 Perda", descricao: "Cobrança perdida", cor: "#9CA3AF", ordem: 7, ativa: true },
       ];
     } catch (error) {
       console.error("Erro ao buscar colunas:", error);
@@ -159,19 +154,22 @@ export class KanbanService {
     cobrancas: any[],
     filtros: FiltrosKanban
   ): CardCobranca[] {
-    const cardsMap = new Map<string, CardCobranca>();
+    const cardsMap = new Map<string, CardCobranca & { _statusList?: string[] }>();
     cobrancas.forEach((cobranca) => {
-      const cnpj = cobranca.cnpj;
-      if (!cardsMap.has(cnpj)) {
+      // Agrupa por CNPJ se existir, senão por CPF
+      const chaveUnidade = cobranca.cnpj || cobranca.cpf;
+      if (!chaveUnidade) return; // ignora cobranças sem identificador
+      if (!cardsMap.has(chaveUnidade)) {
         const unidade = cobranca.unidades_franqueadas;
-        cardsMap.set(cnpj, {
-          id: cnpj,
-          codigo_unidade: unidade?.codigo_unidade || cnpj,
+        cardsMap.set(chaveUnidade, {
+          id: chaveUnidade,
+          codigo_unidade: unidade?.codigo_unidade || chaveUnidade,
           nome_unidade: unidade?.nome_unidade || cobranca.cliente,
-          cnpj: cnpj,
+          cnpj: cobranca.cnpj || "",
+          cpf: cobranca.cpf || "",
           tipo_debito: "royalties",
           valor_total: 0,
-          valor_original: 0, // <-- inicializa
+          valor_original: 0,
           data_vencimento_antiga: cobranca.data_vencimento,
           data_vencimento_recente: cobranca.data_vencimento,
           status_atual: "em_aberto",
@@ -182,12 +180,13 @@ export class KanbanService {
           criticidade: "normal",
           data_entrada_etapa: cobranca.created_at || new Date().toISOString(),
           quantidade_titulos: 0,
-        });
+          _statusList: [],
+        } as any);
       }
-      const card = cardsMap.get(cnpj)!;
+      const card = cardsMap.get(chaveUnidade)!;
       const valorAtual = cobranca.valor_atualizado || cobranca.valor_original;
       card.valor_total += valorAtual;
-      card.valor_original = (card.valor_original || 0) + (cobranca.valor_original || 0); // <-- soma
+      card.valor_original = (card.valor_original || 0) + (cobranca.valor_original || 0);
       card.quantidade_titulos = (card.quantidade_titulos || 0) + 1;
       if (
         new Date(cobranca.data_vencimento) < new Date(card.data_vencimento_antiga)
@@ -199,24 +198,39 @@ export class KanbanService {
       ) {
         card.data_vencimento_recente = cobranca.data_vencimento;
       }
+      // Coletar todos os status individuais
       const statusAtual = this.determinarStatusKanban(cobranca.status);
-      if (this.compararCriticidadeStatus(statusAtual, card.status_atual) > 0) {
-        card.status_atual = statusAtual;
-        card.responsavel_atual = this.determinarResponsavel(cobranca.status);
-      }
+      card._statusList!.push(statusAtual);
       if (new Date(cobranca.created_at) > new Date(card.data_ultima_acao)) {
         card.data_ultima_acao = cobranca.created_at;
         card.ultima_acao = this.determinarUltimaAcao(cobranca);
       }
     });
-    const cards = Array.from(cardsMap.values()).map((card) => ({
-      ...card,
-      tipo_debito: this.determinarTipoDebito(
-        cobrancas.filter((c) => c.cnpj === card.cnpj)
-      ),
-      dias_parado: this.calcularDiasParado(card.data_ultima_acao),
-      criticidade: this.determinarCriticidade(card),
-    }));
+    // Se todas as cobranças da unidade têm o mesmo status, usar esse status. Se não, manter trava (status misto).
+    const cards = Array.from(cardsMap.values()).map((card) => {
+      let statusFinal = "em_aberto";
+      if (card._statusList && card._statusList.length > 0) {
+        const unique = Array.from(new Set(card._statusList));
+        if (unique.length === 1) {
+          statusFinal = unique[0];
+        } else {
+          statusFinal = "misto";
+        }
+      }
+      return {
+        ...card,
+        tipo_debito: this.determinarTipoDebito(
+          cobrancas.filter((c) => (c.cnpj || c.cpf) === (card.cnpj || card.cpf))
+        ),
+        dias_parado: this.calcularDiasParado(card.data_ultima_acao),
+        criticidade: this.determinarCriticidade(card),
+        status_atual: statusFinal,
+        // Garante que codigo_unidade, cnpj e cpf estejam presentes
+        codigo_unidade: card.cnpj || card.cpf || "",
+        cnpj: card.cnpj || "",
+        cpf: card.cpf || "",
+      };
+    });
     return cards.filter((card) => this.aplicarFiltrosCard(card, filtros));
   }
 
@@ -344,14 +358,6 @@ export class KanbanService {
             novoStatus = "notificado";
           }
           break;
-        case "reuniao":
-          descricaoAcao = "Reunião agendada";
-          novoStatus = "reuniao_agendada";
-          break;
-        case "juridico":
-          descricaoAcao = "Escalado para jurídico";
-          novoStatus = "escalado_juridico";
-          break;
         default:
           descricaoAcao = `Ação ${acao} executada`;
       }
@@ -425,18 +431,11 @@ export class KanbanService {
     _agruparPorUnidade?: boolean
   ): Promise<EstatisticasKanban> {
     try {
-  // Marca o parâmetro como utilizado (mantém compatibilidade da assinatura)
-  void _agruparPorUnidade;
-      // Para estatísticas de valores, preferimos trabalhar no nível individual
-      // para evitar dupla contagem ao agrupar por unidade. Portanto, carregamos
-      // sempre como individual aqui.
+      void _agruparPorUnidade;
       const cards = await this.buscarCards({}, false);
-
-      // Busca valores diretamente do banco para maior precisão (original vs atualizado)
       const { data: brutas } = await supabase
         .from("cobrancas_franqueados")
         .select("valor_original, valor_atualizado, status");
-
       const abertas = (brutas || []).filter((c: any) => c.status !== "quitado");
       const totalOriginalAberto = abertas.reduce(
         (sum: number, c: any) => sum + (Number(c.valor_original) || 0),
@@ -447,33 +446,33 @@ export class KanbanService {
           sum + (Number(c.valor_atualizado ?? c.valor_original) || 0),
         0
       );
-
+      // Nova contagem para inadimplencia/perda
+      const inadimplentesPerda = cards.filter(
+        (c) => c.status_atual === "inadimplencia" || c.status_atual === "perda"
+      ).length;
       const stats: EstatisticasKanban = {
         total_cards: cards.length,
         cards_criticos: cards.filter((c) => c.criticidade === "critica").length,
-        cards_parados: cards.filter((c) => c.dias_parado > 7).length,
+        // cards_parados removido
+        inadimplentes_perda: inadimplentesPerda,
         tempo_medio_resolucao: this.calcularTempoMedioResolucao(cards),
-        // Mantém compatibilidade: este campo continuava somando valor_total (que era atualizado)
         valor_total_fluxo: cards.reduce((sum, c) => sum + c.valor_total, 0),
         valor_total_original_aberto: totalOriginalAberto,
         valor_total_atualizado_aberto: totalAtualizadoAberto,
         distribuicao_por_status: {},
         tempo_medio_por_etapa: {},
       };
-
-      // Calcula distribuição por status
       cards.forEach((card) => {
         stats.distribuicao_por_status[card.status_atual] =
           (stats.distribuicao_por_status[card.status_atual] || 0) + 1;
       });
-
       return stats;
     } catch (error) {
       console.error("Erro ao buscar estatísticas:", error);
       return {
         total_cards: 0,
         cards_criticos: 0,
-        cards_parados: 0,
+        inadimplentes_perda: 0,
         tempo_medio_resolucao: 0,
         valor_total_fluxo: 0,
         distribuicao_por_status: {},
@@ -561,59 +560,45 @@ export class KanbanService {
 
   private determinarStatusKanban(statusCobranca: string): string {
     const mapeamento: Record<string, string> = {
-      novo: "em_aberto",
       em_aberto: "em_aberto",
-      cobrado: "notificado",
+      em_negociacao: "em_negociacao",
       negociando: "em_negociacao",
+      parcelado: "parcelado",
       quitado: "quitado",
-      em_tratativa_juridica: "escalado_juridico",
-      em_tratativa_critica: "inadimplencia_critica",
+      juridico: "juridico",
+      inadimplencia: "inadimplencia",
+      perda: "perda",
+      escalado_juridico: "juridico",
+      em_tratativa_juridica: "juridico",
+      inadimplencia_critica: "inadimplencia",
     };
-
-    const statusMapeado = mapeamento[statusCobranca] || "em_aberto";
-    return statusMapeado;
+    if (!(statusCobranca in mapeamento)) {
+      console.warn('Status desconhecido no Kanban:', statusCobranca);
+      return statusCobranca; // Retorna o status original, nunca força em_aberto
+    }
+    return mapeamento[statusCobranca];
   }
 
   private mapearStatusKanbanParaCobranca(statusKanban: string): string {
-    const mapeamento: Record<string, string> = {
-      em_aberto: "em_aberto",
-      notificado: "cobrado",
-      reuniao_agendada: "negociando",
-      em_negociacao: "negociando",
-      proposta_enviada: "negociando",
-      aguardando_pagamento: "negociando",
-      pagamento_parcial: "negociando",
-      quitado: "quitado",
-      ignorado: "em_aberto",
-      notificacao_formal: "cobrado",
-      escalado_juridico: "em_tratativa_juridica",
-      inadimplencia_critica: "em_tratativa_critica",
-    };
-
-    const statusMapeado = mapeamento[statusKanban] || "em_aberto";
-    return statusMapeado;
+    // Não converte mais status, apenas retorna o mesmo status (identidade)
+    return statusKanban;
   }
 
   private determinarResponsavel(status: string): string {
     const responsaveis: Record<string, string> = {
       em_aberto: "Equipe Cobrança",
-      cobrado: "Equipe Cobrança",
       negociando: "Equipe Cobrança",
       em_tratativa_juridica: "Jurídico",
-      em_tratativa_critica: "Jurídico",
     };
     return responsaveis[status] || "Equipe Cobrança";
   }
 
   private determinarUltimaAcao(cobranca: any): string {
     const acoes: Record<string, string> = {
-      novo: "Cobrança registrada",
-      em_aberto: "Aguardando primeira ação",
-      cobrado: "Notificação enviada",
+      em_aberto: "Cobrança atrasada em sistema",
       negociando: "Em processo de negociação",
       quitado: "Débito quitado",
       em_tratativa_juridica: "Escalado para jurídico",
-      em_tratativa_critica: "Situação crítica identificada",
     };
     return acoes[cobranca.status] || "Cobrança registrada no sistema";
   }
@@ -650,25 +635,6 @@ export class KanbanService {
     const vencimento = new Date(dataVencimento);
     const diferenca = hoje.getTime() - vencimento.getTime();
     return Math.max(0, Math.floor(diferenca / (1000 * 60 * 60 * 24)));
-  }
-
-  private compararCriticidadeStatus(status1: string, status2: string): number {
-    const prioridades: Record<string, number> = {
-      inadimplencia_critica: 12,
-      escalado_juridico: 11,
-      notificacao_formal: 10,
-      ignorado: 9,
-      quitado: 8,
-      pagamento_parcial: 7,
-      aguardando_pagamento: 6,
-      proposta_enviada: 5,
-      em_negociacao: 4,
-      reuniao_agendada: 3,
-      notificado: 2,
-      em_aberto: 1,
-    };
-
-    return (prioridades[status1] || 0) - (prioridades[status2] || 0);
   }
 
   private aplicarFiltrosCard(

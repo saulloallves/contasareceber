@@ -4,6 +4,7 @@ export interface CardCobranca {
   codigo_unidade: string;
   nome_unidade: string;
   cnpj: string;
+  cpf?: string;
   tipo_debito: 'royalties' | 'insumos' | 'aluguel' | 'multa';
   valor_total: number;
   data_vencimento_antiga: string;
@@ -61,7 +62,7 @@ export interface FiltrosKanban {
 export interface EstatisticasKanban {
   total_cards: number;
   cards_criticos: number;
-  cards_parados: number;
+  inadimplentes_perda: number;
   tempo_medio_resolucao: number;
   valor_total_fluxo: number;
   // Novos campos para clarificar totais

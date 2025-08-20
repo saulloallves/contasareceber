@@ -18,6 +18,7 @@ type UnitKanbanCard = {
   codigo_unidade: string;
   nome_unidade: string;
   cnpj: string;
+  cpf?: string;
   tipo_debito: string;
   data_vencimento_antiga: string;
   valor_total: number;
@@ -259,7 +260,7 @@ export function KanbanCobranca() {
         const quantidadesPorUnidade: Record<string, number> = {};
 
         todasCobrancasSemFiltro.forEach((card) => {
-          const key = card.cnpj; // Usando CNPJ como chave única da unidade
+          const key = card.cnpj || (card as any).cpf;
           quantidadesPorUnidade[key] = (quantidadesPorUnidade[key] || 0) + 1;
         });
 
@@ -651,11 +652,29 @@ export function KanbanCobranca() {
   };
 
   // Função para obter quantidade total de cobranças de uma unidade
-  const obterQuantidadeTotalCobrancas = (cnpj: string): number => {
-    return quantidadesTotaisPorUnidade[cnpj] || 0;
+  const obterQuantidadeTotalCobrancas = (doc: string): number => {
+    return quantidadesTotaisPorUnidade[doc] || 0;
   };
 
-  // Função para detectar unidades com status misto
+  // Função para buscar todas as cobranças de uma unidade específica (por cnpj ou cpf)
+  const buscarTodasCobrancasUnidade = async (doc: string) => {
+    try {
+      const todasCobrancas = await kanbanService.buscarCards({}, false); // Busca todas as cobranças individuais
+      const cobrancasUnidade = todasCobrancas.filter(
+        (card) => (card.cnpj || (card as any).cpf) === doc
+      );
+      setTodasCobrancasUnidade(cobrancasUnidade);
+      setQuantidadesTotaisPorUnidade((prev) => ({
+        ...prev,
+        [doc]: cobrancasUnidade.length,
+      }));
+    } catch (error) {
+      console.error("Erro ao buscar todas as cobranças da unidade:", error);
+      setTodasCobrancasUnidade([]);
+    }
+  };
+
+  // Detecta unidades com status misto
   const detectarUnidadesComStatusMisto = async (): Promise<{
     unidadesMistas: Set<string>;
     detalhes: Record<string, { statusList: string[]; nomeUnidade: string }>;
@@ -890,14 +909,17 @@ export function KanbanCobranca() {
 
   // Adicionar valor_original ao UnitKanbanCard
   const getUnitCardsByColuna = (colunaId: string): UnitKanbanCard[] => {
+    // Agrupa por cnpj ou cpf
     const filtered = cards.filter((card) => card.status_atual === colunaId);
-    const unitMap: Record<string, UnitKanbanCard & { valor_original?: number }> = {};
+    const unitMap: Record<string, UnitKanbanCard & { valor_original?: number; cpf?: string }> = {};
     filtered.forEach((card) => {
-      if (!unitMap[card.codigo_unidade]) {
-        unitMap[card.codigo_unidade] = {
+      const chave = card.cnpj || (card as any).cpf || card.codigo_unidade;
+      if (!unitMap[chave]) {
+        unitMap[chave] = {
           codigo_unidade: card.codigo_unidade,
           nome_unidade: card.nome_unidade,
           cnpj: card.cnpj,
+          cpf: (card as any).cpf || "",
           tipo_debito: card.tipo_debito,
           data_vencimento_antiga: card.data_vencimento_antiga,
           valor_total: 0,
@@ -909,22 +931,20 @@ export function KanbanCobranca() {
           observacoes: card.observacoes,
         };
       }
-      unitMap[card.codigo_unidade].charges.push(card);
-      unitMap[card.codigo_unidade].valor_total += card.valor_total;
-      unitMap[card.codigo_unidade].valor_original = (unitMap[card.codigo_unidade].valor_original ?? 0) + (card.valor_original ?? 0);
+      unitMap[chave].charges.push(card);
+      unitMap[chave].valor_total += card.valor_total;
+      unitMap[chave].valor_original = (unitMap[chave].valor_original ?? 0) + (card.valor_original ?? 0);
       if (
-        !unitMap[card.codigo_unidade].data_vencimento_antiga ||
-        new Date(card.data_vencimento_antiga) <
-          new Date(unitMap[card.codigo_unidade].data_vencimento_antiga)
+        !unitMap[chave].data_vencimento_antiga ||
+        new Date(card.data_vencimento_antiga) < new Date(unitMap[chave].data_vencimento_antiga)
       ) {
-        unitMap[card.codigo_unidade].data_vencimento_antiga =
-          card.data_vencimento_antiga;
+        unitMap[chave].data_vencimento_antiga = card.data_vencimento_antiga;
       }
-      if (card.dias_parado > unitMap[card.codigo_unidade].dias_parado) {
-        unitMap[card.codigo_unidade].dias_parado = card.dias_parado;
+      if (card.dias_parado > unitMap[chave].dias_parado) {
+        unitMap[chave].dias_parado = card.dias_parado;
       }
       if (card.observacoes) {
-        unitMap[card.codigo_unidade].observacoes = card.observacoes;
+        unitMap[chave].observacoes = card.observacoes;
       }
     });
     return Object.values(unitMap);
@@ -987,12 +1007,7 @@ export function KanbanCobranca() {
         `Movendo ${unit.charges.length} cobranças da unidade ${unit.nome_unidade}`
       );
 
-      // CORREÇÃO: Buscar cobranças individuais usando KanbanService com modo individual
-      // Em vez de usar cards do estado (que pode ter dados agrupados), busca diretamente do banco
-      console.log(
-        `Buscando cobranças individuais da unidade CNPJ: ${unit.cnpj}`
-      );
-
+      // Buscar todas as cobranças da unidade (independentemente do status)
       const todasCobrancasIndividuais = await kanbanService.buscarCards(
         {},
         false
@@ -1004,6 +1019,7 @@ export function KanbanCobranca() {
       console.log(
         `Total de cobranças individuais encontradas para a unidade: ${cobrancasUnidade.length}`
       );
+      console.log('Status das cobranças ANTES:', cobrancasUnidade.map(c => c.status_atual));
 
       if (cobrancasUnidade.length === 0) {
         throw new Error(
@@ -1023,13 +1039,11 @@ export function KanbanCobranca() {
         );
       }
 
-      // Move todas as cobranças da unidade para o status de destino
+      // Move todas as cobranças da unidade para o status de destino, independentemente do status atual
       await Promise.all(
         cobrancasUnidade.map(async (card) => {
           console.log(
-            `Movendo cobrança UUID: ${card.id} de ${card.status_atual} para ${
-              destination!.droppableId
-            }`
+            `Movendo cobrança UUID: ${card.id} de ${card.status_atual} para ${destination!.droppableId}`
           );
           return kanbanService.moverCard(
             card.id, // UUID correto da cobrança individual
@@ -1039,6 +1053,11 @@ export function KanbanCobranca() {
           );
         })
       );
+
+      // Buscar novamente para logar os status após a movimentação
+      const cobrancasApos = await kanbanService.buscarCards({}, false);
+      const cobrancasUnidadeApos = cobrancasApos.filter((card) => card.cnpj === unit.cnpj);
+      console.log('Status das cobranças DEPOIS:', cobrancasUnidadeApos.map(c => c.status_atual));
 
       console.log(
         `Todas as ${cobrancasUnidade.length} cobranças da unidade ${unit.nome_unidade} foram movidas com sucesso`
@@ -1124,28 +1143,6 @@ export function KanbanCobranca() {
       setProcessando(false);
     }
   };
-
-  // Função para buscar todas as cobranças de uma unidade específica
-  const buscarTodasCobrancasUnidade = async (cnpj: string) => {
-    try {
-      const todasCobrancas = await kanbanService.buscarCards({}, false); // Busca todas as cobranças individuais
-      const cobrancasUnidade = todasCobrancas.filter(
-        (card) => card.cnpj === cnpj
-      );
-      setTodasCobrancasUnidade(cobrancasUnidade);
-
-      // Atualiza o mapa de quantidades para garantir que esteja sincronizado
-      setQuantidadesTotaisPorUnidade((prev) => ({
-        ...prev,
-        [cnpj]: cobrancasUnidade.length,
-      }));
-    } catch (error) {
-      console.error("Erro ao buscar todas as cobranças da unidade:", error);
-      setTodasCobrancasUnidade([]);
-    }
-  };
-
-  // executarAcao removido temporariamente; reuniões não implementadas
 
   const salvarObservacao = async () => {
     if (!observacaoEditando.trim()) return;
@@ -1487,21 +1484,12 @@ _Mensagem Automática do Sistema_
   const formatarStatusCobranca = (status: string) => {
     const statusMap: Record<string, string> = {
       em_aberto: "Em Aberto",
-      notificado: "Notificado",
-      reuniao_agendada: "Reunião Agendada",
       em_negociacao: "Em Negociação",
-      proposta_enviada: "Proposta Enviada",
-      aguardando_pagamento: "Aguardando Pagamento",
-      pagamento_parcial: "Pagamento Parcial",
+      parcelado: "Parcelado",
       quitado: "Quitado",
-      ignorado: "Ignorado",
-      notificacao_formal: "Notificação Formal",
-      escalado_juridico: "Escalado Jurídico",
-      inadimplencia_critica: "Inadimplência Crítica",
-      cobrado: "Cobrado",
-      negociando: "Negociando",
-      em_tratativa_juridica: "Em Tratativa Jurídica",
-      em_tratativa_critica: "Em Tratativa Crítica",
+      juridico: "Jurídico",
+      inadimplencia: "Inadimplência",
+      perda: "Perda",
     };
     return (
       statusMap[status] ||
@@ -1559,7 +1547,7 @@ _Mensagem Automática do Sistema_
                     {unit.nome_unidade}
                   </h4>
                   <p className="text-xs text-gray-600">
-                    {formatarCNPJCPF(unit.cnpj)}
+                    {formatarCNPJCPF((unit.cnpj || unit.cpf || ""))}
                   </p>
                 </div>
               </div>
@@ -1675,7 +1663,7 @@ _Mensagem Automática do Sistema_
                     {card.nome_unidade}
                   </h4>
                   <p className="text-xs text-gray-600">
-                    {formatarCNPJCPF(card.cnpj)}
+                    {formatarCNPJCPF((card.cnpj || card.cpf || ""))}
                   </p>
                 </div>
               </div>
@@ -1758,7 +1746,7 @@ _Mensagem Automática do Sistema_
             </div>
           </div>
 
-          <div className="flex space-x-3">
+          <div className="flex items-center gap-3">
             <button
               onClick={exportarDados}
               className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -1770,12 +1758,19 @@ _Mensagem Automática do Sistema_
               onClick={handleAtualizarClick}
               disabled={carregando}
               title={(movimentacaoIndividualFeita || unidadesComStatusMisto.size > 0) ? 'Liberar travas e atualizar' : 'Atualizar dados'}
-              className="flex items-center px-4 py-2 bg-[#ff9923] text-white rounded-lg hover:bg-[#6b3a10] disabled:opacity-50 transition-colors"
+              className="flex items-center px-4 py-2 bg-[#ff9923] text-white rounded-lg hover:bg-[#c5700e] disabled:opacity-50 transition-colors"
             >
               <RefreshCw
                 className={`w-4 h-4 mr-2 ${carregando ? "animate-spin" : ""}`}
               />
               Atualizar
+            </button>
+            <button
+              onClick={() => setShowFiltrosAvancados(!showFiltrosAvancados)}
+              className="flex items-center px-4 py-2 bg-[#6b3a10] text-white rounded-lg hover:bg-[#a35919] transition-colors"
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              {showFiltrosAvancados ? "Ocultar Filtros" : "Mostrar Filtros"}
             </button>
           </div>
         </div>
@@ -1789,17 +1784,17 @@ _Mensagem Automática do Sistema_
               </div>
               <div className="text-sm text-blue-800">Total de Cards</div>
             </div>
-            <div className="bg-red-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-red-600">
+            <div className="bg-red-100 rounded-lg p-4">
+              <div className="text-2xl font-bold text-red-700">
+                {estatisticas.inadimplentes_perda}
+              </div>
+              <div className="text-sm text-red-700">Cobranças Inadimplentes/Perda</div>
+            </div>
+            <div className="bg-yellow-100 rounded-lg p-4">
+              <div className="text-2xl font-bold text-yellow-700">
                 {estatisticas.cards_criticos}
               </div>
-              <div className="text-sm text-red-800">Cards Críticos</div>
-            </div>
-            <div className="bg-yellow-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-yellow-600">
-                {estatisticas.cards_parados}
-              </div>
-              <div className="text-sm text-yellow-800">Cards Parados</div>
+              <div className="text-sm text-yellow-700">Cards Críticos</div>
             </div>
             <div className="bg-green-50 rounded-lg p-4">
               <div className="text-2xl font-bold text-green-600">
@@ -1882,27 +1877,6 @@ _Mensagem Automática do Sistema_
                   Modo Individual Ativo - O modo de movimento de cobranças por unidade está desativado até todas as cobranças terem o mesmo status!
                 </span>
               </div>
-            )}
-          </div>
-
-          {/* Botão de Filtros */}
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setShowFiltrosAvancados(!showFiltrosAvancados)}
-              className="flex items-center px-4 py-2 bg-[#6b3a10] text-white rounded-lg hover:bg-[#a35919] transition-colors"
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              {showFiltrosAvancados ? "Ocultar Filtros" : "Mostrar Filtros"}
-            </button>
-
-            {(Object.values(filtrosAvancados).some((v) => v !== "") ||
-              Object.values(filtros).some((v) => v !== "")) && (
-              <button
-                onClick={limparFiltros}
-                className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-              >
-                Limpar Filtros
-              </button>
             )}
           </div>
         </div>
@@ -1988,21 +1962,12 @@ _Mensagem Automática do Sistema_
                 >
                   <option value="">Todos os Status</option>
                   <option value="em_aberto">Em Aberto</option>
-                  <option value="notificado">Notificado</option>
-                  <option value="reuniao_agendada">Reunião Agendada</option>
                   <option value="em_negociacao">Em Negociação</option>
-                  <option value="proposta_enviada">Proposta Enviada</option>
-                  <option value="aguardando_pagamento">
-                    Aguardando Pagamento
-                  </option>
-                  <option value="pagamento_parcial">Pagamento Parcial</option>
+                  <option value="parcelado">Parcelado</option>
                   <option value="quitado">Quitado</option>
-                  <option value="ignorado">Ignorado</option>
-                  <option value="notificacao_formal">Notificação Formal</option>
-                  <option value="escalado_juridico">Escalado Jurídico</option>
-                  <option value="inadimplencia_critica">
-                    Inadimplência Crítica
-                  </option>
+                  <option value="juridico">Jurídico</option>
+                  <option value="inadimplencia">Inadimplência</option>
+                  <option value="perda">Perda</option>
                 </select>
               </div>
 
@@ -2173,45 +2138,48 @@ _Mensagem Automática do Sistema_
         <DragDropContext
           onDragEnd={aba === "unidade" ? onDragEndUnidade : onDragEndIndividual}
         >
-          <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {colunas
-              .filter((col) => col.ativa)
-              .map((coluna) => (
-                <div key={coluna.id} className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-gray-800 text-sm">
-                      {coluna.nome}
-                    </h3>
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: coluna.cor }}
-                    ></div>
-                  </div>
-
-                  <Droppable droppableId={coluna.id}>
-                    {(provided, snapshot) => (
+          <div className="w-full overflow-x-auto">
+            <div className="flex flex-row gap-6 min-w-fit">
+              {colunas
+                .filter((col) => col.ativa)
+                .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
+                .map((coluna) => (
+                  <div key={coluna.id} className="bg-gray-50 rounded-lg p-4 min-w-[320px] w-[320px] flex-shrink-0">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-gray-800 text-sm">
+                        {coluna.nome}
+                      </h3>
                       <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={`min-h-[200px] transition-colors ${
-                          snapshot.isDraggingOver ? "bg-blue-50" : ""
-                        }`}
-                      >
-                        {aba === "unidade"
-                          ? getUnitCardsByColuna(coluna.id).map((unit, index) =>
-                              renderCardUnidade(unit, index)
-                            )
-                          : cards
-                              .filter((card) => card.status_atual === coluna.id)
-                              .map((card, index) =>
-                                renderCardIndividual(card, index)
-                              )}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-                </div>
-              ))}
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: coluna.cor }}
+                      ></div>
+                    </div>
+
+                    <Droppable droppableId={coluna.id}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          className={`min-h-[200px] transition-colors ${
+                            snapshot.isDraggingOver ? "bg-blue-50" : ""
+                          }`}
+                        >
+                          {aba === "unidade"
+                            ? getUnitCardsByColuna(coluna.id).map((unit, index) =>
+                                renderCardUnidade(unit, index)
+                              )
+                            : cards
+                                .filter((card) => card.status_atual === coluna.id)
+                                .map((card, index) =>
+                                  renderCardIndividual(card, index)
+                                )}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
+                  </div>
+                ))}
+            </div>
           </div>
         </DragDropContext>
 
@@ -2406,10 +2374,10 @@ _Mensagem Automática do Sistema_
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">
-                        CNPJ
+                        CNPJ/CPF
                       </label>
                       <p className="text-gray-800">
-                        {formatarCNPJCPF(unitSelecionada.cnpj)}
+                        {formatarCNPJCPF((unitSelecionada.cnpj || (unitSelecionada as any).cpf || ""))}
                       </p>
                     </div>
                     <div>
@@ -2577,9 +2545,9 @@ _Mensagem Automática do Sistema_
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">
-                        CNPJ
+                        CNPJ/CPF
                       </label>
-                      <p className="text-gray-800">{formatarCNPJCPF(cobrancaSelecionada.cnpj)}</p>
+                      <p className="text-gray-800">{formatarCNPJCPF(cobrancaSelecionada.cnpj || cobrancaSelecionada.cpf || "")}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">
