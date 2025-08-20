@@ -1132,103 +1132,105 @@ export function SimulacaoParcelamento() {
                   <div className="text-sm text-gray-600">
                     Valor Total da Proposta
                   </div>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="text-2xl font-bold text-green-600">
-                    {formatarMoeda(
-                      (propostaSelecionada as any).simulacoes_parcelamento
-                        ?.valor_entrada || 0
-                    )}
-                  </div>
-                  <div className="text-sm text-gray-600">Entrada</div>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {(propostaSelecionada as any).simulacoes_parcelamento
-                      ?.quantidade_parcelas || 0}
-                    x{" "}
-                    {formatarMoeda(
-                      (propostaSelecionada as any).simulacoes_parcelamento
-                        ?.parcelas?.[0]?.valor || 0
-                    )}
-                  </div>
-                  <div className="text-sm text-gray-600">Parcelas</div>
-                </div>
+            <>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold">Detalhes da Simulação</h3>
+                <button
+                  onClick={() => setModalVisualizacao(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
               </div>
+              
+              <div className="space-y-6">
+                {/* Informações Gerais */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {formatarMoeda(simulacaoAtual.valor_total_parcelamento)}
+                    </div>
+                    <div className="text-sm text-blue-800">Valor Total do Parcelamento</div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-green-600">
+                      {simulacaoAtual.valor_entrada ? formatarMoeda(simulacaoAtual.valor_entrada) : 'Sem entrada'}
+                    </div>
+                    <div className="text-sm text-green-800">Entrada</div>
+                  </div>
+                  <div className="bg-purple-50 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {simulacaoAtual.quantidade_parcelas}x {formatarMoeda(simulacaoAtual.parcelas[0]?.valor || 0)}
+                    </div>
+                    <div className="text-sm text-purple-800">Parcelas</div>
+                  </div>
+                </div>
 
-              {/* Cronograma */}
-              <div>
-                <h4 className="text-lg font-semibold mb-4">
-                  Cronograma de Pagamentos
-                </h4>
-                <div className="max-h-60 overflow-y-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Parcela
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Valor
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Vencimento
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Multa
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Juros Mora
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {(propostaSelecionada as any).simulacoes_parcelamento
-                        ?.parcelas?.map((parcela: any, index: number) => (
-                        <tr key={index}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {parcela.numero}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatarMoeda(parcela.valor)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatarData(parcela.data_vencimento)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                            {formatarMoeda(parcela.multa)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
-                            {formatarMoeda(parcela.juros_mora)}
-                          </td>
-                        </tr>
-                      )) || (
+                {/* Cronograma de Parcelas */}
+                <div>
+                  <h4 className="text-lg font-semibold mb-4">Cronograma de Parcelas</h4>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
                         <tr>
-                          <td
-                            colSpan={5}
-                            className="px-6 py-4 text-center text-gray-500"
-                          >
-                            Dados de parcelas não disponíveis
-                          </td>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parcela</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vencimento</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Multa</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Juros Mora</th>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {simulacaoAtual.parcelas.map((parcela) => (
+                          <tr key={parcela.numero}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {parcela.numero}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {formatarMoeda(parcela.valor)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {formatarData(parcela.data_vencimento)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {formatarMoeda(parcela.multa)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {formatarMoeda(parcela.juros_mora)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
 
-              {/* Mensagem da Proposta */}
-              <div>
-                <h4 className="text-lg font-semibold mb-4">
-                  Mensagem da Proposta
-                </h4>
+                {/* Resumo Financeiro */}
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                    {propostaSelecionada.mensagem_proposta}
-                  </pre>
+                  <h4 className="font-medium text-gray-800 mb-3">Resumo Financeiro:</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">Valor Original:</span>
+                      <p className="font-medium">{formatarMoeda(simulacaoAtual.valor_original)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Valor Atualizado:</span>
+                      <p className="font-medium text-red-600">{formatarMoeda(simulacaoAtual.valor_atualizado)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Total Parcelamento:</span>
+                      <p className="font-medium text-blue-600">{formatarMoeda(simulacaoAtual.valor_total_parcelamento)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Juros Total:</span>
+                      <p className="font-medium text-purple-600">
+                        {formatarMoeda(simulacaoAtual.valor_total_parcelamento - simulacaoAtual.valor_atualizado)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </>
           </div>
         </div>
       )}
