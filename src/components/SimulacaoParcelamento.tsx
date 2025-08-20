@@ -18,6 +18,12 @@ import {
   AlertTriangle,
   Plus,
   Minus,
+  Grid3X3,
+  List,
+  Search,
+  FileText,
+  Building2,
+  User,
 } from "lucide-react";
 import { SimulacaoParcelamentoService } from "../services/simulacaoParcelamentoService";
 import {
@@ -27,7 +33,7 @@ import {
   EstatisticasParcelamento,
 } from "../types/simulacaoParcelamento";
 import { cobrancaService } from "../services/cobrancaService";
-import { formatarCNPJCPF, formatarMoeda } from "../utils/formatters";
+import { formatarCNPJCPF, formatarMoeda, formatarData } from "../utils/formatters";
 import toast from "react-hot-toast";
 
 export function SimulacaoParcelamento() {
@@ -53,6 +59,8 @@ export function SimulacaoParcelamento() {
   const [propostaSelecionada, setPropostaSelecionada] = useState<any>(null);
   const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
   const [enviandoEmail, setEnviandoEmail] = useState(false);
+  const [visualizacao, setVisualizacao] = useState<"cards" | "lista">("cards");
+  const [busca, setBusca] = useState("");
 
   const simulacaoService = new SimulacaoParcelamentoService();
 
@@ -275,10 +283,6 @@ export function SimulacaoParcelamento() {
     }
   };
 
-  const formatarData = (data: string) => {
-    return new Date(data).toLocaleDateString("pt-BR");
-  };
-
   const handleQuantidadeParcelasChange = (value: string) => {
     const quantidade = parseInt(value) || 0;
     
@@ -316,46 +320,156 @@ export function SimulacaoParcelamento() {
     return formSimulacao.quantidade_parcelas >= 2 && formSimulacao.quantidade_parcelas <= 42;
   };
 
-  return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-lg p-8">
-        <div className="flex items-center justify-between mb-8">
+  // Filtrar cobranças baseado na busca
+  const cobrancasFiltradas = cobrancas.filter((cobranca) => {
+    const termoBusca = busca.toLowerCase();
+    return (
+      cobranca.cliente.toLowerCase().includes(termoBusca) ||
+      (cobranca.cnpj && cobranca.cnpj.includes(termoBusca.replace(/\D/g, ""))) ||
+      (cobranca.cpf && cobranca.cpf.includes(termoBusca.replace(/\D/g, "")))
+    );
+  });
+
+  const CardCobranca = ({ cobranca }: { cobranca: any }) => {
+    const valorAtualizado = cobranca.valor_atualizado || cobranca.valor_original;
+    const diasAtraso = cobranca.dias_em_atraso || 0;
+    
+    return (
+      <div
+        className="bg-white rounded-lg shadow-md border border-gray-200 p-6 hover:shadow-lg transition-all duration-200 cursor-pointer"
+        onClick={() => abrirModalSimular(cobranca)}
+      >
+        <div className="flex items-start justify-between mb-4">
           <div className="flex items-center">
-            <Calculator className="w-8 h-8 text-green-600 mr-3" />
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-md mr-4">
+              <Calculator className="w-6 h-6 text-white" />
+            </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">
-                Simulação de Parcelamento
-              </h1>
-              <p className="text-gray-600">
-                Simule e envie propostas de parcelamento personalizadas
+              <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                {cobranca.cliente}
+              </h3>
+              <p className="text-sm text-gray-600">
+                {formatarCNPJCPF(cobranca.cnpj || cobranca.cpf || "")}
               </p>
             </div>
           </div>
+          <div className="text-right">
+            <div className="text-2xl font-bold text-red-600">
+              {formatarMoeda(valorAtualizado)}
+            </div>
+            <div className="text-sm text-gray-500">Valor Atualizado</div>
+          </div>
+        </div>
 
-          <div className="flex space-x-3">
-            <button
-              onClick={exportarDados}
-              className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Exportar
-            </button>
-            <button
-              onClick={carregarDados}
-              disabled={carregando}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
-              <RefreshCw
-                className={`w-4 h-4 mr-2 ${carregando ? "animate-spin" : ""}`}
-              />
-              Atualizar
-            </button>
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <div className="text-sm text-gray-500">Valor Original</div>
+            <div className="text-lg font-semibold text-gray-800">
+              {formatarMoeda(cobranca.valor_original)}
+            </div>
+          </div>
+          <div>
+            <div className="text-sm text-gray-500">Vencimento</div>
+            <div className="text-lg font-semibold text-gray-800">
+              {formatarData(cobranca.data_vencimento)}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+              diasAtraso > 30 ? 'bg-red-100 text-red-800' :
+              diasAtraso > 0 ? 'bg-yellow-100 text-yellow-800' :
+              'bg-green-100 text-green-800'
+            }`}>
+              {diasAtraso > 0 ? `${diasAtraso} dias atraso` : 'No prazo'}
+            </span>
+          </div>
+          <div className="text-sm text-gray-500">
+            Clique para simular
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const LinhaCobranca = ({ cobranca }: { cobranca: any }) => {
+    const valorAtualizado = cobranca.valor_atualizado || cobranca.valor_original;
+    const diasAtraso = cobranca.dias_em_atraso || 0;
+
+    return (
+      <tr 
+        className="hover:bg-gray-50 cursor-pointer transition-colors"
+        onClick={() => abrirModalSimular(cobranca)}
+      >
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="flex items-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-md mr-3">
+              <Calculator className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="text-sm font-medium text-gray-900">
+                {cobranca.cliente}
+              </div>
+              <div className="text-sm text-gray-500">
+                {formatarCNPJCPF(cobranca.cnpj || cobranca.cpf || "")}
+              </div>
+            </div>
+          </div>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="text-sm text-gray-900">
+            {formatarMoeda(cobranca.valor_original)}
+          </div>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="text-sm font-medium text-red-600">
+            {formatarMoeda(valorAtualizado)}
+          </div>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="text-sm text-gray-900">
+            {formatarData(cobranca.data_vencimento)}
+          </div>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+            diasAtraso > 30 ? 'bg-red-100 text-red-800' :
+            diasAtraso > 0 ? 'bg-yellow-100 text-yellow-800' :
+            'bg-green-100 text-green-800'
+          }`}>
+            {diasAtraso > 0 ? `${diasAtraso} dias` : 'No prazo'}
+          </span>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+          Clique para simular
+        </td>
+      </tr>
+    );
+  };
+
+  return (
+    <div className="max-w-full mx-auto p-6">
+      {/* Header */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8 mb-8">
+        <div className="flex items-center mb-2">
+          <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
+            <Calculator className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800 mb-1">
+              Simulação de Parcelamento
+            </h1>
+            <p className="text-gray-600">
+              Simule e envie propostas de parcelamento personalizadas
+            </p>
           </div>
         </div>
 
         {/* Estatísticas */}
         {estatisticas && (
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mt-6">
             <div className="bg-blue-50 rounded-lg p-4">
               <div className="text-2xl font-bold text-blue-600">
                 {estatisticas.total_simulacoes}
@@ -388,256 +502,148 @@ export function SimulacaoParcelamento() {
             </div>
           </div>
         )}
+      </div>
 
-        {/* Filtros */}
-        <div className="bg-gray-50 rounded-lg p-6 mb-6">
-          <div className="flex items-center mb-4">
-            <Filter className="w-5 h-5 text-gray-600 mr-2" />
-            <h3 className="text-lg font-semibold text-gray-800">
-              Filtros e Busca
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Controles e Filtros */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          {/* Busca */}
+          <div className="flex-1 flex items-center bg-gray-50 rounded-lg px-4 py-2 border border-gray-200">
+            <Search className="w-5 h-5 text-gray-400 mr-2" />
             <input
               type="text"
-              value={filtros.cnpj || ""}
-              onChange={(e) => setFiltros({ ...filtros, cnpj: e.target.value })}
-              placeholder="CNPJ/CPF"
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por cliente, CNPJ ou CPF..."
+              className="flex-1 bg-transparent outline-none text-gray-800"
             />
+          </div>
 
-            <select
-              value={filtros.status_proposta || ""}
-              onChange={(e) =>
-                setFiltros({ ...filtros, status_proposta: e.target.value })
-              }
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+          {/* Controles de Visualização */}
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setVisualizacao("cards")}
+                className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  visualizacao === "cards"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                <Grid3X3 className="w-4 h-4 mr-2" />
+                Cards
+              </button>
+              <button
+                onClick={() => setVisualizacao("lista")}
+                className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  visualizacao === "lista"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                <List className="w-4 h-4 mr-2" />
+                Lista
+              </button>
+            </div>
+
+            <button
+              onClick={exportarDados}
+              className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
             >
-              <option value="">Todos os Status</option>
-              <option value="enviada">Enviada</option>
-              <option value="aceita">Aceita</option>
-              <option value="recusada">Recusada</option>
-              <option value="expirada">Expirada</option>
-            </select>
+              <Download className="w-4 h-4 mr-2" />
+              Exportar
+            </button>
 
-            <input
-              type="date"
-              value={filtros.data_inicio || ""}
-              onChange={(e) =>
-                setFiltros({ ...filtros, data_inicio: e.target.value })
-              }
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-            />
-
-            <input
-              type="text"
-              value={filtros.enviado_por || ""}
-              onChange={(e) =>
-                setFiltros({ ...filtros, enviado_por: e.target.value })
-              }
-              placeholder="Enviado por"
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-            />
+            <button
+              onClick={carregarDados}
+              disabled={carregando}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${carregando ? "animate-spin" : ""}`}
+              />
+              Atualizar
+            </button>
           </div>
         </div>
 
-        {/* Tabela de Cobranças para Simulação */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            Cobranças Disponíveis para Parcelamento
-          </h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cliente
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    CNPJ/CPF
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor Original
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor Atualizado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Dias Atraso
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {carregando ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center">
-                      <div className="flex items-center justify-center">
-                        <RefreshCw className="w-6 h-6 animate-spin text-green-600 mr-2" />
-                        Carregando cobranças...
-                      </div>
-                    </td>
-                  </tr>
-                ) : cobrancas.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-6 py-4 text-center text-gray-500"
-                    >
-                      Nenhuma cobrança disponível para parcelamento
-                    </td>
-                  </tr>
-                ) : (
-                  cobrancas.slice(0, 20).map((cobranca) => (
-                    <tr key={cobranca.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {cobranca.cliente}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {formatarCNPJCPF(cobranca.cnpj || cobranca.cpf || "")}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {formatarMoeda(cobranca.valor_original)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-red-600">
-                          {formatarMoeda(
-                            cobranca.valor_atualizado || cobranca.valor_original
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {cobranca.dias_em_atraso || 0} dias
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => abrirModalSimular(cobranca)}
-                          className="text-green-600 hover:text-green-900"
-                          title="Simular parcelamento"
-                        >
-                          <Calculator className="w-4 h-4" />
-                        </button>
-                      </td>
+        {/* Informações */}
+        <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+          <span>
+            Mostrando {cobrancasFiltradas.length} de {cobrancas.length} cobranças disponíveis para parcelamento
+          </span>
+          <span>
+            Clique em uma cobrança para simular parcelamento
+          </span>
+        </div>
+      </div>
+
+      {/* Conteúdo Principal */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+        {carregando ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <RefreshCw className="w-12 h-12 animate-spin text-green-600 mx-auto mb-4" />
+              <p className="text-gray-600">Carregando cobranças...</p>
+            </div>
+          </div>
+        ) : cobrancasFiltradas.length === 0 ? (
+          <div className="text-center py-12">
+            <Calculator className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-600 mb-2">
+              Nenhuma cobrança encontrada
+            </h3>
+            <p className="text-gray-500">
+              {busca ? "Tente ajustar os termos de busca" : "Não há cobranças disponíveis para parcelamento"}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Visualização em Cards */}
+            {visualizacao === "cards" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {cobrancasFiltradas.map((cobranca) => (
+                  <CardCobranca key={cobranca.id} cobranca={cobranca} />
+                ))}
+              </div>
+            )}
+
+            {/* Visualização em Lista */}
+            {visualizacao === "lista" && (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Cliente
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Valor Original
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Valor Atualizado
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Vencimento
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status Atraso
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ação
+                      </th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Tabela de Propostas */}
-        <div className="overflow-x-auto">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            Propostas de Parcelamento
-          </h3>
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Data
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cliente
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  CNPJ/CPF
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Parcelas
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Valor Total
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {propostas.map((proposta) => (
-                <tr key={proposta.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {formatarData(proposta.created_at!)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {(proposta as any).cobrancas_franqueados?.cliente}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {formatarCNPJCPF(proposta.cnpj_unidade)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {(proposta as any).simulacoes_parcelamento
-                        ?.quantidade_parcelas || "N/A"}
-                      x
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-blue-600">
-                      {formatarMoeda(
-                        (proposta as any).simulacoes_parcelamento
-                          ?.valor_total_parcelamento || 0
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      {getStatusIcon(proposta.status_proposta)}
-                      <span
-                        className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
-                          proposta.status_proposta
-                        )}`}
-                      >
-                        {proposta.status_proposta.toUpperCase()}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => abrirModalVisualizar(proposta)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Visualizar proposta"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      {proposta.status_proposta === "enviada" && (
-                        <button
-                          onClick={() => abrirModalEnviar(proposta)}
-                          className="text-green-600 hover:text-green-900"
-                          title="Reenviar proposta"
-                        >
-                          <Send className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {cobrancasFiltradas.map((cobranca) => (
+                      <LinhaCobranca key={cobranca.id} cobranca={cobranca} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Modal de Simulação */}
