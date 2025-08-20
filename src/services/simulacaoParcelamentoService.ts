@@ -2,7 +2,7 @@
 import { supabase } from "./databaseService";
 import { formatarCNPJCPF } from "../utils/formatters";
 import {
-  SimulacaoParcelamento,
+  ISimulacaoParcelamento,
   ParcelaSimulacao,
   PropostaParcelamento,
   RegistroAceite,
@@ -29,7 +29,7 @@ export class SimulacaoParcelamentoService {
     quantidadeParcelas: number,
     dataPrimeiraParcela: string,
     valorEntrada?: number
-  ): Promise<SimulacaoParcelamento> {
+  ): Promise<ISimulacaoParcelamento> {
     try {
       // Busca dados da cobrança
       const { data: cobranca, error } = await supabase
@@ -126,7 +126,7 @@ export class SimulacaoParcelamentoService {
         );
       }
 
-      const simulacao: SimulacaoParcelamento = {
+      const simulacao: ISimulacaoParcelamento = {
         titulo_id: tituloId,
         // Para cobranças por CPF, preservamos o documento disponível (CPF ou CNPJ)
         cnpj_unidade: (cobranca as any).cnpj || (cobranca as any).cpf,
@@ -152,7 +152,7 @@ export class SimulacaoParcelamentoService {
   /**
    * Salva simulação no banco
    */
-  async salvarSimulacao(simulacao: SimulacaoParcelamento): Promise<string> {
+  async salvarSimulacao(simulacao: ISimulacaoParcelamento): Promise<string> {
     try {
       const { data, error } = await supabase
         .from("simulacoes_parcelamento")

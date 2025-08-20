@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { SimulacaoParcelamentoService } from "../services/simulacaoParcelamentoService";
 import {
-  SimulacaoParcelamento,
+  ISimulacaoParcelamento,
   PropostaParcelamento,
   FiltrosSimulacao,
   EstatisticasParcelamento,
@@ -39,7 +39,7 @@ export function SimulacaoParcelamento() {
     "simular" | "visualizar" | "enviar" | null
   >(null);
   const [cobrancaSelecionada, setCobrancaSelecionada] = useState<any>(null);
-  const [simulacao, setSimulacao] = useState<SimulacaoParcelamento | null>(
+  const [simulacao, setSimulacao] = useState<ISimulacaoParcelamento | null>(
     null
   );
   const [formSimulacao, setFormSimulacao] = useState({

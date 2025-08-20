@@ -1,4 +1,4 @@
-export interface SimulacaoParcelamento {
+export interface ISimulacaoParcelamento {
   id?: string;
   titulo_id: string;
   cnpj_unidade: string;
