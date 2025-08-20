@@ -733,7 +733,8 @@ export function SimulacaoParcelamento() {
         )}
       </div>
 
-      {/* Modal de Simulação */}
+      <>
+        {/* Modal de Simulação */}
       {modalAberto === "simular" && cobrancasParaSimular.length > 0 && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -1129,11 +1130,11 @@ export function SimulacaoParcelamento() {
                         ?.valor_total_parcelamento || 0
                     )}
                   </div>
-                  <div className="text-sm text-gray-600">
-                    Valor Total da Proposta
-                  </div>
-            <>
-              <div className="flex items-center justify-between mb-6">
+        {modalAberto === 'simular' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <>
+                <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold">Detalhes da Simulação</h3>
                 <button
                   onClick={() => setModalVisualizacao(false)}
@@ -1220,93 +1221,94 @@ export function SimulacaoParcelamento() {
                     <div>
                       <span className="text-gray-600">Total Parcelamento:</span>
                       <p className="font-medium text-blue-600">{formatarMoeda(simulacaoAtual.valor_total_parcelamento)}</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Número de Parcelas *
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const novoValor = Math.max(2, quantidadeParcelas - 1);
+                {/* Resultado da Simulação */}
+                {simulacao && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                    <h4 className="text-lg font-semibold text-green-800 mb-4">Resultado da Simulação</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Valor Original:</span>
+                        <p className="text-lg font-bold text-gray-800">{formatarMoeda(simulacao.valor_original)}</p>
+        {/* Modal de Visualização */}
+        {modalAberto === 'visualizar' && propostaSelecionada && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold">Detalhes da Proposta</h3>
+                <button onClick={fecharModal} className="text-gray-500 hover:text-gray-700">✕</button>
+              </div>
+              
+              <div className="space-y-6">
+                {/* Informações da Proposta */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {formatarMoeda((propostaSelecionada as any).simulacoes_parcelamento?.valor_total_parcelamento || 0)}
                     </div>
-                    <div>
-                      <span className="text-gray-600">Juros Total:</span>
-                      <p className="font-medium text-purple-600">
-                        {formatarMoeda(simulacaoAtual.valor_total_parcelamento - simulacaoAtual.valor_atualizado)}
-                      </p>
+                    <div className="text-sm text-gray-600">Valor Total</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-green-600">
+                      {formatarMoeda((propostaSelecionada as any).simulacoes_parcelamento?.valor_entrada || 0)}
                     </div>
+                    <div className="text-sm text-gray-600">Entrada</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {(propostaSelecionada as any).simulacoes_parcelamento?.quantidade_parcelas || 0}x
+                    </div>
+                    <div className="text-sm text-gray-600">Parcelas</div>
                   </div>
                 </div>
-              </div>
-            </>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Envio */}
-      {modalAberto === "enviar" && propostaSelecionada && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold">Enviar Proposta</h3>
-              <button
-                onClick={fecharModal}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-medium text-blue-800 mb-2">
-                  Resumo da Proposta:
-                </h4>
-                <div className="space-y-1 text-sm text-blue-700">
-                  <p>
-                    Cliente:{" "}
-                    {(propostaSelecionada as any).cobrancas_franqueados?.cliente}
-                  </p>
-                  <p>
-                    Parcelas:{" "}
-                    {(propostaSelecionada as any).simulacoes_parcelamento
-                      ?.quantidade_parcelas || "N/A"}
-                    x
-                  </p>
-                  <p>
-                    Total:{" "}
-                    {formatarMoeda(
-                      (propostaSelecionada as any).simulacoes_parcelamento
-                        ?.valor_total_parcelamento || 0
+                        ))}
+                {/* Status da Proposta */}
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-blue-800">Status:</span>
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(propostaSelecionada.status_proposta)}`}>
+                      {propostaSelecionada.status_proposta.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-sm text-blue-700">
+                    <p>Enviado em: {formatarData(propostaSelecionada.created_at)}</p>
+                    <p>Por: {propostaSelecionada.enviado_por}</p>
+                    {propostaSelecionada.aceito_em && (
+                      <p>Aceito em: {formatarData(propostaSelecionada.aceito_em)}</p>
                     )}
-                  </p>
+                  </div>
                 </div>
+                      <button
+                {/* Cronograma */}
+                {(propostaSelecionada as any).simulacoes_parcelamento?.parcelas && (
+                  <div>
+                    <h5 className="font-medium text-gray-800 mb-3">Cronograma de Parcelas:</h5>
+                    <div className="max-h-40 overflow-y-auto">
+                      {(propostaSelecionada as any).simulacoes_parcelamento.parcelas.map((parcela: any, index: number) => (
+                        <div key={index} className="flex justify-between items-center p-2 border-b border-gray-200">
+                          <span>Parcela {parcela.numero}</span>
+                          <span>{formatarData(parcela.data_vencimento)}</span>
+                          <span className="font-medium">{formatarMoeda(parcela.valor)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-
-              <div className="space-y-3">
-                <button
-                  onClick={enviarWhatsApp}
-                  disabled={enviandoWhatsApp}
-                  className="w-full flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                >
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  {enviandoWhatsApp ? "Enviando..." : "Enviar via WhatsApp"}
-                </button>
-
-                <button
-                  onClick={enviarEmail}
-                  disabled={enviandoEmail}
-                  className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  <Mail className="w-4 h-4 mr-2" />
-                  {enviandoEmail ? "Enviando..." : "Enviar via Email"}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex space-x-3 mt-6">
-              <button
-                onClick={fecharModal}
-                className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-              >
-                Fechar
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </>
     </div>
   );
 }
