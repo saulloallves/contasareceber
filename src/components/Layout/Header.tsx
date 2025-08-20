@@ -5,9 +5,7 @@ import { alertasService } from "../../services/alertasService";
 import { NotificationsDropdown } from "./NotificationsDropdown";
 import { UserAccountDropdown } from "./UserAccountDropdown";
 import { supabase } from "../../lib/supabaseClient";
-
-const LOGO_URL =
-  "https://raw.githubusercontent.com/saulloallves/contasareceber/refs/heads/main/src/assets/logo-header.png";
+import logoheader from "../../assets/logo cresci-header.png";
 
 interface HeaderProps {
   user?: {
@@ -103,13 +101,10 @@ export function Header({ user }: HeaderProps) {
     <header className="bg-white border-b border-gray-200 px-6 py-3 shadow-sm">
       <div className="flex items-center justify-between">
         <div className="flex items-center">
-          <h2 className="text-xl font-bold text-[#222222] mt-4">
-            Contas a Receber -
-          </h2>
           <img
-            src={LOGO_URL}
-            alt="Logo Cresci e Perdi"
-            className="w-20 h-auto ml-1"
+            src={logoheader}
+            alt="Logo Cresci e Perdi Header"
+            className="w-[180px] h-auto"
           />
         </div>
 

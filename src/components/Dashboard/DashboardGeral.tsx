@@ -2,8 +2,10 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   TrendingUp, TrendingDown, Users, AlertTriangle, CheckCircle,
-  RefreshCw, Clock, Mail, MessageSquare, Activity,
-  FileText, Calculator, Building2, Calendar, Zap,
+  RefreshCw, Clock, Mail, MessageSquare,
+  Calculator, Building2, Calendar, Zap,
+  CircleDollarSign,
+  Receipt,
 } from "lucide-react";
 import { DashboardService } from "../../services/dashboardService";
 
@@ -442,7 +444,7 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
             className="flex items-center gap-3 p-4 rounded-xl border border-blue-200 hover:bg-blue-50 transition-colors"
             aria-label="Kanban Cobranças"
           >
-            <Activity className="w-5 h-5 text-blue-600" />
+            <CircleDollarSign className="w-5 h-5 text-blue-600" />
             <span className="text-blue-700 font-medium">Kanban Cobranças</span>
           </button>
           <button
@@ -450,7 +452,7 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
             className="flex items-center gap-3 p-4 rounded-xl border border-emerald-200 hover:bg-emerald-50 transition-colors"
             aria-label="Gestão Cobranças"
           >
-            <FileText className="w-5 h-5 text-emerald-600" />
+            <Receipt className="w-5 h-5 text-emerald-600" />
             <span className="text-emerald-700 font-medium">
               Gestão Cobranças
             </span>

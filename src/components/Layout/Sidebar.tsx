@@ -5,9 +5,7 @@ import {
   Menu, X, Shield, Receipt, CircleDollarSign, Calculator, Users,
   // BarChart3, Calendar, Scale, FileText,
 } from "lucide-react";
-
-const FAVICON_URL =
-  "https://raw.githubusercontent.com/saulloallves/contasareceber/refs/heads/main/src/assets/favicon.png";
+import icon from "../../assets/cabeca.png";
 
 interface SidebarProps {
   activeTab: string;
@@ -54,16 +52,16 @@ export function Sidebar({
       <div className="flex items-center justify-between p-4 border-b border-gray-700">
         {!collapsed && (
           <div className="flex items-center">
-            <div className="w-12 h-auto rounded-lg flex items-center justify-center shadow-lg">
-              <img src={FAVICON_URL} alt="Logo" className="w-12 h-auto" />
+            <div className="w-[3em] h-auto rounded-lg flex items-center justify-center shadow-lg">
+              <img src={icon} alt="Icone Girafa" />
             </div>
             <div className="ml-3">
-              <h1 className="text-lg font-bold text-white">Cresci e Perdi</h1>
-              <p className="text-xs text-gray-400">Sistema de Cobrança</p>
+              <h1 className="text-base font-bold text-white">Gestor Financeiro CP</h1>
+              <p className="text-[10px] text-center text-gray-400">Sistema Automático de Cobranças</p>
             </div>
           </div>
         )}
-        <button onClick={() => setCollapsed(!collapsed)} className="p-2 rounded-lg hover:bg-gray-700 transition-colors hidden lg:block" >
+        <button onClick={() => setCollapsed(!collapsed)} className="p-1 rounded-lg hover:bg-gray-700 transition-colors hidden lg:block" >
           {collapsed ? (
             <ChevronRight className="w-5 h-5 text-gray-300" />
           ) : (
@@ -180,7 +178,7 @@ export function Sidebar({
               <div className="flex items-center justify-between p-4 border-b border-gray-700">
                 <div className="flex items-center">
                   <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-                    <img src={FAVICON_URL} alt="Logo" />
+                    <img src={icon} alt="Logo" />
                   </div>
                   <div className="ml-3">
                     <h1 className="text-lg font-bold text-white">
