@@ -1294,6 +1294,38 @@ $$;
 ALTER FUNCTION "public"."limpar_sessoes_expiradas"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."marcar_cobrancas_quitadas"("p_importacao_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    AS $$DECLARE
+  quitadas_count integer;
+  updated_ids uuid[];
+BEGIN
+  -- A lógica central: atualiza para 'quitado' todas as cobranças em aberto
+  -- que NÃO foram processadas na importação atual (identificada por p_importacao_id).
+  WITH updated_rows AS (
+    UPDATE public.cobrancas_franqueados
+    SET
+      status = 'quitado'
+    WHERE
+      (status = 'em_aberto' OR status = 'parcialmente_pago')
+      AND (importacao_id_fk IS NULL OR importacao_id_fk <> p_importacao_id)
+    RETURNING id
+  )
+  SELECT count(*), array_agg(id) INTO quitadas_count, updated_ids FROM updated_rows;
+
+  -- Retorna um objeto JSON para o n8n. Isso permite que você logue o resultado
+  -- e até mesmo atualize seu log de importação com o número de cobranças quitadas.
+  RETURN jsonb_build_object(
+    'sucesso', true,
+    'mensagem', 'Processo de conciliação finalizado.',
+    'registros_quitados', quitadas_count
+  );
+END;$$;
+
+
+ALTER FUNCTION "public"."marcar_cobrancas_quitadas"("p_importacao_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."processar_acionamento_juridico_automatico"() RETURNS integer
     LANGUAGE "plpgsql"
     AS $$
@@ -2586,6 +2618,7 @@ CREATE TABLE IF NOT EXISTS "public"."cobrancas_franqueados" (
     "notificacao_automatica_email" "jsonb" DEFAULT '{"3": false, "7": false, "15": false, "30": false}'::"jsonb",
     "cpf" "text",
     "franqueado_id_fk" "uuid",
+    "importacao_id_fk" "uuid",
     CONSTRAINT "cobrancas_doc_presente_chk" CHECK ((("cnpj" IS NOT NULL) OR ("cpf" IS NOT NULL))),
     CONSTRAINT "cobrancas_franqueados_nivel_criticidade_check" CHECK (("nivel_criticidade" = ANY (ARRAY['normal'::"text", 'grave'::"text", 'critico'::"text", 'juridico'::"text"])))
 );
@@ -3190,7 +3223,8 @@ CREATE TABLE IF NOT EXISTS "public"."importacoes_planilha" (
     "created_at" timestamp with time zone DEFAULT "now"(),
     "novos_registros" integer,
     "registros_atualizados" integer,
-    "total_registros" integer
+    "total_registros" integer,
+    "registros_quitados" integer DEFAULT 0
 );
 
 
@@ -4102,6 +4136,10 @@ CREATE UNIQUE INDEX "idx_cobrancas_hash_titulo" ON "public"."cobrancas_franquead
 
 
 
+CREATE INDEX "idx_cobrancas_importacao_id_fk" ON "public"."cobrancas_franqueados" USING "btree" ("importacao_id_fk");
+
+
+
 CREATE INDEX "idx_cobrancas_referencia" ON "public"."cobrancas_franqueados" USING "btree" ("referencia_importacao");
 
 
@@ -4620,6 +4658,8 @@ CREATE OR REPLACE TRIGGER "trigger_processar_resultado_reuniao" AFTER UPDATE ON 
 
 CREATE OR REPLACE TRIGGER "trigger_resolver_acionamento_juridico" AFTER UPDATE ON "public"."cobrancas_franqueados" FOR EACH ROW EXECUTE FUNCTION "public"."trigger_resolver_acionamento"();
 
+ALTER TABLE "public"."cobrancas_franqueados" DISABLE TRIGGER "trigger_resolver_acionamento_juridico";
+
 
 
 CREATE OR REPLACE TRIGGER "trigger_risco_cobrancas" AFTER INSERT OR UPDATE ON "public"."cobrancas_franqueados" FOR EACH ROW EXECUTE FUNCTION "public"."processar_evento_risco"();
@@ -4782,6 +4822,11 @@ ALTER TABLE ONLY "public"."eventos_risco"
 
 ALTER TABLE ONLY "public"."eventos_risco"
     ADD CONSTRAINT "eventos_risco_titulo_id_fkey" FOREIGN KEY ("titulo_id") REFERENCES "public"."cobrancas_franqueados"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."cobrancas_franqueados"
+    ADD CONSTRAINT "fk_cobrancas_to_importacao_log" FOREIGN KEY ("importacao_id_fk") REFERENCES "public"."importacoes_planilha"("id") ON DELETE SET NULL;
 
 
 
@@ -5725,6 +5770,12 @@ GRANT ALL ON FUNCTION "public"."increment_template_disparos"() TO "service_role"
 GRANT ALL ON FUNCTION "public"."limpar_sessoes_expiradas"() TO "anon";
 GRANT ALL ON FUNCTION "public"."limpar_sessoes_expiradas"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."limpar_sessoes_expiradas"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."marcar_cobrancas_quitadas"("p_importacao_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."marcar_cobrancas_quitadas"("p_importacao_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."marcar_cobrancas_quitadas"("p_importacao_id" "uuid") TO "service_role";
 
 
 
