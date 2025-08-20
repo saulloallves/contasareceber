@@ -734,12 +734,15 @@ export function SimulacaoParcelamento() {
       </div>
 
       {/* Modal de Simulação */}
-      {modalAberto === "simular" && cobrancaSelecionada && (
+      {modalAberto === "simular" && cobrancasParaSimular.length > 0 && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold">
-                Simular Parcelamento - {cobrancaSelecionada.cliente}
+                {cobrancasParaSimular.length > 1 
+                  ? `Simular Parcelamento - ${cobrancasParaSimular.length} cobranças selecionadas`
+                  : `Simular Parcelamento - ${cobrancasParaSimular[0].cliente}`
+                }
               </h3>
               <button
                 onClick={fecharModal}
@@ -750,51 +753,133 @@ export function SimulacaoParcelamento() {
             </div>
 
             <div className="space-y-6">
-              {/* Informações da Cobrança */}
+              {/* Informações das Cobranças */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <h4 className="font-medium text-gray-800 mb-3">
-                  Dados da Cobrança:
+                  {cobrancasParaSimular.length > 1 
+                    ? `Dados das ${cobrancasParaSimular.length} Cobranças Selecionadas:`
+                    : "Dados da Cobrança:"
+                  }
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600">Cliente:</span>
-                    <p className="font-medium">{cobrancaSelecionada.cliente}</p>
+                
+                {cobrancasParaSimular.length === 1 ? (
+                  // Exibição para uma cobrança
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">Cliente:</span>
+                      <p className="font-medium">{cobrancasParaSimular[0].cliente}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">CNPJ/CPF:</span>
+                      <p className="font-medium">
+                        {formatarCNPJCPF(
+                          cobrancasParaSimular[0].cnpj || cobrancasParaSimular[0].cpf || ""
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Valor Original:</span>
+                      <p className="font-medium">
+                        {formatarMoeda(cobrancasParaSimular[0].valor_original)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Valor Atualizado:</span>
+                      <p className="font-medium text-red-600">
+                        {formatarMoeda(
+                          cobrancasParaSimular[0].valor_atualizado ||
+                            cobrancasParaSimular[0].valor_original
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Vencimento:</span>
+                      <p className="font-medium">
+                        {formatarData(cobrancasParaSimular[0].data_vencimento)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Dias em Atraso:</span>
+                      <p className="font-medium">
+                        {cobrancasParaSimular[0].dias_em_atraso || 0} dias
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-gray-600">CNPJ/CPF:</span>
-                    <p className="font-medium">
-                      {formatarCNPJCPF(
-                        cobrancaSelecionada.cnpj || cobrancaSelecionada.cpf || ""
-                      )}
-                    </p>
+                ) : (
+                  // Exibição para múltiplas cobranças
+                  <div className="space-y-4">
+                    {/* Resumo consolidado */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm bg-white rounded-lg p-4 border">
+                      <div>
+                        <span className="text-gray-600">Cliente:</span>
+                        <p className="font-medium">{cobrancasParaSimular[0].cliente}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">CNPJ/CPF:</span>
+                        <p className="font-medium">
+                          {formatarCNPJCPF(
+                            cobrancasParaSimular[0].cnpj || cobrancasParaSimular[0].cpf || ""
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Total de Cobranças:</span>
+                        <p className="font-medium text-blue-600">
+                          {cobrancasParaSimular.length} cobranças
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Valor Original Total:</span>
+                        <p className="font-medium">
+                          {formatarMoeda(
+                            cobrancasParaSimular.reduce((acc, c) => acc + c.valor_original, 0)
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Valor Atualizado Total:</span>
+                        <p className="font-medium text-red-600">
+                          {formatarMoeda(
+                            cobrancasParaSimular.reduce((acc, c) => 
+                              acc + (c.valor_atualizado || c.valor_original), 0
+                            )
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Maior Atraso:</span>
+                        <p className="font-medium">
+                          {Math.max(...cobrancasParaSimular.map(c => c.dias_em_atraso || 0))} dias
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Lista detalhada das cobranças */}
+                    <div>
+                      <h5 className="font-medium text-gray-700 mb-2">Detalhamento das Cobranças:</h5>
+                      <div className="max-h-40 overflow-y-auto space-y-2">
+                        {cobrancasParaSimular.map((cobranca, index) => (
+                          <div key={cobranca.id} className="flex justify-between items-center p-2 bg-white rounded border text-sm">
+                            <div>
+                              <span className="font-medium">Cobrança {index + 1}</span>
+                              <span className="text-gray-500 ml-2">
+                                (Venc: {formatarData(cobranca.data_vencimento)})
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-medium">
+                                {formatarMoeda(cobranca.valor_atualizado || cobranca.valor_original)}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {cobranca.dias_em_atraso || 0} dias atraso
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-gray-600">Valor Original:</span>
-                    <p className="font-medium">
-                      {formatarMoeda(cobrancaSelecionada.valor_original)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Valor Atualizado:</span>
-                    <p className="font-medium text-red-600">
-                      {formatarMoeda(
-                        cobrancaSelecionada.valor_atualizado ||
-                          cobrancaSelecionada.valor_original
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Vencimento:</span>
-                    <p className="font-medium">
-                      {formatarData(cobrancaSelecionada.data_vencimento)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Dias em Atraso:</span>
-                    <p className="font-medium">
-                      {cobrancaSelecionada.dias_em_atraso || 0} dias
-                    </p>
-                  </div>
+                )}
                 </div>
               </div>
 
