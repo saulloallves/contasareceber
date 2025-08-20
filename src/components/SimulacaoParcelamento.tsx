@@ -1,37 +1,12 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect, useMemo, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, } from "react";
 import {
-  useState,
-  useEffect,
-  useMemo,
-  JSXElementConstructor,
-  Key,
-  ReactElement,
-  ReactNode,
-  ReactPortal,
-} from "react";
-import {
-  Calculator,
-  Send,
-  MessageSquare,
-  Mail,
-  CheckCircle,
-  Clock,
-  FileText,
-  Download,
-  Filter,
-  RefreshCw,
-  Eye,
-  AlertTriangle,
-  X,
-} from "lucide-react";
+  Calculator, Send, MessageSquare, Mail, CheckCircle,
+  Clock, FileText, Download, Filter, RefreshCw,
+  Eye, AlertTriangle, X, } from "lucide-react";
 import { SimulacaoParcelamentoService } from "../services/simulacaoParcelamentoService";
-import {
-  SimulacaoParcelamentoType as SimulacaoParcelamentoType,
-  FiltrosSimulacao,
-  EstatisticasParcelamento,
-  RegistroAceite,
-} from "../types/simulacaoParcelamento";
+import { SimulacaoParcelamentoType as SimulacaoParcelamentoType, FiltrosSimulacao, EstatisticasParcelamento, RegistroAceite, } from "../types/simulacaoParcelamento";
 import { toast } from "react-hot-toast";
 import { cobrancaService } from "../services/cobrancaService";
 import { supabase } from "../lib/supabaseClient";
