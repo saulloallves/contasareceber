@@ -5,7 +5,7 @@ export interface CardCobranca {
   nome_unidade: string;
   cnpj: string;
   cpf?: string;
-  tipo_debito: 'royalties' | 'insumos' | 'aluguel' | 'multa';
+  tipo_debito: 'Franchising - Royalties' | 'Vendas - Vendas' | 'Franchising - Tx de Propagand' | '- Multa/Infração' | 'Franchising - Tx de Franquia';
   valor_total: number;
   data_vencimento_antiga: string;
   data_vencimento_recente: string;
@@ -13,14 +13,13 @@ export interface CardCobranca {
   ultima_acao: string;
   data_ultima_acao: string;
   responsavel_atual: string;
-  dias_parado: number;
   observacoes?: string;
   criticidade: 'normal' | 'atencao' | 'critica';
   data_entrada_etapa: string;
   // Campos opcionais para cobranças individuais
   descricao_cobranca?: string;
   valor_recebido?: number;
-  quantidade_titulos?: number;
+  quantidade_titulos: number;
   created_at?: string;
   updated_at?: string;
   valor_original?: number; // Valor sem juros/multa
@@ -63,7 +62,6 @@ export interface EstatisticasKanban {
   total_cards: number;
   cards_criticos: number;
   inadimplentes_perda: number;
-  tempo_medio_resolucao: number;
   valor_total_fluxo: number;
   // Novos campos para clarificar totais
   // Soma do valor_original de todas as cobranças com status diferente de 'quitado'
@@ -71,7 +69,6 @@ export interface EstatisticasKanban {
   // Soma do valor_atualizado (ou valor_original se não houver atualizado) das cobranças em aberto
   valor_total_atualizado_aberto?: number;
   distribuicao_por_status: Record<string, number>;
-  tempo_medio_por_etapa: Record<string, number>;
 }
 
 export interface AcaoRapida {

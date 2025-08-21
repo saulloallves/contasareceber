@@ -25,7 +25,6 @@ type UnitKanbanCard = {
   valor_original?: number;
   status_atual: string;
   responsavel_atual: string;
-  dias_parado: number;
   charges: CardCobranca[];
   observacoes?: string;
 };
@@ -926,7 +925,6 @@ export function KanbanCobranca() {
           valor_original: 0,
           status_atual: card.status_atual,
           responsavel_atual: card.responsavel_atual,
-          dias_parado: card.dias_parado,
           charges: [],
           observacoes: card.observacoes,
         };
@@ -939,9 +937,6 @@ export function KanbanCobranca() {
         new Date(card.data_vencimento_antiga) < new Date(unitMap[chave].data_vencimento_antiga)
       ) {
         unitMap[chave].data_vencimento_antiga = card.data_vencimento_antiga;
-      }
-      if (card.dias_parado > unitMap[chave].dias_parado) {
-        unitMap[chave].dias_parado = card.dias_parado;
       }
       if (card.observacoes) {
         unitMap[chave].observacoes = card.observacoes;
@@ -1145,30 +1140,27 @@ export function KanbanCobranca() {
   };
 
   const salvarObservacao = async () => {
-    if (!observacaoEditando.trim()) return;
-
     setProcessando(true);
     try {
-      const cardId = unitSelecionada?.codigo_unidade || cobrancaSelecionada?.id;
-      if (cardId) {
+      // Determina o ID correto para unidade (CNPJ) ou cobrança individual (UUID)
+      const idParaSalvar = aba === "unidade"
+        ? unitSelecionada?.cnpj
+        : cobrancaSelecionada?.id;
+
+      if (idParaSalvar) {
         await kanbanService.atualizarObservacao(
-          cardId,
-          observacaoEditando,
+          idParaSalvar,
+          observacaoEditando.trim(), // Salva o texto (pode ser vazio para apagar)
           "usuario_atual",
           aba === "unidade"
         );
-        carregarDados();
+        toast.success("Observação salva com sucesso!");
+        await carregarDados(); // Recarrega os dados para atualizar a UI
         limparEstadosModal();
       }
     } catch (error) {
       console.error("Erro ao salvar observação:", error);
-      toast.error(`Erro ao salvar observação: ${error}`, {
-        duration: 5000,
-        style: {
-          background: "#ef4444",
-          color: "#fff",
-        },
-      });
+      toast.error(`Erro ao salvar observação: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -2139,45 +2131,57 @@ _Mensagem Automática do Sistema_
           onDragEnd={aba === "unidade" ? onDragEndUnidade : onDragEndIndividual}
         >
           <div className="w-full overflow-x-auto">
-            <div className="flex flex-row gap-6 min-w-fit">
+            <div className="flex flex-row gap-10 min-w-fit">
               {colunas
                 .filter((col) => col.ativa)
                 .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
                 .map((coluna) => (
-                  <div key={coluna.id} className="bg-gray-50 rounded-lg p-4 min-w-[320px] w-[320px] flex-shrink-0">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold text-gray-800 text-sm">
-                        {coluna.nome}
-                      </h3>
+                  <Droppable key={coluna.id} droppableId={coluna.id}>
+                    {(provided, snapshot) => (
+                      // ===== CORREÇÃO PRINCIPAL =====
+                      // As propriedades `ref` e `droppableProps` foram movidas para este container principal.
+                      // Este é o elemento raiz retornado e agora a biblioteca o reconhecerá corretamente.
                       <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: coluna.cor }}
-                      ></div>
-                    </div>
-
-                    <Droppable droppableId={coluna.id}>
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className={`min-h-[200px] transition-colors ${
-                            snapshot.isDraggingOver ? "bg-blue-50" : ""
-                          }`}
-                        >
-                          {aba === "unidade"
-                            ? getUnitCardsByColuna(coluna.id).map((unit, index) =>
-                                renderCardUnidade(unit, index)
-                              )
-                            : cards
-                                .filter((card) => card.status_atual === coluna.id)
-                                .map((card, index) =>
-                                  renderCardIndividual(card, index)
-                                )}
-                          {provided.placeholder}
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`p-4 min-w-[320px] w-[320px] flex flex-col rounded-lg bg-gray-50 border-2 transition-colors duration-200 ${
+                          snapshot.isDraggingOver
+                        }`}
+                        style={{
+                          borderColor: snapshot.isDraggingOver
+                            ? '#18429e'
+                            : coluna.cor,
+                          backgroundColor: snapshot.isDraggingOver
+                            ? '#18429E1A'
+                            : '',
+                        }}
+                      >
+                        {/* O Header continua aqui, normalmente */}
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="font-semibold text-gray-800 text-sm">
+                            {coluna.nome}
+                          </h3>
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: coluna.cor }}
+                          ></div>
                         </div>
-                      )}
-                    </Droppable>
-                  </div>
+
+                        {/* Os cards e o placeholder agora são filhos diretos da área de soltura,
+                            sem um div intermediário, para garantir o funcionamento. */}
+                        {aba === "unidade"
+                          ? getUnitCardsByColuna(coluna.id).map((unit, index) =>
+                              renderCardUnidade(unit, index)
+                            )
+                          : cards
+                              .filter((card) => card.status_atual === coluna.id)
+                              .map((card, index) =>
+                                renderCardIndividual(card, index)
+                              )}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
                 ))}
             </div>
           </div>
@@ -2328,7 +2332,7 @@ _Mensagem Automática do Sistema_
       {/* Modal de Detalhes */}
       {modalAberto === "detalhes" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full h-auto overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center">
                 {unitSelecionada ? (
@@ -2340,8 +2344,8 @@ _Mensagem Automática do Sistema_
                   </>
                 ) : (
                   <>
-                    <DollarSign className="w-6 h-6 text-green-600 mr-2" />
-                    <h3 className="text-lg font-semibold text-green-800">
+                    <DollarSign className="w-6 h-6 text-blue-600 mr-2" />
+                    <h3 className="text-lg font-semibold text-blue-800">
                       Detalhes da Cobrança
                     </h3>
                   </>
@@ -2406,6 +2410,17 @@ _Mensagem Automática do Sistema_
                     </div>
                   </div>
                 </div>
+                {/* Observações da Unidade */}
+                {unitSelecionada.observacoes && unitSelecionada.observacoes.trim() !== "" && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-yellow-800 mb-2">
+                      Observações
+                    </h4>
+                    <p className="text-yellow-700 text-sm whitespace-pre-wrap">
+                      {unitSelecionada.observacoes}
+                    </p>
+                  </div>
+                )}
 
                 {/* Lista de Cobranças da Unidade */}
                 {todasCobrancasUnidade.length > 0 && (
@@ -2450,18 +2465,6 @@ _Mensagem Automática do Sistema_
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
-
-                {/* Observações da Unidade */}
-                {unitSelecionada.observacoes && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-yellow-800 mb-2">
-                      Observações
-                    </h4>
-                    <p className="text-yellow-700 text-sm">
-                      {unitSelecionada.observacoes}
-                    </p>
                   </div>
                 )}
 
@@ -2585,6 +2588,17 @@ _Mensagem Automática do Sistema_
                     </div>
                   </div>
                 </div>
+                {/* Observações da Cobrança Individual */}
+                {cobrancaSelecionada.observacoes && cobrancaSelecionada.observacoes.trim() !== "" && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-yellow-800 mb-2">
+                      Observações
+                    </h4>
+                    <p className="text-yellow-700 text-sm whitespace-pre-wrap">
+                      {cobrancaSelecionada.observacoes}
+                    </p>
+                  </div>
+                )}
 
                 {/* Botões de Ação */}
                 <div className="bg-white border-t border-gray-200 pt-4">
@@ -2676,7 +2690,7 @@ _Mensagem Automática do Sistema_
             <div className="flex space-x-3 mt-4">
               <button
                 onClick={salvarObservacao}
-                disabled={processando || !observacaoEditando.trim()}
+                disabled={processando}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 <Save className="w-4 h-4 mr-2 inline" />

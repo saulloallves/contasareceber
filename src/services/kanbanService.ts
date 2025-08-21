@@ -24,13 +24,62 @@ export class KanbanService {
     try {
       // Colunas do Kanban na ordem e nomes definidos pelo cliente
       return [
-        { id: "em_aberto", nome: "📥 Em Aberto", descricao: "Não notificado", cor: "#6B7280", ordem: 1, ativa: true },
-        { id: "em_negociacao", nome: "🤝 Em Negociação", descricao: "Negociando acordo", cor: "#F59E0B", ordem: 2, ativa: true },
-        { id: "parcelado", nome: "🗂️ Parcelado", descricao: "Cobrança parcelada", cor: "#6366F1", ordem: 3, ativa: true },
-        { id: "quitado", nome: "✅ Quitado", descricao: "Totalmente quitado", cor: "#059669", ordem: 4, ativa: true },
-        { id: "juridico", nome: "⚖️ Jurídico", descricao: "Cobrança no jurídico", cor: "#B91C1C", ordem: 5, ativa: true },
-        { id: "inadimplencia", nome: "❌ Inadimplência", descricao: "Situação crítica", cor: "#7F1D1D", ordem: 6, ativa: true },
-        { id: "perda", nome: "🚫 Perda", descricao: "Cobrança perdida", cor: "#9CA3AF", ordem: 7, ativa: true },
+        {
+          id: "em_aberto",
+          nome: "📥 Atrasadas",
+          descricao: "Valor atrasado em aberto",
+          cor: "#6B7280",
+          ordem: 1,
+          ativa: true,
+        },
+        {
+          id: "em_negociacao",
+          nome: "🤝 Negociando",
+          descricao: "Negociando",
+          cor: "#F59E0B",
+          ordem: 2,
+          ativa: true,
+        },
+        {
+          id: "parcelado",
+          nome: "🗂️ Parcelado",
+          descricao: "Cobrança parcelada",
+          cor: "#7031AF",
+          ordem: 3,
+          ativa: true,
+        },
+        {
+          id: "quitado",
+          nome: "✅ Quitado",
+          descricao: "Totalmente quitado",
+          cor: "#2EBF11",
+          ordem: 4,
+          ativa: true,
+        },
+        {
+          id: "juridico",
+          nome: "⚖️ Jurídico",
+          descricao: "Cobrança no jurídico",
+          cor: "#31A3FB",
+          ordem: 5,
+          ativa: true,
+        },
+        {
+          id: "inadimplencia",
+          nome: "❌ Inadimplência",
+          descricao: "Situação crítica a mais de 30",
+          cor: "#8d4925",
+          ordem: 6,
+          ativa: true,
+        },
+        {
+          id: "perda",
+          nome: "🚫 Perda",
+          descricao: "Cobrança perdida a mais de 180 dias",
+          cor: "#FF0A0E",
+          ordem: 7,
+          ativa: true,
+        },
       ];
     } catch (error) {
       console.error("Erro ao buscar colunas:", error);
@@ -59,6 +108,7 @@ export class KanbanService {
           tipo_cobranca,
           descricao,
           created_at,
+          observacoes,
           unidade_id_fk,
           unidades_franqueadas!unidade_id_fk (
             id,
@@ -123,24 +173,21 @@ export class KanbanService {
           cnpj: cobranca.cnpj,
           tipo_debito: this.determinarTipoDebito([cobranca]),
           valor_total: valorAtual,
-          valor_original: cobranca.valor_original || 0, // <-- aqui
+          valor_original: cobranca.valor_original || 0,
           data_vencimento_antiga: cobranca.data_vencimento,
           data_vencimento_recente: cobranca.data_vencimento,
           status_atual: this.determinarStatusKanban(cobranca.status),
           ultima_acao: this.determinarUltimaAcao(cobranca),
           data_ultima_acao: cobranca.created_at || new Date().toISOString(),
           responsavel_atual: this.determinarResponsavel(cobranca.status),
-          dias_parado: this.calcularDiasParado(
-            cobranca.created_at || new Date().toISOString()
-          ),
           criticidade: this.determinarCriticidadeIndividual(
-            valorAtual,
             cobranca.data_vencimento
           ),
           data_entrada_etapa: cobranca.created_at || new Date().toISOString(),
           descricao_cobranca: cobranca.descricao,
           valor_recebido: cobranca.valor_recebido || 0,
           quantidade_titulos: 1,
+          observacoes: cobranca.observacoes || "",
         };
         return card;
       })
@@ -154,7 +201,10 @@ export class KanbanService {
     cobrancas: any[],
     filtros: FiltrosKanban
   ): CardCobranca[] {
-    const cardsMap = new Map<string, CardCobranca & { _statusList?: string[] }>();
+    const cardsMap = new Map<
+      string,
+      CardCobranca & { _statusList?: string[], _observacoesList?: string[] }
+    >();
     cobrancas.forEach((cobranca) => {
       // Agrupa por CNPJ se existir, senão por CPF
       const chaveUnidade = cobranca.cnpj || cobranca.cpf;
@@ -167,7 +217,7 @@ export class KanbanService {
           nome_unidade: unidade?.nome_unidade || cobranca.cliente,
           cnpj: cobranca.cnpj || "",
           cpf: cobranca.cpf || "",
-          tipo_debito: "royalties",
+          tipo_debito: "Franchising - Royalties",
           valor_total: 0,
           valor_original: 0,
           data_vencimento_antiga: cobranca.data_vencimento,
@@ -181,26 +231,32 @@ export class KanbanService {
           data_entrada_etapa: cobranca.created_at || new Date().toISOString(),
           quantidade_titulos: 0,
           _statusList: [],
+          _observacoesList: [],
+          observacoes: "",
         } as any);
       }
       const card = cardsMap.get(chaveUnidade)!;
       const valorAtual = cobranca.valor_atualizado || cobranca.valor_original;
       card.valor_total += valorAtual;
-      card.valor_original = (card.valor_original || 0) + (cobranca.valor_original || 0);
+      card.valor_original =
+        (card.valor_original || 0) + (cobranca.valor_original || 0);
       card.quantidade_titulos = (card.quantidade_titulos || 0) + 1;
       if (
-        new Date(cobranca.data_vencimento) < new Date(card.data_vencimento_antiga)
+        new Date(cobranca.data_vencimento) <
+        new Date(card.data_vencimento_antiga)
       ) {
         card.data_vencimento_antiga = cobranca.data_vencimento;
       }
       if (
-        new Date(cobranca.data_vencimento) > new Date(card.data_vencimento_recente)
+        new Date(cobranca.data_vencimento) >
+        new Date(card.data_vencimento_recente)
       ) {
         card.data_vencimento_recente = cobranca.data_vencimento;
       }
       // Coletar todos os status individuais
       const statusAtual = this.determinarStatusKanban(cobranca.status);
       card._statusList!.push(statusAtual);
+      card._observacoesList!.push(cobranca.observacoes || "");
       if (new Date(cobranca.created_at) > new Date(card.data_ultima_acao)) {
         card.data_ultima_acao = cobranca.created_at;
         card.ultima_acao = this.determinarUltimaAcao(cobranca);
@@ -217,14 +273,19 @@ export class KanbanService {
           statusFinal = "misto";
         }
       }
+      // Observação: pega a primeira observação não vazia (ou vazio se nenhuma)
+      let observacaoFinal = "";
+      if (card._observacoesList && card._observacoesList.length > 0) {
+        observacaoFinal = card._observacoesList.find((obs) => obs && obs.trim() !== "") || "";
+      }
       return {
         ...card,
         tipo_debito: this.determinarTipoDebito(
           cobrancas.filter((c) => (c.cnpj || c.cpf) === (card.cnpj || card.cpf))
         ),
-        dias_parado: this.calcularDiasParado(card.data_ultima_acao),
         criticidade: this.determinarCriticidade(card),
         status_atual: statusFinal,
+        observacoes: observacaoFinal,
         // Garante que codigo_unidade, cnpj e cpf estejam presentes
         codigo_unidade: card.cnpj || card.cpf || "",
         cnpj: card.cnpj || "",
@@ -383,43 +444,47 @@ export class KanbanService {
   }
 
   /**
-   * Atualiza observação de um card
+   * Atualiza observação de um card ou de todas as cobranças de uma unidade
    */
   async atualizarObservacao(
-    cardId: string,
+    id: string, // Pode ser o UUID da cobrança ou o CNPJ da unidade
     observacao: string,
-    usuario: string,
+    _usuario: string, // _usuario para indicar que não será usado diretamente aqui
     agrupadoPorUnidade: boolean = false
   ): Promise<void> {
     try {
       if (agrupadoPorUnidade) {
-        // Para unidades agrupadas, registra na primeira cobrança
-        const { data: cobranca } = await supabase
+        // Se for uma unidade, atualiza a observação em TODAS as cobranças com o mesmo CNPJ
+        console.log(
+          `Atualizando observação para todas as cobranças do CNPJ: ${id}`
+        );
+        const { error } = await supabase
           .from("cobrancas_franqueados")
-          .select("id")
-          .eq("cnpj", cardId)
-          .limit(1)
-          .single();
+          .update({ observacoes: observacao })
+          .eq("cnpj", id); // O 'id' aqui é o CNPJ
 
-        if (cobranca) {
-          await this.tratativasService.registrarObservacao(
-            cobranca.id,
-            usuario,
-            observacao,
-            undefined
+        if (error) {
+          throw new Error(
+            `Erro ao atualizar observações da unidade: ${error.message}`
           );
         }
       } else {
-        // Para cobranças individuais
-        await this.tratativasService.registrarObservacao(
-          cardId,
-          usuario,
-          observacao,
-          undefined
-        );
+        // Se for uma cobrança individual, atualiza apenas ela
+        console.log(`Atualizando observação para a cobrança ID: ${id}`);
+        const { error } = await supabase
+          .from("cobrancas_franqueados")
+          .update({ observacoes: observacao })
+          .eq("id", id); // O 'id' aqui é o UUID
+
+        if (error) {
+          throw new Error(
+            `Erro ao atualizar observação individual: ${error.message}`
+          );
+        }
       }
+      console.log("✅ Observação salva com sucesso!");
     } catch (error) {
-      console.error("Erro ao atualizar observação:", error);
+      console.error("❌ Erro ao atualizar observação:", error);
       throw error;
     }
   }
@@ -455,12 +520,10 @@ export class KanbanService {
         cards_criticos: cards.filter((c) => c.criticidade === "critica").length,
         // cards_parados removido
         inadimplentes_perda: inadimplentesPerda,
-        tempo_medio_resolucao: this.calcularTempoMedioResolucao(cards),
         valor_total_fluxo: cards.reduce((sum, c) => sum + c.valor_total, 0),
         valor_total_original_aberto: totalOriginalAberto,
         valor_total_atualizado_aberto: totalAtualizadoAberto,
         distribuicao_por_status: {},
-        tempo_medio_por_etapa: {},
       };
       cards.forEach((card) => {
         stats.distribuicao_por_status[card.status_atual] =
@@ -473,10 +536,8 @@ export class KanbanService {
         total_cards: 0,
         cards_criticos: 0,
         inadimplentes_perda: 0,
-        tempo_medio_resolucao: 0,
         valor_total_fluxo: 0,
         distribuicao_por_status: {},
-        tempo_medio_por_etapa: {},
       };
     }
   }
@@ -517,7 +578,6 @@ export class KanbanService {
           card.valor_total.toFixed(2),
           card.status_atual,
           card.responsavel_atual,
-          card.dias_parado,
           card.ultima_acao.replace(/,/g, ";"),
           new Date(card.data_ultima_acao).toLocaleDateString("pt-BR"),
           card.criticidade,
@@ -539,10 +599,15 @@ export class KanbanService {
    */
   private determinarTipoDebito(
     cobrancas: any[]
-  ): "royalties" | "insumos" | "aluguel" | "multa" {
-    if (!cobrancas || cobrancas.length === 0) return "royalties";
-
-    const tipos = cobrancas.map((c) => c.tipo_cobranca || "royalties");
+  ):
+    | "Franchising - Royalties"
+    | "Vendas - Vendas"
+    | "Franchising - Tx de Propagand"
+    | "- Multa/Infração"
+    | "Franchising - Tx de Franquia" {
+    const tipos = cobrancas.map(
+      (c) => c.tipo_cobranca || "Franchising - Royalties"
+    );
     const contagem = tipos.reduce(
       (acc: Record<string, number>, tipo: string) => {
         acc[tipo] = (acc[tipo] || 0) + 1;
@@ -555,7 +620,7 @@ export class KanbanService {
       ([, a], [, b]) => (b as number) - (a as number)
     )[0]?.[0];
 
-    return (tipoMaisFrequente as any) || "royalties";
+    return (tipoMaisFrequente as any) || "Franchising - Royalties";
   }
 
   private determinarStatusKanban(statusCobranca: string): string {
@@ -573,7 +638,7 @@ export class KanbanService {
       inadimplencia_critica: "inadimplencia",
     };
     if (!(statusCobranca in mapeamento)) {
-      console.warn('Status desconhecido no Kanban:', statusCobranca);
+      console.warn("Status desconhecido no Kanban:", statusCobranca);
       return statusCobranca; // Retorna o status original, nunca força em_aberto
     }
     return mapeamento[statusCobranca];
@@ -614,19 +679,22 @@ export class KanbanService {
   private determinarCriticidade(
     card: CardCobranca
   ): "normal" | "atencao" | "critica" {
-    if (card.valor_total > 10000 || card.dias_parado > 15) return "critica";
-    if (card.valor_total > 5000 || card.dias_parado > 7) return "atencao";
+    if (
+      card.tipo_debito === "Franchising - Royalties" ||
+      card.quantidade_titulos >= 2
+    )
+      return "critica";
+    if (card.valor_total > 9000) return "atencao";
     return "normal";
   }
 
   private determinarCriticidadeIndividual(
-    valor: number,
     dataVencimento: string
   ): "normal" | "atencao" | "critica" {
     const diasAtraso = this.calcularDiasAtraso(dataVencimento);
 
-    if (valor > 10000 || diasAtraso > 30) return "critica";
-    if (valor > 5000 || diasAtraso > 15) return "atencao";
+    if (diasAtraso > 30) return "critica";
+    if (diasAtraso >= 20) return "atencao";
     return "normal";
   }
 
@@ -652,17 +720,7 @@ export class KanbanService {
       return false;
     if (filtros.criticidade && card.criticidade !== filtros.criticidade)
       return false;
-    if (filtros.dias_parado_min && card.dias_parado < filtros.dias_parado_min)
-      return false;
     return true;
-  }
-
-  private calcularTempoMedioResolucao(cards: CardCobranca[]): number {
-    const cardsComTempo = cards.filter((c) => c.dias_parado > 0);
-    if (cardsComTempo.length === 0) return 0;
-
-    const somaTempos = cardsComTempo.reduce((sum, c) => sum + c.dias_parado, 0);
-    return somaTempos / cardsComTempo.length;
   }
 
   private async registrarMovimentacao(
