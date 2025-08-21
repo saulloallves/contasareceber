@@ -497,32 +497,29 @@ export class KanbanService {
   ): Promise<EstatisticasKanban> {
     try {
       void _agruparPorUnidade;
-      const cards = await this.buscarCards({}, false);
+      // Busca todas as cobranças diretamente do banco, sem agrupamento
       const { data: brutas } = await supabase
         .from("cobrancas_franqueados")
-        .select("valor_original, valor_atualizado, status");
-      const abertas = (brutas || []).filter((c: any) => c.status !== "quitado");
+        .select("valor_original, status");
+      // Considera apenas cobranças realmente em aberto (exclui quitado, perda e inadimplencia)
+      const abertas = (brutas || []).filter(
+        (c: any) => c.status === "em_aberto" || c.status === "parcelado");
       const totalOriginalAberto = abertas.reduce(
         (sum: number, c: any) => sum + (Number(c.valor_original) || 0),
         0
       );
-      const totalAtualizadoAberto = abertas.reduce(
-        (sum: number, c: any) =>
-          sum + (Number(c.valor_atualizado ?? c.valor_original) || 0),
-        0
-      );
-      // Nova contagem para inadimplencia/perda
+      // O restante permanece igual
+      const cards = await this.buscarCards({}, false);
       const inadimplentesPerda = cards.filter(
         (c) => c.status_atual === "inadimplencia" || c.status_atual === "perda"
       ).length;
       const stats: EstatisticasKanban = {
         total_cards: cards.length,
         cards_criticos: cards.filter((c) => c.criticidade === "critica").length,
-        // cards_parados removido
         inadimplentes_perda: inadimplentesPerda,
         valor_total_fluxo: cards.reduce((sum, c) => sum + c.valor_total, 0),
         valor_total_original_aberto: totalOriginalAberto,
-        valor_total_atualizado_aberto: totalAtualizadoAberto,
+        valor_total_atualizado_aberto: 0, // não usado
         distribuicao_por_status: {},
       };
       cards.forEach((card) => {
@@ -620,7 +617,7 @@ export class KanbanService {
       ([, a], [, b]) => (b as number) - (a as number)
     )[0]?.[0];
 
-    return (tipoMaisFrequente as any) || "Franchising - Royalties";
+    return (tipoMaisFrequente as any) || "";
   }
 
   private determinarStatusKanban(statusCobranca: string): string {
@@ -666,14 +663,6 @@ export class KanbanService {
       em_tratativa_juridica: "Escalado para jurídico",
     };
     return acoes[cobranca.status] || "Cobrança registrada no sistema";
-  }
-
-  private calcularDiasParado(dataUltimaAcao: string): number {
-    const hoje = new Date();
-    const ultimaAcao = new Date(dataUltimaAcao);
-    return Math.floor(
-      (hoje.getTime() - ultimaAcao.getTime()) / (1000 * 60 * 60 * 24)
-    );
   }
 
   private determinarCriticidade(

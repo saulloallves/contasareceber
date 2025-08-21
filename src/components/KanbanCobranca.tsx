@@ -57,6 +57,7 @@ export function KanbanCobranca() {
   const [monitoramentoAtivo, setMonitoramentoAtivo] = useState(false);
   const kanbanService = new KanbanService();
   const processandoAnteriorRef = useRef(processando);
+  const [cardsVisiveisPorColuna, setCardsVisiveisPorColuna] = useState<{ [colunaId: string]: number }>({});
 
   // Chaves para localStorage
   const STORAGE_KEY_STATUS_MISTO = "kanban_unidades_status_misto";
@@ -701,8 +702,8 @@ export function KanbanCobranca() {
       const statusPorUnidade = new Map<string, Set<string>>();
       const nomesPorUnidade = new Map<string, string>();
       const detalhesCompletos: Record<string, { statusList: string[]; nomeUnidade: string }> = {};
-      // Removido: log detalhado das cobranças encontradas
       cobrancas?.forEach((cobranca: any) => {
+        if (cobranca.status === "quitado") return; // IGNORA quitados
         const cnpj = cobranca.cnpj;
         const nomeUnidade = cobranca.unidades_franqueadas?.nome_unidade || "Unidade não identificada";
         if (!statusPorUnidade.has(cnpj)) {
@@ -1791,8 +1792,7 @@ _Mensagem Automática do Sistema_
             <div className="bg-green-50 rounded-lg p-4">
               <div className="text-2xl font-bold text-green-600">
                 {formatarMoeda(
-                  estatisticas.valor_total_original_aberto ??
-                    estatisticas.valor_total_fluxo
+                  estatisticas.valor_total_original_aberto || 0
                 )}
               </div>
               <div className="text-sm text-green-800">Valor Total em Aberto (Original)</div>
@@ -2016,12 +2016,11 @@ _Mensagem Automática do Sistema_
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Todos os Tipos</option>
-                  <option value="royalties">Royalties</option>
-                  <option value="insumos">Insumos</option>
-                  <option value="aluguel">Aluguel</option>
-                  <option value="multa">Multa</option>
-                  <option value="taxa">Taxa</option>
-                  <option value="outros">Outros</option>
+                  <option value="royalties">Franchising - Royalties</option>
+                  <option value="franquia">Franchising - Tx de Franquia</option>
+                  <option value="propaganda">Franchising - Tx de Propagand</option>
+                  <option value="vendas">Vendas - Vendas</option>
+                  <option value="multa">Multa/Infração</option>
                 </select>
               </div>
 
@@ -2130,7 +2129,7 @@ _Mensagem Automática do Sistema_
         <DragDropContext
           onDragEnd={aba === "unidade" ? onDragEndUnidade : onDragEndIndividual}
         >
-          <div className="w-full overflow-x-auto">
+          <div className="w-full overflow-x-auto pb-5">
             <div className="flex flex-row gap-10 min-w-fit">
               {colunas
                 .filter((col) => col.ativa)
@@ -2154,6 +2153,7 @@ _Mensagem Automática do Sistema_
                           backgroundColor: snapshot.isDraggingOver
                             ? '#18429E1A'
                             : '',
+                          height: '700px', // altura fixa da coluna
                         }}
                       >
                         {/* O Header continua aqui, normalmente */}
@@ -2167,18 +2167,52 @@ _Mensagem Automática do Sistema_
                           ></div>
                         </div>
 
-                        {/* Os cards e o placeholder agora são filhos diretos da área de soltura,
-                            sem um div intermediário, para garantir o funcionamento. */}
-                        {aba === "unidade"
-                          ? getUnitCardsByColuna(coluna.id).map((unit, index) =>
-                              renderCardUnidade(unit, index)
-                            )
-                          : cards
-                              .filter((card) => card.status_atual === coluna.id)
-                              .map((card, index) =>
-                                renderCardIndividual(card, index)
-                              )}
-                        {provided.placeholder}
+                        {/* Cards com rolagem interna e paginação incremental */}
+                        <div className="flex-1 overflow-y-auto pr-2 pl-2">
+                          {aba === "unidade"
+                            ? (() => {
+                                const units = getUnitCardsByColuna(coluna.id);
+                                const limite = cardsVisiveisPorColuna[coluna.id] || 20;
+                                return (
+                                  <>
+                                    {units.slice(0, limite).map((unit, index) => renderCardUnidade(unit, index))}
+                                    {units.length > limite && (
+                                      <div className="flex justify-center my-2">
+                                        <button
+                                          className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs"
+                                          onClick={() => setCardsVisiveisPorColuna(v => ({ ...v, [coluna.id]: (v[coluna.id] || 20) + 20 }))
+                                          }
+                                        >
+                                          Carregar mais
+                                        </button>
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()
+                            : (() => {
+                                const cardsCol = cards.filter((card) => card.status_atual === coluna.id);
+                                const limite = cardsVisiveisPorColuna[coluna.id] || 20;
+                                return (
+                                  <>
+                                    {cardsCol.slice(0, limite).map((card, index) => renderCardIndividual(card, index))}
+                                    {cardsCol.length > limite && (
+                                      <div className="flex justify-center my-2">
+                                        <button
+                                          className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs"
+                                          onClick={() => setCardsVisiveisPorColuna(v => ({ ...v, [coluna.id]: (v[coluna.id] || 20) + 20 }))
+                                          }
+                                        >
+                                          Carregar mais
+                                        </button>
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()
+                          }
+                          {provided.placeholder}
+                        </div>
                       </div>
                     )}
                   </Droppable>
