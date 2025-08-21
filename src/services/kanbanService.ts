@@ -117,7 +117,8 @@ export class KanbanService {
             cidade,
             estado
           )
-        `);
+        `)
+        .range(0, 5000); // Limite para evitar sobrecarga
 
       // Aplica filtros
       if (filtros.unidade) {
@@ -500,10 +501,11 @@ export class KanbanService {
       // Busca todas as cobranças diretamente do banco, sem agrupamento
       const { data: brutas } = await supabase
         .from("cobrancas_franqueados")
-        .select("valor_original, status");
-      // Considera apenas cobranças realmente em aberto (exclui quitado, perda e inadimplencia)
+        .select("valor_original, status")
+        .range(0, 5000);
+      // Considera apenas cobranças realmente em aberto
       const abertas = (brutas || []).filter(
-        (c: any) => c.status === "em_aberto" || c.status === "parcelado");
+        (c: any) => c.status === "em_aberto" || c.status === "parcelado" || c.status === "em_negociacao");
       const totalOriginalAberto = abertas.reduce(
         (sum: number, c: any) => sum + (Number(c.valor_original) || 0),
         0
