@@ -322,10 +322,10 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-emerald-400 hover:shadow-xl transition-all duration-300">
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-red-400 hover:shadow-xl transition-all duration-300">
             <div className="flex items-start space-x-4 min-h-[80px]">
-              <div className="p-2 bg-emerald-50 rounded-lg flex-shrink-0 border border-emerald-100">
-                <TrendingUp className="w-6 h-6 text-emerald-500" />
+              <div className="p-2 bg-red-50 rounded-lg flex-shrink-0 border border-red-100">
+                <TrendingUp className="w-6 h-6 text-red-500" />
               </div>
               <div className="monetary-container">
                 <p className="text-sm font-medium text-gray-700">Valor Original (Sem Juros/Multa)</p>
