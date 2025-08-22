@@ -295,18 +295,18 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
       <div className="space-y-6">
         {/* Linha Superior - 2 Cards em Destaque */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl shadow-lg p-8 border-l-4 border-red-400 hover:shadow-xl transition-all duration-300">
-            <div className="flex items-start space-x-6 min-h-[120px]">
-              <div className="p-3 bg-red-50 rounded-xl flex-shrink-0 border border-red-100">
-                <TrendingUp className="w-8 h-8 text-red-500" />
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-red-400 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-start space-x-4 min-h-[80px]">
+              <div className="p-2 bg-red-50 rounded-lg flex-shrink-0 border border-red-100">
+                <TrendingUp className="w-6 h-6 text-red-500" />
               </div>
               <div className="monetary-container">
-                <p className="text-lg font-medium text-gray-700 mb-2">Valor com Juros e Multa</p>
+                <p className="text-sm font-medium text-gray-700">Valor com Juros e Multa</p>
                 {renderMonetaryValue(
                   indicadores.totalEmAbertoAtualizado ?? indicadores.totalEmAberto,
                   "text-gray-900"
                 )}
-                <div className="mt-3 flex items-center text-base">
+                <div className="mt-2 flex items-center text-sm">
                   <span
                     className={`font-semibold ${getVariacaoColor(
                       indicadores.variacaoEmAberto,
@@ -322,18 +322,18 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-8 border-l-4 border-emerald-400 hover:shadow-xl transition-all duration-300">
-            <div className="flex items-start space-x-6 min-h-[120px]">
-              <div className="p-3 bg-emerald-50 rounded-xl flex-shrink-0 border border-emerald-100">
-                <TrendingUp className="w-8 h-8 text-emerald-500" />
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-emerald-400 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-start space-x-4 min-h-[80px]">
+              <div className="p-2 bg-emerald-50 rounded-lg flex-shrink-0 border border-emerald-100">
+                <TrendingUp className="w-6 h-6 text-emerald-500" />
               </div>
               <div className="monetary-container">
-                <p className="text-lg font-medium text-gray-700 mb-2">Valor Original (Sem Juros/Multa)</p>
+                <p className="text-sm font-medium text-gray-700">Valor Original (Sem Juros/Multa)</p>
                 {renderMonetaryValue(
                   indicadores.totalEmAbertoOriginal ?? indicadores.totalEmAberto,
                   "text-gray-900"
                 )}
-                <div className="mt-3 text-sm text-gray-500">
+                <div className="mt-2 text-sm text-gray-500">
                   Soma dos valores originais das cobranças em aberto e negociando
                 </div>
               </div>
