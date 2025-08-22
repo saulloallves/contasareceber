@@ -183,7 +183,7 @@ export function KanbanCobranca() {
     } catch (e) {
       console.warn("Erro ao resetar travas automaticamente:", e);
     }
-  }, [limparStorageKanban]);
+  }, []);
 
   // ===== carregarDados vem antes das funções de verificação para evitar closures obsoletas =====
   const carregarDados = useCallback(async () => {
@@ -298,7 +298,7 @@ export function KanbanCobranca() {
           }
         } else {
           console.log(
-            `� Salvando ${resultado.unidadesMistas.size} unidades bloqueadas no storage`
+            `💾 Salvando ${resultado.unidadesMistas.size} unidades bloqueadas no storage`
           );
           salvarStatusMistoStorage(
             resultado.unidadesMistas,
@@ -308,7 +308,7 @@ export function KanbanCobranca() {
 
         // Inicia/para monitoramento conforme necessário
         if (resultado.unidadesMistas.size > 0 && !monitoramentoAtivo) {
-          console.log("� Iniciando monitoramento automático...");
+          console.log("🤖 Iniciando monitoramento automático...");
           setMonitoramentoAtivo(true);
         } else if (resultado.unidadesMistas.size === 0 && monitoramentoAtivo) {
           console.log("🛑 Parando monitoramento - nenhuma unidade bloqueada");
@@ -998,65 +998,19 @@ export function KanbanCobranca() {
           `Unidade ${draggableId} não encontrada na coluna ${source.droppableId}`
         );
       }
-
-      console.log(
-        `Movendo ${unit.charges.length} cobranças da unidade ${unit.nome_unidade}`
-      );
-
-      // Buscar todas as cobranças da unidade (independentemente do status)
-      const todasCobrancasIndividuais = await kanbanService.buscarCards(
-        {},
-        false
-      ); // false = modo individual
-      const cobrancasUnidade = todasCobrancasIndividuais.filter(
-        (card) => card.cnpj === unit.cnpj
+      
+      // **CORREÇÃO APLICADA AQUI**
+      // Simplifica a chamada para mover a unidade inteira de uma vez, passando o CNPJ
+      await kanbanService.moverCard(
+        unit.cnpj, // ID da unidade (CNPJ)
+        source.droppableId, // Status de ORIGEM
+        destination.droppableId, // Status de DESTINO
+        "usuario_atual",
+        `Movimentação manual via Kanban (em massa) - Unidade: ${unit.nome_unidade}`
       );
 
       console.log(
-        `Total de cobranças individuais encontradas para a unidade: ${cobrancasUnidade.length}`
-      );
-      console.log('Status das cobranças ANTES:', cobrancasUnidade.map(c => c.status_atual));
-
-      if (cobrancasUnidade.length === 0) {
-        throw new Error(
-          `Nenhuma cobrança individual encontrada para a unidade ${unit.nome_unidade}`
-        );
-      }
-
-      // Valida que todas as cobranças têm UUIDs válidos
-      const cobrancasComUUIDInvalido = cobrancasUnidade.filter(
-        (card) => !card.id || card.id.length !== 36 || !card.id.includes("-")
-      );
-
-      if (cobrancasComUUIDInvalido.length > 0) {
-        console.error("Cobranças com UUID inválido:", cobrancasComUUIDInvalido);
-        throw new Error(
-          `Encontradas ${cobrancasComUUIDInvalido.length} cobranças com UUID inválido`
-        );
-      }
-
-      // Move todas as cobranças da unidade para o status de destino, independentemente do status atual
-      await Promise.all(
-        cobrancasUnidade.map(async (card) => {
-          console.log(
-            `Movendo cobrança UUID: ${card.id} de ${card.status_atual} para ${destination!.droppableId}`
-          );
-          return kanbanService.moverCard(
-            card.id, // UUID correto da cobrança individual
-            destination!.droppableId,
-            "usuario_atual",
-            `Movimentação manual via Kanban (em massa) - Unidade: ${unit.nome_unidade}`
-          );
-        })
-      );
-
-      // Buscar novamente para logar os status após a movimentação
-      const cobrancasApos = await kanbanService.buscarCards({}, false);
-      const cobrancasUnidadeApos = cobrancasApos.filter((card) => card.cnpj === unit.cnpj);
-      console.log('Status das cobranças DEPOIS:', cobrancasUnidadeApos.map(c => c.status_atual));
-
-      console.log(
-        `Todas as ${cobrancasUnidade.length} cobranças da unidade ${unit.nome_unidade} foram movidas com sucesso`
+        `Todas as cobranças da unidade ${unit.nome_unidade} foram movidas com sucesso`
       );
 
       // Recarrega os dados para refletir as mudanças
@@ -1105,9 +1059,12 @@ export function KanbanCobranca() {
 
     setProcessando(true);
     try {
+      // **CORREÇÃO APLICADA AQUI**
+      // Adiciona o argumento 'source.droppableId' que estava faltando
       await kanbanService.moverCard(
         draggableId,
-        destination.droppableId,
+        source.droppableId, // Status de ORIGEM
+        destination.droppableId, // Status de DESTINO
         "usuario_atual",
         "Movimentação manual via Kanban"
       );

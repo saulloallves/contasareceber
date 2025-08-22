@@ -88,63 +88,123 @@ export class KanbanService {
   }
 
   /**
-   * Busca cards do Kanban com opção de agrupamento
+   * Busca cards do Kanban com opção de agrupamento.
    */
   async buscarCards(
     filtros: FiltrosKanban = {},
     agruparPorUnidade: boolean = false
   ): Promise<CardCobranca[]> {
     try {
-      // Busca dados das cobranças com join correto
-      let query = supabase.from("cobrancas_franqueados").select(`
-          id,
-          cnpj,
-          cliente,
-          valor_original,
-          valor_atualizado,
-          valor_recebido,
-          data_vencimento,
-          status,
-          tipo_cobranca,
-          descricao,
-          created_at,
-          observacoes,
-          unidade_id_fk,
+      // Seleção de colunas para a tabela principal (com a junção que funciona)
+      const selectComJoin = `
+          id, cnpj, cliente, valor_original, valor_atualizado, valor_recebido,
+          data_vencimento, status, tipo_cobranca, descricao, created_at,
+          observacoes, unidade_id_fk,
           unidades_franqueadas!unidade_id_fk (
-            id,
-            codigo_unidade,
-            nome_unidade,
-            cidade,
-            estado
+            id, codigo_unidade, nome_unidade, cidade, estado
           )
-        `)
-        .range(0, 5000); // Limite para evitar sobrecarga
+        `;
 
-      // Aplica filtros
-      if (filtros.unidade) {
-        query = query.or(
-          `cnpj.ilike.%${filtros.unidade}%,unidades_franqueadas.codigo_unidade.ilike.%${filtros.unidade}%`
-        );
-      }
+      // Seleção de colunas para a tabela de quitadas (sem a junção e sem a coluna removida)
+      const selectSemJoin = `
+          id, cnpj, cliente, valor_original, valor_atualizado, valor_recebido,
+          data_vencimento, status, tipo_cobranca, descricao, created_at,
+          observacoes, unidade_id_fk
+        `;
 
+      // Query para buscar cobranças que NÃO estão quitadas
+      let queryNaoQuitadas = supabase
+        .from("cobrancas_franqueados")
+        .select(selectComJoin)
+        .not("status", "eq", "quitado")
+        .range(0, 5000);
+
+      // Query para buscar as cobranças da nova tabela de quitadas
+      let queryQuitadas = supabase
+        .from("cobrancas_quitadas")
+        .select(selectSemJoin)
+        .range(0, 5000);
+
+      // Aplica filtros que funcionam em ambas as tabelas diretamente
       if (filtros.valor_min) {
-        query = query.gte("valor_atualizado", filtros.valor_min);
+        queryNaoQuitadas = queryNaoQuitadas.gte("valor_atualizado", filtros.valor_min);
+        queryQuitadas = queryQuitadas.gte("valor_atualizado", filtros.valor_min);
       }
-
       if (filtros.valor_max) {
-        query = query.lte("valor_atualizado", filtros.valor_max);
+        queryNaoQuitadas = queryNaoQuitadas.lte("valor_atualizado", filtros.valor_max);
+        queryQuitadas = queryQuitadas.lte("valor_atualizado", filtros.valor_max);
+      }
+      // Aplica filtro de unidade (CNPJ/Código) apenas na query que suporta o join
+      if (filtros.unidade) {
+        const orFilter = `cnpj.ilike.%${filtros.unidade}%,unidades_franqueadas.codigo_unidade.ilike.%${filtros.unidade}%`;
+        queryNaoQuitadas = queryNaoQuitadas.or(orFilter);
+        // Para a query de quitadas, o filtro de unidade será aplicado depois da junção manual
       }
 
-      const { data: cobrancas, error } = await query;
 
-      if (error) {
-        throw new Error(`Erro ao buscar cobranças: ${error.message}`);
+      // Executa as duas consultas em paralelo para otimizar o tempo
+      const [
+        { data: naoQuitadasData, error: naoQuitadasError },
+        { data: quitadasData, error: quitadasError },
+      ] = await Promise.all([queryNaoQuitadas, queryQuitadas]);
+
+      if (naoQuitadasError) {
+        throw new Error(`Erro ao buscar cobranças pendentes: ${naoQuitadasError.message}`);
       }
+      if (quitadasError) {
+        throw new Error(`Erro ao buscar cobranças quitadas: ${quitadasError.message}`);
+      }
+
+      // --- JUNÇÃO MANUAL PARA COBRANÇAS QUITADAS ---
+      let quitadasComUnidade: any[] = [];
+      if (quitadasData && quitadasData.length > 0) {
+        const unidadeIds = [...new Set(quitadasData.map(c => c.unidade_id_fk).filter(id => id))];
+
+        if (unidadeIds.length > 0) {
+          const { data: unidadesData, error: unidadesError } = await supabase
+            .from('unidades_franqueadas')
+            .select('id, codigo_unidade, nome_unidade, cidade, estado')
+            .in('id', unidadeIds);
+
+          if (unidadesError) {
+            throw new Error(`Erro ao buscar unidades para cobranças quitadas: ${unidadesError.message}`);
+          }
+
+          const unidadesMap = new Map(unidadesData.map(u => [u.id, u]));
+
+          quitadasComUnidade = quitadasData.map(cobranca => ({
+            ...cobranca,
+            unidades_franqueadas: unidadesMap.get(cobranca.unidade_id_fk) || null
+          }));
+        } else {
+          quitadasComUnidade = quitadasData.map(cobranca => ({
+            ...cobranca,
+            unidades_franqueadas: null
+          }));
+        }
+      }
+      // --- FIM DA JUNÇÃO MANUAL ---
+
+      // Aplica o filtro de unidade para os quitados agora que temos os dados da unidade
+      if (filtros.unidade) {
+          const filtroLowerCase = filtros.unidade.toLowerCase();
+          quitadasComUnidade = quitadasComUnidade.filter(c => {
+              const unidade = c.unidades_franqueadas;
+              const cnpjMatch = c.cnpj && c.cnpj.toLowerCase().includes(filtroLowerCase);
+              const nomeMatch = unidade && unidade.nome_unidade && unidade.nome_unidade.toLowerCase().includes(filtroLowerCase);
+              const codigoMatch = unidade && unidade.codigo_unidade && unidade.codigo_unidade.toLowerCase().includes(filtroLowerCase);
+              return cnpjMatch || nomeMatch || codigoMatch;
+          });
+      }
+
+      // Combina os resultados das duas consultas em um único array
+      const cobrancas = [...(naoQuitadasData || []), ...quitadasComUnidade];
 
       if (!cobrancas || cobrancas.length === 0) {
         return [];
       }
 
+      // O restante da lógica para agrupar ou criar cards individuais permanece o mesmo
       if (agruparPorUnidade) {
         return this.agruparCobrancasPorUnidade(cobrancas, filtros);
       } else {
@@ -297,80 +357,101 @@ export class KanbanService {
   }
 
   /**
-   * Move um card para nova coluna
+   * NOVA VERSÃO: Move um card ou unidade inteira, gerenciando a troca entre tabelas.
+   * @param cardOrUnitId - O UUID da cobrança ou o CNPJ da unidade.
+   * @param statusOrigem - O status da coluna de onde o card está saindo.
+   * @param novoStatus - O status da coluna para onde o card está indo.
+   * @param usuario - O usuário que está realizando a ação.
+   * @param motivo - O motivo da movimentação.
    */
   async moverCard(
-    cardId: string,
+    cardOrUnitId: string,
+    statusOrigem: string,
     novoStatus: string,
     usuario: string,
     motivo: string
   ): Promise<void> {
     try {
-      console.log(
-        `🔄 Iniciando movimentação do card ID: ${cardId} para status: ${novoStatus}`
-      );
+      console.log(`🔄 Iniciando movimentação de ${cardOrUnitId} de '${statusOrigem}' para '${novoStatus}'`);
 
-      // Para UUIDs, mantém como string (não converte para número)
-      const uuidId = cardId.trim();
+      const isMovingToQuitado = novoStatus === 'quitado';
+      const isMovingFromQuitado = statusOrigem === 'quitado';
+      const isIndividualMove = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cardOrUnitId);
 
-      // Validação básica de UUID (formato: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
-      const uuidRegex =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(uuidId)) {
-        console.error(`❌ ID não é um UUID válido: ${uuidId}`);
-        throw new Error(`ID inválido: ${cardId} não é um UUID válido`);
+      // --- CENÁRIO 1: Movendo PARA a coluna 'Quitado' ---
+      if (isMovingToQuitado && !isMovingFromQuitado) {
+        const { data: cobrancas, error: fetchError } = isIndividualMove
+          ? await supabase.from('cobrancas_franqueados').select('*').eq('id', cardOrUnitId)
+          : await supabase.from('cobrancas_franqueados').select('*').eq('cnpj', cardOrUnitId);
+
+        if (fetchError) throw new Error(`Erro ao buscar cobranças para quitar: ${fetchError.message}`);
+        if (!cobrancas || cobrancas.length === 0) throw new Error('Cobrança(s) de origem não encontrada(s).');
+        
+        // Prepara os dados para a nova tabela (sem colunas que não existem lá)
+        const cobrancasParaQuitar = cobrancas.map(c => {
+            c.status = 'quitado'; // Garante o status correto
+            delete c.kanban_manual_change; // Remove colunas que podem não existir na tabela de destino
+            return c;
+        });
+
+        const { error: insertError } = await supabase.from('cobrancas_quitadas').insert(cobrancasParaQuitar);
+        if (insertError) throw new Error(`Erro ao inserir em cobranças quitadas: ${insertError.message}`);
+
+        const idsParaDeletar = cobrancas.map(c => c.id);
+        const { error: deleteError } = await supabase.from('cobrancas_franqueados').delete().in('id', idsParaDeletar);
+        if (deleteError) throw new Error(`Erro ao deletar de cobranças franqueados: ${deleteError.message}`);
+
+        console.log(`✅ ${cobrancas.length} cobrança(s) movida(s) para a tabela de quitadas.`);
       }
 
-      // Busca informações completas para diagnóstico
-      const { data: cobranca, error: fetchError } = await supabase
-        .from("cobrancas_franqueados")
-        .select(
-          "id, status, valor_original, valor_atualizado, valor_recebido, dias_em_atraso"
-        )
-        .eq("id", uuidId)
-        .single();
+      // --- CENÁRIO 2: Movendo DE VOLTA da coluna 'Quitado' ---
+      else if (isMovingFromQuitado && !isMovingToQuitado) {
+        const { data: cobrancas, error: fetchError } = isIndividualMove
+          ? await supabase.from('cobrancas_quitadas').select('*').eq('id', cardOrUnitId)
+          : await supabase.from('cobrancas_quitadas').select('*').eq('cnpj', cardOrUnitId);
 
-      if (fetchError || !cobranca) {
-        console.error(
-          `❌ Erro ao buscar cobrança: ${
-            fetchError?.message || "Cobrança não encontrada"
-          }`
-        );
-        throw new Error(`Cobrança com ID ${cardId} não encontrada.`);
+        if (fetchError) throw new Error(`Erro ao buscar cobranças para reabrir: ${fetchError.message}`);
+        if (!cobrancas || cobrancas.length === 0) throw new Error('Cobrança(s) quitada(s) de origem não encontrada(s).');
+        
+        // Prepara os dados para a tabela de franqueados
+        const cobrancasParaReabrir = cobrancas.map(c => {
+            c.status = this.mapearStatusKanbanParaCobranca(novoStatus);
+            return c;
+        });
+
+        const { error: insertError } = await supabase.from('cobrancas_franqueados').insert(cobrancasParaReabrir);
+        if (insertError) throw new Error(`Erro ao inserir de volta em cobranças franqueados: ${insertError.message}`);
+
+        const idsParaDeletar = cobrancas.map(c => c.id);
+        const { error: deleteError } = await supabase.from('cobrancas_quitadas').delete().in('id', idsParaDeletar);
+        if (deleteError) throw new Error(`Erro ao deletar de cobranças quitadas: ${deleteError.message}`);
+        
+        console.log(`✅ ${cobrancas.length} cobrança(s) retornada(s) para a tabela de franqueados.`);
       }
 
-      const statusOrigem = this.determinarStatusKanban(cobranca.status);
-      const novoStatusCobranca =
-        this.mapearStatusKanbanParaCobranca(novoStatus);
+      // --- CENÁRIO 3: Movimentação padrão (dentro de cobranças_franqueados) ---
+      else if (!isMovingToQuitado && !isMovingFromQuitado) {
+        const novoStatusMapeado = this.mapearStatusKanbanParaCobranca(novoStatus);
+        const query = supabase.from('cobrancas_franqueados')
+          .update({ status: novoStatusMapeado, kanban_manual_change: true });
 
-      const { data: updatedRows, error: updateError } = await supabase
-        .from("cobrancas_franqueados")
-        .update({
-          status: novoStatusCobranca,
-          kanban_manual_change: true, // Flag para indicar mudança manual do Kanban
-        })
-        .eq("id", uuidId)
-        .select("id");
+        const { error: updateError } = isIndividualMove
+          ? await query.eq('id', cardOrUnitId)
+          : await query.eq('cnpj', cardOrUnitId);
 
-      if (updateError) {
-        console.error(`❌ Erro no update: ${updateError.message}`);
-        throw new Error(
-          `Erro ao atualizar status da cobrança: ${updateError.message}`
-        );
+        if (updateError) throw new Error(`Erro ao atualizar status: ${updateError.message}`);
+        
+        console.log(`✅ Status de ${cardOrUnitId} atualizado para ${novoStatusMapeado}.`);
       }
-      if (!updatedRows || updatedRows.length === 0) {
-        console.error(`❌ Nenhuma linha foi atualizada para ID ${cardId}`);
-        throw new Error(
-          `Nenhuma linha atualizada para a cobrança ID ${cardId}. Verifique se o ID corresponde ao registro no banco.`
-        );
+      
+      // Se a movimentação foi entre colunas do mesmo tipo de tabela (ex: quitado para quitado), não faz nada.
+      else {
+          console.log("Movimentação na mesma tabela de origem, nenhuma ação de migração necessária.");
       }
 
-      console.log(
-        `✅ Status atualizado no banco! Linhas afetadas: ${updatedRows.length}`
-      );
-
+      // Registra a movimentação para fins de log
       await this.registrarMovimentacao({
-        card_id: cardId,
+        card_id: cardOrUnitId,
         status_origem: statusOrigem,
         status_destino: novoStatus,
         usuario,
@@ -379,19 +460,12 @@ export class KanbanService {
         automatica: false,
       });
 
-      await this.tratativasService.registrarObservacao(
-        cardId,
-        usuario,
-        `Card movido no Kanban de '${statusOrigem}' para '${novoStatus}'. Motivo: ${motivo}`,
-        novoStatusCobranca
-      );
-
-      console.log(`🎉 Movimentação do card ${cardId} concluída com sucesso!`);
     } catch (error) {
-      console.error("❌ Erro ao mover card:", error);
-      throw error;
+      console.error("❌ Erro fatal ao mover card:", error);
+      throw error; // Propaga o erro para ser tratado na UI (ex: com um toast)
     }
   }
+
 
   /**
    * Executa ação rápida em um card
@@ -417,19 +491,16 @@ export class KanbanService {
         case "whatsapp":
           descricaoAcao = "Mensagem WhatsApp enviada";
           if (card.status_atual === "em_aberto") {
-            novoStatus = "notificado";
+            novoStatus = "em_negociacao"; // Exemplo de mudança de status
           }
           break;
         default:
           descricaoAcao = `Ação ${acao} executada`;
       }
 
-      // Se mudou o status, move o card
       if (novoStatus !== card.status_atual) {
-        // Removido parâmetro extra; moverCard espera apenas (cardId, novoStatus, usuario, motivo)
-        await this.moverCard(cardId, novoStatus, usuario, descricaoAcao);
+        await this.moverCard(cardId, card.status_atual, novoStatus, usuario, descricaoAcao);
       } else {
-        // Apenas registra a ação
         await this.registrarLog({
           card_id: cardId,
           acao: acao,
@@ -505,7 +576,7 @@ export class KanbanService {
         .range(0, 5000);
       // Considera apenas cobranças realmente em aberto
       const abertas = (brutas || []).filter(
-        (c: any) => c.status === "em_aberto" || c.status === "parcelado" || c.status === "em_negociacao");
+        (c: any) => c.status !== "quitado" || c.status !== "perda");
       const totalOriginalAberto = abertas.reduce(
         (sum: number, c: any) => sum + (Number(c.valor_original) || 0),
         0
