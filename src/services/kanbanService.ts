@@ -24,62 +24,13 @@ export class KanbanService {
     try {
       // Colunas do Kanban na ordem e nomes definidos pelo cliente
       return [
-        {
-          id: "em_aberto",
-          nome: "📥 Atrasadas",
-          descricao: "Valor atrasado em aberto",
-          cor: "#6B7280",
-          ordem: 1,
-          ativa: true,
-        },
-        {
-          id: "em_negociacao",
-          nome: "🤝 Negociando",
-          descricao: "Negociando",
-          cor: "#F59E0B",
-          ordem: 2,
-          ativa: true,
-        },
-        {
-          id: "parcelado",
-          nome: "🗂️ Parcelado",
-          descricao: "Cobrança parcelada",
-          cor: "#7031AF",
-          ordem: 3,
-          ativa: true,
-        },
-        {
-          id: "quitado",
-          nome: "✅ Quitado",
-          descricao: "Totalmente quitado",
-          cor: "#2EBF11",
-          ordem: 4,
-          ativa: true,
-        },
-        {
-          id: "juridico",
-          nome: "⚖️ Jurídico",
-          descricao: "Cobrança no jurídico",
-          cor: "#31A3FB",
-          ordem: 5,
-          ativa: true,
-        },
-        {
-          id: "inadimplencia",
-          nome: "❌ Inadimplência",
-          descricao: "Situação crítica a mais de 30",
-          cor: "#8d4925",
-          ordem: 6,
-          ativa: true,
-        },
-        {
-          id: "perda",
-          nome: "🚫 Perda",
-          descricao: "Cobrança perdida a mais de 180 dias",
-          cor: "#FF0A0E",
-          ordem: 7,
-          ativa: true,
-        },
+        { id: "em_aberto", nome: "📥 Atrasadas", descricao: "Valor atrasado em aberto", cor: "#6B7280", ordem: 1, ativa: true, },
+        { id: "em_negociacao", nome: "🤝 Negociando", descricao: "Negociando", cor: "#F59E0B", ordem: 2, ativa: true, },
+        { id: "parcelado", nome: "🗂️ Parcelado", descricao: "Cobrança parcelada", cor: "#7031AF", ordem: 3, ativa: true, },
+        { id: "inadimplencia", nome: "❌ Inadimplência", descricao: "Cobrança atrasada mais de 30 dias", cor: "#8d4925", ordem: 4, ativa: true, },
+        { id: "juridico", nome: "⚖️ Jurídico", descricao: "Cobrança no jurídico", cor: "#31A3FB", ordem: 5, ativa: true, },
+        { id: "perda", nome: "🚫 Perda", descricao: "Cobrança perdida a mais de 180 dias", cor: "#FF0A0E", ordem: 6, ativa: true, },
+        { id: "quitado", nome: "✅ Quitado", descricao: "Totalmente quitado", cor: "#2EBF11", ordem: 7, ativa: true, },
       ];
     } catch (error) {
       console.error("Erro ao buscar colunas:", error);
