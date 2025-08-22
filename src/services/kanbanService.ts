@@ -97,7 +97,7 @@ export class KanbanService {
     try {
       // Seleção de colunas para a tabela principal (com a junção que funciona)
       const selectComJoin = `
-          id, cnpj, cliente, valor_original, valor_atualizado, valor_recebido,
+          id, cnpj, cpf, cliente, valor_original, valor_atualizado, valor_recebido,
           data_vencimento, status, tipo_cobranca, descricao, created_at,
           observacoes, unidade_id_fk,
           unidades_franqueadas!unidade_id_fk (
@@ -107,7 +107,7 @@ export class KanbanService {
 
       // Seleção de colunas para a tabela de quitadas (sem a junção e sem a coluna removida)
       const selectSemJoin = `
-          id, cnpj, cliente, valor_original, valor_atualizado, valor_recebido,
+          id, cnpj, cpf, cliente, valor_original, valor_atualizado, valor_recebido,
           data_vencimento, status, tipo_cobranca, descricao, created_at,
           observacoes, unidade_id_fk
         `;
@@ -124,6 +124,12 @@ export class KanbanService {
         .from("cobrancas_quitadas")
         .select(selectSemJoin)
         .range(0, 5000);
+
+      if (filtros.tipo_debito) {
+        // O nome da coluna no banco é 'tipo_cobranca'
+        queryNaoQuitadas = queryNaoQuitadas.eq('tipo_cobranca', filtros.tipo_debito);
+        queryQuitadas = queryQuitadas.eq('tipo_cobranca', filtros.tipo_debito);
+      }
 
       // Aplica filtros que funcionam em ambas as tabelas diretamente
       if (filtros.valor_min) {
@@ -232,6 +238,7 @@ export class KanbanService {
           codigo_unidade: unidade?.codigo_unidade || cobranca.cnpj,
           nome_unidade: unidade?.nome_unidade || cobranca.cliente,
           cnpj: cobranca.cnpj,
+          cpf: cobranca.cpf || "",
           tipo_debito: this.determinarTipoDebito([cobranca]),
           valor_total: valorAtual,
           valor_original: cobranca.valor_original || 0,
@@ -256,7 +263,7 @@ export class KanbanService {
   }
 
   /**
-   * Agrupa cobranças por unidade
+   * Agrupa cobranças por unidade (CNPJ ou CPF) - VERSÃO CORRIGIDA
    */
   private agruparCobrancasPorUnidade(
     cobrancas: any[],
@@ -264,18 +271,19 @@ export class KanbanService {
   ): CardCobranca[] {
     const cardsMap = new Map<
       string,
-      CardCobranca & { _statusList?: string[], _observacoesList?: string[] }
+      CardCobranca & { _statusList?: string[]; _observacoesList?: string[] }
     >();
     cobrancas.forEach((cobranca) => {
-      // Agrupa por CNPJ se existir, senão por CPF
+      // LÓGICA CPF: Esta é a mudança principal. A chave de agrupamento é o CNPJ ou, se não houver, o CPF.
       const chaveUnidade = cobranca.cnpj || cobranca.cpf;
-      if (!chaveUnidade) return; // ignora cobranças sem identificador
+      if (!chaveUnidade) return; // Ignora cobranças sem um documento
+
       if (!cardsMap.has(chaveUnidade)) {
         const unidade = cobranca.unidades_franqueadas;
         cardsMap.set(chaveUnidade, {
-          id: chaveUnidade,
+          id: chaveUnidade, // A ID do card agrupado é o próprio documento
           codigo_unidade: unidade?.codigo_unidade || chaveUnidade,
-          nome_unidade: unidade?.nome_unidade || cobranca.cliente,
+          nome_unidade: unidade?.nome_unidade || cobranca.cliente || "Franqueado(a)",
           cnpj: cobranca.cnpj || "",
           cpf: cobranca.cpf || "",
           tipo_debito: "Franchising - Royalties",
@@ -296,69 +304,67 @@ export class KanbanService {
           observacoes: "",
         } as any);
       }
+
       const card = cardsMap.get(chaveUnidade)!;
       const valorAtual = cobranca.valor_atualizado || cobranca.valor_original;
       card.valor_total += valorAtual;
-      card.valor_original =
-        (card.valor_original || 0) + (cobranca.valor_original || 0);
+      card.valor_original = (card.valor_original || 0) + (cobranca.valor_original || 0);
       card.quantidade_titulos = (card.quantidade_titulos || 0) + 1;
-      if (
-        new Date(cobranca.data_vencimento) <
-        new Date(card.data_vencimento_antiga)
-      ) {
+      
+      if (new Date(cobranca.data_vencimento) < new Date(card.data_vencimento_antiga)) {
         card.data_vencimento_antiga = cobranca.data_vencimento;
       }
-      if (
-        new Date(cobranca.data_vencimento) >
-        new Date(card.data_vencimento_recente)
-      ) {
+      if (new Date(cobranca.data_vencimento) > new Date(card.data_vencimento_recente)) {
         card.data_vencimento_recente = cobranca.data_vencimento;
       }
-      // Coletar todos os status individuais
+      
       const statusAtual = this.determinarStatusKanban(cobranca.status);
       card._statusList!.push(statusAtual);
-      card._observacoesList!.push(cobranca.observacoes || "");
+      if (cobranca.observacoes) {
+        card._observacoesList!.push(cobranca.observacoes);
+      }
+      
       if (new Date(cobranca.created_at) > new Date(card.data_ultima_acao)) {
         card.data_ultima_acao = cobranca.created_at;
         card.ultima_acao = this.determinarUltimaAcao(cobranca);
       }
     });
-    // Se todas as cobranças da unidade têm o mesmo status, usar esse status. Se não, manter trava (status misto).
+
     const cards = Array.from(cardsMap.values()).map((card) => {
       let statusFinal = "em_aberto";
       if (card._statusList && card._statusList.length > 0) {
-        const unique = Array.from(new Set(card._statusList));
-        if (unique.length === 1) {
-          statusFinal = unique[0];
+        const unique = new Set(card._statusList);
+        if (unique.size === 1) {
+          statusFinal = card._statusList[0];
         } else {
           statusFinal = "misto";
         }
       }
-      // Observação: pega a primeira observação não vazia (ou vazio se nenhuma)
-      let observacaoFinal = "";
-      if (card._observacoesList && card._observacoesList.length > 0) {
-        observacaoFinal = card._observacoesList.find((obs) => obs && obs.trim() !== "") || "";
-      }
-      return {
+      
+      const observacaoFinal = card._observacoesList?.find((obs) => obs && obs.trim() !== "") || "";
+      const cobrancasDoCard = cobrancas.filter((c) => (c.cnpj || c.cpf) === (card.cnpj || card.cpf));
+
+      // Removendo as propriedades temporárias e garantindo a tipagem correta
+      const finalCard: CardCobranca = {
         ...card,
-        tipo_debito: this.determinarTipoDebito(
-          cobrancas.filter((c) => (c.cnpj || c.cpf) === (card.cnpj || card.cpf))
-        ),
+        tipo_debito: this.determinarTipoDebito(cobrancasDoCard),
         criticidade: this.determinarCriticidade(card),
         status_atual: statusFinal,
         observacoes: observacaoFinal,
-        // Garante que codigo_unidade, cnpj e cpf estejam presentes
-        codigo_unidade: card.cnpj || card.cpf || "",
-        cnpj: card.cnpj || "",
-        cpf: card.cpf || "",
       };
+
+      delete (finalCard as any)._statusList;
+      delete (finalCard as any)._observacoesList;
+
+      return finalCard;
     });
+
     return cards.filter((card) => this.aplicarFiltrosCard(card, filtros));
   }
 
   /**
-   * NOVA VERSÃO: Move um card ou unidade inteira, gerenciando a troca entre tabelas.
-   * @param cardOrUnitId - O UUID da cobrança ou o CNPJ da unidade.
+   * Registra a movimentação de um Card.
+   * @param cardOrUnitId - O UUID da cobrança ou o CNPJ/CPF da unidade.
    * @param statusOrigem - O status da coluna de onde o card está saindo.
    * @param novoStatus - O status da coluna para onde o card está indo.
    * @param usuario - O usuário que está realizando a ação.
@@ -377,20 +383,24 @@ export class KanbanService {
       const isMovingToQuitado = novoStatus === 'quitado';
       const isMovingFromQuitado = statusOrigem === 'quitado';
       const isIndividualMove = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cardOrUnitId);
+      
+      // ===== LÓGICA DE FILTRO CORRIGIDA =====
+      // Cria um filtro OR para cobrir tanto CNPJ quanto CPF quando for um movimento de unidade
+      const unitFilter = `cnpj.eq.${cardOrUnitId},cpf.eq.${cardOrUnitId}`;
 
       // --- CENÁRIO 1: Movendo PARA a coluna 'Quitado' ---
       if (isMovingToQuitado && !isMovingFromQuitado) {
+        const query = supabase.from('cobrancas_franqueados').select('*');
         const { data: cobrancas, error: fetchError } = isIndividualMove
-          ? await supabase.from('cobrancas_franqueados').select('*').eq('id', cardOrUnitId)
-          : await supabase.from('cobrancas_franqueados').select('*').eq('cnpj', cardOrUnitId);
+          ? await query.eq('id', cardOrUnitId)
+          : await query.or(unitFilter);
 
         if (fetchError) throw new Error(`Erro ao buscar cobranças para quitar: ${fetchError.message}`);
         if (!cobrancas || cobrancas.length === 0) throw new Error('Cobrança(s) de origem não encontrada(s).');
         
-        // Prepara os dados para a nova tabela (sem colunas que não existem lá)
         const cobrancasParaQuitar = cobrancas.map(c => {
-            c.status = 'quitado'; // Garante o status correto
-            delete c.kanban_manual_change; // Remove colunas que podem não existir na tabela de destino
+            c.status = 'quitado';
+            delete (c as any).kanban_manual_change;
             return c;
         });
 
@@ -406,14 +416,14 @@ export class KanbanService {
 
       // --- CENÁRIO 2: Movendo DE VOLTA da coluna 'Quitado' ---
       else if (isMovingFromQuitado && !isMovingToQuitado) {
-        const { data: cobrancas, error: fetchError } = isIndividualMove
-          ? await supabase.from('cobrancas_quitadas').select('*').eq('id', cardOrUnitId)
-          : await supabase.from('cobrancas_quitadas').select('*').eq('cnpj', cardOrUnitId);
+        const query = supabase.from('cobrancas_quitadas').select('*');
+         const { data: cobrancas, error: fetchError } = isIndividualMove
+          ? await query.eq('id', cardOrUnitId)
+          : await query.or(unitFilter);
 
         if (fetchError) throw new Error(`Erro ao buscar cobranças para reabrir: ${fetchError.message}`);
         if (!cobrancas || cobrancas.length === 0) throw new Error('Cobrança(s) quitada(s) de origem não encontrada(s).');
         
-        // Prepara os dados para a tabela de franqueados
         const cobrancasParaReabrir = cobrancas.map(c => {
             c.status = this.mapearStatusKanbanParaCobranca(novoStatus);
             return c;
@@ -437,19 +447,17 @@ export class KanbanService {
 
         const { error: updateError } = isIndividualMove
           ? await query.eq('id', cardOrUnitId)
-          : await query.eq('cnpj', cardOrUnitId);
+          : await query.or(unitFilter);
 
         if (updateError) throw new Error(`Erro ao atualizar status: ${updateError.message}`);
         
         console.log(`✅ Status de ${cardOrUnitId} atualizado para ${novoStatusMapeado}.`);
       }
       
-      // Se a movimentação foi entre colunas do mesmo tipo de tabela (ex: quitado para quitado), não faz nada.
       else {
           console.log("Movimentação na mesma tabela de origem, nenhuma ação de migração necessária.");
       }
 
-      // Registra a movimentação para fins de log
       await this.registrarMovimentacao({
         card_id: cardOrUnitId,
         status_origem: statusOrigem,
@@ -462,7 +470,7 @@ export class KanbanService {
 
     } catch (error) {
       console.error("❌ Erro fatal ao mover card:", error);
-      throw error; // Propaga o erro para ser tratado na UI (ex: com um toast)
+      throw error;
     }
   }
 
@@ -533,7 +541,7 @@ export class KanbanService {
         const { error } = await supabase
           .from("cobrancas_franqueados")
           .update({ observacoes: observacao })
-          .eq("cnpj", id); // O 'id' aqui é o CNPJ
+          .or(`cnpj.eq.${id},cpf.eq.${id}`); // O 'id' aqui é o CNPJ ou CPF
 
         if (error) {
           throw new Error(
@@ -576,7 +584,7 @@ export class KanbanService {
         .range(0, 5000);
       // Considera apenas cobranças realmente em aberto
       const abertas = (brutas || []).filter(
-        (c: any) => c.status !== "quitado" || c.status !== "perda");
+        (c: any) => c.status !== "quitado");
       const totalOriginalAberto = abertas.reduce(
         (sum: number, c: any) => sum + (Number(c.valor_original) || 0),
         0

@@ -686,7 +686,8 @@ export function KanbanCobranca() {
         .select(
           `
           id, 
-          cnpj, 
+          cnpj,
+          cpf, 
           status,
           unidades_franqueadas!unidade_id_fk (
             nome_unidade
@@ -704,24 +705,26 @@ export function KanbanCobranca() {
       const detalhesCompletos: Record<string, { statusList: string[]; nomeUnidade: string }> = {};
       cobrancas?.forEach((cobranca: any) => {
         if (cobranca.status === "quitado") return; // IGNORA quitados
-        const cnpj = cobranca.cnpj;
+
+        const doc = cobranca.cnpj || cobranca.cpf;
+        if (!doc) return; // Pula se não tiver nenhum documento
         const nomeUnidade = cobranca.unidades_franqueadas?.nome_unidade || "Unidade não identificada";
-        if (!statusPorUnidade.has(cnpj)) {
-          statusPorUnidade.set(cnpj, new Set());
-          nomesPorUnidade.set(cnpj, nomeUnidade);
+        if (!statusPorUnidade.has(doc)) {
+          statusPorUnidade.set(doc, new Set());
+          nomesPorUnidade.set(doc, nomeUnidade);
         }
-        statusPorUnidade.get(cnpj)!.add(cobranca.status);
+        statusPorUnidade.get(doc)!.add(cobranca.status);
       });
       if (DEBUG) console.log(`📋 Analisando ${statusPorUnidade.size} unidades diferentes`);
-      statusPorUnidade.forEach((statusSet, cnpj) => {
+      statusPorUnidade.forEach((statusSet, doc) => {
         const statusArray = Array.from(statusSet);
         if (statusSet.size > 1) {
-          unidadesMistas.add(cnpj);
-          detalhesCompletos[cnpj] = {
+          unidadesMistas.add(doc);
+          detalhesCompletos[doc] = {
             statusList: statusArray.sort(),
-            nomeUnidade: nomesPorUnidade.get(cnpj) || "Unidade não identificada",
+            nomeUnidade: nomesPorUnidade.get(doc) || "Unidade não identificada",
           };
-          if (DEBUG) console.log(`⚠️  UNIDADE COM STATUS MISTO DETECTADA: ${nomesPorUnidade.get(cnpj)}`);
+          if (DEBUG) console.log(`⚠️  UNIDADE COM STATUS MISTO DETECTADA: ${nomesPorUnidade.get(doc)}`);
         }
       });
       if (DEBUG) console.log(`🎯 RESULTADO FINAL: ${unidadesMistas.size} unidades com status misto encontradas`);
@@ -887,11 +890,6 @@ export function KanbanCobranca() {
     }
   }, [unidadesComStatusMisto.size, monitoramentoAtivo, iniciarMonitoramento]);
 
-  // Função para aplicar filtros
-  const aplicarFiltros = () => {
-    carregarDados();
-  };
-
   // Função para limpar filtros
   const limparFiltros = () => {
     setFiltrosAvancados({
@@ -957,17 +955,16 @@ export function KanbanCobranca() {
 
     // Busca a unidade pelo draggableId para verificar o CNPJ
     const unidadeCard = getUnitCardsByColuna(result.source.droppableId).find(
-      (u) => u.codigo_unidade === result.draggableId
+    (u) => (u.cnpj || u.cpf) === result.draggableId.replace(/unit-/, '') // Adaptação se o draggableId tiver prefixo
+    // Se draggableId é o próprio documento, use: (u.cnpj || u.cpf) === result.draggableId
     );
 
+    const documento = unidadeCard?.cnpj || unidadeCard?.cpf;
+
     // Verifica se é uma unidade com status misto no modo agrupado usando CNPJ
-    if (
-      aba === "unidade" &&
-      unidadeCard &&
-      unidadesComStatusMisto.has(unidadeCard.cnpj)
-    ) {
+    if ( aba === "unidade" && documento && unidadesComStatusMisto.has(documento)) {
       // Define qual unidade será mostrada no modal de detalhes
-      setModalDetalhesStatusMisto(unidadeCard.cnpj);
+      setModalDetalhesStatusMisto(documento ?? null);
       setShowMixedStatusWarning(true);
       return;
     }
@@ -998,11 +995,14 @@ export function KanbanCobranca() {
           `Unidade ${draggableId} não encontrada na coluna ${source.droppableId}`
         );
       }
-      
+      const documento = unit.cnpj || unit.cpf;
+      if (!documento) {
+          throw new Error(`Unidade ${draggableId} não possui CNPJ ou CPF para movimentação.`);
+      }
       // **CORREÇÃO APLICADA AQUI**
       // Simplifica a chamada para mover a unidade inteira de uma vez, passando o CNPJ
       await kanbanService.moverCard(
-        unit.cnpj, // ID da unidade (CNPJ)
+        documento, // Passa o CNPJ ou CPF
         source.droppableId, // Status de ORIGEM
         destination.droppableId, // Status de DESTINO
         "usuario_atual",
@@ -1458,9 +1458,9 @@ _Mensagem Automática do Sistema_
     };
     return tipoMap[tipo] || tipo.replace(/\b\w/g, (l) => l.toUpperCase());
   };
-
   const renderCardUnidade = (unit: UnitKanbanCard & { valor_original?: number }, index: number) => {
-    const temStatusMisto = unidadesComStatusMisto.has(unit.cnpj);
+    const documento = unit.cnpj || unit.cpf;
+    const temStatusMisto = typeof documento === "string" && unidadesComStatusMisto.has(documento);
 
     return (
       <Draggable
@@ -1485,7 +1485,9 @@ _Mensagem Automática do Sistema_
               setCobrancaSelecionada(null);
               setUnitSelecionada(unit);
               // Busca todas as cobranças da unidade, não apenas as da coluna atual
-              buscarTodasCobrancasUnidade(unit.cnpj);
+              if (typeof documento === "string") {
+                buscarTodasCobrancasUnidade(documento);
+              }
               setModalAberto("detalhes");
             }}
           >
@@ -1497,7 +1499,7 @@ _Mensagem Automática do Sistema_
                     {unit.nome_unidade}
                   </h4>
                   <p className="text-xs text-gray-600">
-                    {formatarCNPJCPF((unit.cnpj || unit.cpf || ""))}
+                    {formatarCNPJCPF((documento || ""))}
                   </p>
                 </div>
               </div>
@@ -1518,7 +1520,7 @@ _Mensagem Automática do Sistema_
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setModalDetalhesStatusMisto(unit.cnpj);
+                      setModalDetalhesStatusMisto(documento ?? null);
                       setShowMixedStatusWarning(true);
                     }}
                     className="text-orange-600 hover:text-orange-800 underline"
@@ -1526,10 +1528,10 @@ _Mensagem Automática do Sistema_
                     Ver detalhes
                   </button>
                 </div>
-                {detalhesStatusMisto[unit.cnpj]?.statusList && (
+                {detalhesStatusMisto[documento]?.statusList && (
                   <div className="mt-1 text-xs">
                     Status:{" "}
-                    {detalhesStatusMisto[unit.cnpj].statusList
+                    {detalhesStatusMisto[documento].statusList
                       .map((s) => formatarStatusCobranca(s))
                       .join(", ")}
                   </div>
@@ -1553,7 +1555,7 @@ _Mensagem Automática do Sistema_
               <div className="flex justify-between">
                 <span className="text-gray-600">Cobranças:</span>
                 <span className="font-medium">
-                  {obterQuantidadeTotalCobrancas(unit.cnpj)}
+              {obterQuantidadeTotalCobrancas(unit.cnpj || (unit as any).cpf || "")}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -1791,7 +1793,7 @@ _Mensagem Automática do Sistema_
                     : ""
                 }
               >
-                Por Unidade
+                Cobranças Agrupadas
                 {unidadesMistasCount > 0 && (
                   <span className="ml-2 px-2 py-1 bg-orange-500 text-white rounded-full text-xs">
                     {unidadesMistasCount} bloqueadas
@@ -1809,7 +1811,7 @@ _Mensagem Automática do Sistema_
                     : "text-gray-600 hover:text-gray-800"
                 }`}
               >
-                Por Cobrança
+                Cobrança Individuais
                 {movimentacaoIndividualFeita && (
                   <span className="ml-2 px-2 py-1 bg-green-500 text-white rounded-full text-xs">
                     Ativo
@@ -1843,7 +1845,7 @@ _Mensagem Automática do Sistema_
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome da Unidade
+                  Nome
                 </label>
                 <input
                   type="text"
@@ -1854,14 +1856,14 @@ _Mensagem Automática do Sistema_
                       nomeUnidade: e.target.value,
                     })
                   }
-                  placeholder="Buscar por nome..."
+                  placeholder="Buscar por nome da unidade ou franqueado"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  CNPJ
+                  Documento
                 </label>
                 <input
                   type="text"
@@ -1872,25 +1874,7 @@ _Mensagem Automática do Sistema_
                       cnpj: e.target.value,
                     })
                   }
-                  placeholder="00.000.000/0000-00"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Código da Unidade
-                </label>
-                <input
-                  type="text"
-                  value={filtrosAvancados.codigo}
-                  onChange={(e) =>
-                    setFiltrosAvancados({
-                      ...filtrosAvancados,
-                      codigo: e.target.value,
-                    })
-                  }
-                  placeholder="Código..."
+                  placeholder="00.000.000/0000-00 ou 000.000.000-00"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -1973,21 +1957,12 @@ _Mensagem Automática do Sistema_
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Todos os Tipos</option>
-                  <option value="royalties">Franchising - Royalties</option>
-                  <option value="franquia">Franchising - Tx de Franquia</option>
-                  <option value="propaganda">Franchising - Tx de Propagand</option>
-                  <option value="vendas">Vendas - Vendas</option>
-                  <option value="multa">Multa/Infração</option>
+                  <option value="Franchising - Royalties">Franchising - Royalties</option>
+                  <option value="Franchising - Tx de Franquia">Franchising - Tx de Franquia</option>
+                  <option value="Franchising - Tx de Propagand">Franchising - Tx de Propagand</option>
+                  <option value="Vendas - Vendas">Vendas - Vendas</option>
+                  <option value="- Multa/Infração">Multa/Infração</option>
                 </select>
-              </div>
-
-              <div className="flex items-end">
-                <button
-                  onClick={aplicarFiltros}
-                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  Aplicar Filtros
-                </button>
               </div>
             </div>
 
@@ -2396,7 +2371,7 @@ _Mensagem Automática do Sistema_
                         Quantidade de Cobranças
                       </label>
                       <p className="text-gray-800">
-                        {obterQuantidadeTotalCobrancas(unitSelecionada.cnpj)}
+                        {obterQuantidadeTotalCobrancas(unitSelecionada.cnpj || (unitSelecionada as any).cpf || "")}
                       </p>
                     </div>
                   </div>
@@ -2723,7 +2698,7 @@ _Mensagem Automática do Sistema_
                   </p>
                   <p>
                     <strong>Quantidade de cobranças:</strong>{" "}
-                    {obterQuantidadeTotalCobrancas(unidadeParaWhatsApp.cnpj)}
+                    {obterQuantidadeTotalCobrancas(unidadeParaWhatsApp.cnpj || (unidadeParaWhatsApp as any).cpf || "")}
                   </p>
                   <p>
                     <strong>Valor total aproximado:</strong>{" "}
