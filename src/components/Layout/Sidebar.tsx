@@ -3,7 +3,7 @@ import {
   Home, Building2, 
   Settings, ChevronLeft, ChevronRight,
   Menu, X, Shield, Receipt, CircleDollarSign, Calculator, Users,
-  // BarChart3, Calendar, Scale, FileText,
+  Bell, Search, MoreHorizontal
 } from "lucide-react";
 import icon from "../../assets/cabeca.png";
 
@@ -23,17 +23,55 @@ export function Sidebar({
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const menuItems = [
-    { id: "dashboard", label: "Dashboard", icon: Home, permissions: ["admin", "financeiro", "cobranca", "juridico", "leitura"], description: "Resumo geral e indicadores", },
-    { id: "cobrancas", label: "Kanban Cobranças", icon: CircleDollarSign, permissions: ["admin", "financeiro", "cobranca"], description: "Kanban visual de cobrança", },
-    { id: "cobrancas-lista", label: "Gestão de Cobranças", icon: Receipt, permissions: ["admin", "financeiro", "cobranca"], description: "Gestão geral de cobranças", },
-    { id: "simulacao-parcelamento", label: "Simulação Parcelamento", icon: Calculator, permissions: ["admin", "financeiro", "cobranca"], description: "Propostas de parcelamento", },
-    { id: "unidades", label: "Unidades", icon: Building2, permissions: ["admin", "financeiro"], description: "Cadastro e gestão de unidades", },
-    { id: "franqueados", label: "Franqueados", icon: Users, permissions: ["admin", "financeiro"], description: "Cadastro e vínculos de franqueados", },
-  //  { id: "reunioes", label: "Reuniões", icon: Calendar, permissions: ["admin", "financeiro", "cobranca"], description: "Agenda e negociações", },
-  //  { id: "juridico", label: "Jurídico", icon: Scale, permissions: ["admin", "juridico"], description: "Escalonamentos e ações legais", },
-  //  { id: "templates-juridicos", label: "Templates Jurídicos", icon: FileText, permissions: ["admin", "juridico"], description: "Templates e gatilhos automáticos", },
-  //  { id: "relatorios", label: "Relatórios", icon: BarChart3, permissions: ["admin", "financeiro", "juridico", "leitura"], description: "Análises e indicadores", },
-    { id: "admin", label: "Configurações", icon: Settings, permissions: ["admin"], description: "Parâmetros do sistema", },
+    { 
+      id: "dashboard", 
+      label: "Dashboard", 
+      icon: Home, 
+      permissions: ["admin", "financeiro", "cobranca", "juridico", "leitura"],
+      badge: null
+    },
+    { 
+      id: "cobrancas", 
+      label: "Kanban Cobranças", 
+      icon: CircleDollarSign, 
+      permissions: ["admin", "financeiro", "cobranca"],
+      badge: null
+    },
+    { 
+      id: "cobrancas-lista", 
+      label: "Gestão de Cobranças", 
+      icon: Receipt, 
+      permissions: ["admin", "financeiro", "cobranca"],
+      badge: null
+    },
+    { 
+      id: "simulacao-parcelamento", 
+      label: "Simulação Parcelamento", 
+      icon: Calculator, 
+      permissions: ["admin", "financeiro", "cobranca"],
+      badge: null
+    },
+    { 
+      id: "unidades", 
+      label: "Unidades", 
+      icon: Building2, 
+      permissions: ["admin", "financeiro"],
+      badge: null
+    },
+    { 
+      id: "franqueados", 
+      label: "Franqueados", 
+      icon: Users, 
+      permissions: ["admin", "financeiro"],
+      badge: null
+    },
+    { 
+      id: "admin", 
+      label: "Configurações", 
+      icon: Settings, 
+      permissions: ["admin"],
+      badge: null
+    },
   ];
 
   const hasPermission = (itemPermissions: string[]) => {
@@ -47,75 +85,155 @@ export function Sidebar({
   );
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-gray-900 text-white">
+    <div className="flex flex-col h-full bg-white border-r border-gray-200">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-700">
+      <div className="flex items-center justify-between p-4 border-b border-gray-100">
         {!collapsed && (
           <div className="flex items-center">
-            <div className="w-[3em] h-auto rounded-lg flex items-center justify-center shadow-lg">
-              <img src={icon} alt="Icone Girafa" />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center mr-3">
+              <img src={icon} alt="Icone Girafa" className="w-full h-full object-contain" />
             </div>
-            <div className="ml-3">
-              <h1 className="text-base font-bold text-white">Gestor Financeiro CP</h1>
-              <p className="text-[10px] text-center text-gray-400">Sistema Automático de Cobranças</p>
+            <div>
+              <h1 className="text-sm font-semibold text-gray-900">Cresci e Perdi</h1>
+              <p className="text-xs text-gray-500">Sistema Financeiro</p>
             </div>
           </div>
         )}
-        <button onClick={() => setCollapsed(!collapsed)} className="p-1 rounded-lg hover:bg-gray-700 transition-colors hidden lg:block" >
+        
+        {/* Toggle button - sempre visível */}
+        <button 
+          onClick={() => setCollapsed(!collapsed)} 
+          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors hidden lg:flex items-center justify-center"
+        >
           {collapsed ? (
-            <ChevronRight className="w-5 h-5 text-gray-300" />
+            <ChevronRight className="w-4 h-4 text-gray-500" />
           ) : (
-            <ChevronLeft className="w-5 h-5 text-gray-300" />
+            <ChevronLeft className="w-4 h-4 text-gray-500" />
           )}
         </button>
+        
+        {/* Collapsed header */}
+        {collapsed && (
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+            <img src={icon} alt="Icone Girafa" className="w-full h-full object-contain" />
+          </div>
+        )}
       </div>
 
+      {/* Search bar - apenas quando expandido */}
+      {!collapsed && (
+        <div className="p-4 border-b border-gray-100">
+          <div className="relative">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar..."
+              className="w-full pl-10 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Navigation */}
-      <nav className="flex-1 p-3 pt-6 space-y-1 overflow-y-auto overflow-x-hidden">
-        {filteredMenuItems.map((item) => {
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        {/* Seção Principal */}
+        {!collapsed && (
+          <div className="px-3 py-2">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Principal</p>
+          </div>
+        )}
+        
+        {filteredMenuItems.slice(0, 4).map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           return (
             <div key={item.id} className="relative group">
               <button
                 onClick={() => { onTabChange(item.id); setMobileOpen(false); }}
-                className={`w-full flex items-center px-3 py-3 rounded-xl text-left transition-all duration-200 ${
+                className={`w-full flex items-center px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
                   isActive
-                    ? "bg-gradient-to-r from-[#FFC31A] to-[#eeb414] text-white shadow-lg shadow-yellow-500/25 transform scale-[1.02]"
-                    : "text-gray-300 hover:bg-gray-800 hover:text-white hover:transform hover:scale-[1.01]"
+                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                 }`}
                 title={collapsed ? item.label : undefined}
               >
-                <div
-                  className={`p-2 rounded-lg ${
-                    isActive ? "bg-white/10" : "bg-gray-700/50"
-                  } ${collapsed ? "mx-auto" : "mr-3"}`}
-                >
+                <div className={`flex items-center justify-center w-5 h-5 ${collapsed ? "mx-auto" : "mr-3"}`}>
                   <Icon className="w-5 h-5" />
                 </div>
                 {!collapsed && (
-                  <div className="flex-1 min-w-0">
-                    <span className="font-medium text-sm block truncate">
+                  <div className="flex-1 flex items-center justify-between min-w-0">
+                    <span className="font-medium text-sm truncate">
                       {item.label}
                     </span>
-                    <span className="text-xs text-white block truncate">
-                      {item.description}
-                    </span>
+                    {item.badge && (
+                      <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-red-500 text-white rounded-full">
+                        {item.badge}
+                      </span>
+                    )}
                   </div>
                 )}
-                {!collapsed && isActive && (
-                  <div className="w-2 h-2 bg-white rounded-full opacity-75"></div>
+                {isActive && (
+                  <div className="absolute right-2 w-1.5 h-1.5 bg-blue-600 rounded-full"></div>
                 )}
               </button>
 
               {/* Tooltip for collapsed state */}
               {collapsed && (
-                <div className="absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
-                  <div className="font-medium">{item.label}</div>
-                  <div className="text-xs text-gray-300">
-                    {item.description}
+                <div className="absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-900 text-white px-3 py-2 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+                  <div className="font-medium text-sm">{item.label}</div>
+                  <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-900"></div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Seção Gestão */}
+        {!collapsed && (
+          <div className="px-3 py-2 mt-6">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Gestão</p>
+          </div>
+        )}
+        
+        {filteredMenuItems.slice(4).map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+          return (
+            <div key={item.id} className="relative group">
+              <button
+                onClick={() => { onTabChange(item.id); setMobileOpen(false); }}
+                className={`w-full flex items-center px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
+                  isActive
+                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                }`}
+                title={collapsed ? item.label : undefined}
+              >
+                <div className={`flex items-center justify-center w-5 h-5 ${collapsed ? "mx-auto" : "mr-3"}`}>
+                  <Icon className="w-5 h-5" />
+                </div>
+                {!collapsed && (
+                  <div className="flex-1 flex items-center justify-between min-w-0">
+                    <span className="font-medium text-sm truncate">
+                      {item.label}
+                    </span>
+                    {item.badge && (
+                      <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-red-500 text-white rounded-full">
+                        {item.badge}
+                      </span>
+                    )}
                   </div>
-                  <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-800"></div>
+                )}
+                {isActive && (
+                  <div className="absolute right-2 w-1.5 h-1.5 bg-blue-600 rounded-full"></div>
+                )}
+              </button>
+
+              {/* Tooltip for collapsed state */}
+              {collapsed && (
+                <div className="absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-900 text-white px-3 py-2 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+                  <div className="font-medium text-sm">{item.label}</div>
+                  <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-900"></div>
                 </div>
               )}
             </div>
@@ -123,111 +241,187 @@ export function Sidebar({
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-gray-700">
+      {/* Footer com perfil do usuário */}
+      <div className="p-4 border-t border-gray-100">
         {!collapsed ? (
-          <div className="text-center">
-            <div className="text-xs text-gray-400 mb-2">
-              <div className="flex items-center justify-center space-x-2 mb-1">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span>Sistema Online</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mr-3">
+                <span className="text-white text-sm font-semibold">CP</span>
               </div>
-              <p>© 2025 Cresci e Perdi - Versão 1.0.0</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">Sistema</p>
+                <p className="text-xs text-gray-500 truncate">Cresci e Perdi</p>
+              </div>
             </div>
-            <div className="flex items-center justify-center space-x-1 text-xs text-gray-500">
-              <Shield className="w-3 h-3" />
-              <span>Seguro</span>
-            </div>
+            <button className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+              <MoreHorizontal className="w-4 h-4 text-gray-400" />
+            </button>
           </div>
         ) : (
           <div className="flex justify-center">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <span className="text-white text-sm font-semibold">CP</span>
+            </div>
           </div>
         )}
       </div>
     </div>
   );
+
   return (
     <>
       {/* Desktop Sidebar */}
       <div
         className={`hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:z-50 transition-all duration-300 ${
-          collapsed ? "lg:w-20" : "lg:w-72"
+          collapsed ? "lg:w-16" : "lg:w-72"
         }`}
       >
         <SidebarContent />
       </div>
+
       {/* Mobile Menu Button */}
       <div className="lg:hidden fixed top-4 left-4 z-50">
         <button
           onClick={() => setMobileOpen(true)}
-          className="p-3 bg-gray-900 text-white rounded-xl shadow-lg border border-gray-700 hover:bg-gray-800 transition-colors"
+          className="p-3 bg-white text-gray-700 rounded-xl shadow-lg border border-gray-200 hover:bg-gray-50 transition-colors"
         >
           <Menu className="w-6 h-6" />
         </button>
       </div>
+
       {/* Mobile Sidebar */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
+            className="fixed inset-0 bg-black bg-opacity-25 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="relative flex flex-col w-80 max-w-sm">
-            <div className="bg-gray-900 text-white h-full">
-              <div className="flex items-center justify-between p-4 border-b border-gray-700">
+          <div className="relative flex flex-col w-80 max-w-sm bg-white">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100">
+              <div className="flex items-center">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center mr-3">
+                  <img src={icon} alt="Logo" className="w-full h-full object-contain" />
+                </div>
+                <div>
+                  <h1 className="text-sm font-semibold text-gray-900">Cresci e Perdi</h1>
+                  <p className="text-xs text-gray-500">Sistema Financeiro</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Search bar mobile */}
+            <div className="p-4 border-b border-gray-100">
+              <div className="relative">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Buscar..."
+                  className="w-full pl-10 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+              {/* Seção Principal Mobile */}
+              <div className="px-3 py-2">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Principal</p>
+              </div>
+              
+              {filteredMenuItems.slice(0, 4).map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button 
+                    key={item.id} 
+                    onClick={() => { onTabChange(item.id); setMobileOpen(false); }}
+                    className={`w-full flex items-center px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
+                      isActive
+                        ? "bg-blue-50 text-blue-700 border border-blue-200"
+                        : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                    }`}
+                  >
+                    <div className="flex items-center justify-center w-5 h-5 mr-3">
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 flex items-center justify-between min-w-0">
+                      <span className="font-medium text-sm truncate">
+                        {item.label}
+                      </span>
+                      {item.badge && (
+                        <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-red-500 text-white rounded-full">
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
+                    {isActive && (
+                      <div className="w-1.5 h-1.5 bg-blue-600 rounded-full ml-2"></div>
+                    )}
+                  </button>
+                );
+              })}
+
+              {/* Seção Gestão Mobile */}
+              <div className="px-3 py-2 mt-6">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Gestão</p>
+              </div>
+              
+              {filteredMenuItems.slice(4).map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button 
+                    key={item.id} 
+                    onClick={() => { onTabChange(item.id); setMobileOpen(false); }}
+                    className={`w-full flex items-center px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
+                      isActive
+                        ? "bg-blue-50 text-blue-700 border border-blue-200"
+                        : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                    }`}
+                  >
+                    <div className="flex items-center justify-center w-5 h-5 mr-3">
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 flex items-center justify-between min-w-0">
+                      <span className="font-medium text-sm truncate">
+                        {item.label}
+                      </span>
+                      {item.badge && (
+                        <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-red-500 text-white rounded-full">
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
+                    {isActive && (
+                      <div className="w-1.5 h-1.5 bg-blue-600 rounded-full ml-2"></div>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+
+            {/* Footer Mobile */}
+            <div className="p-4 border-t border-gray-100">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-                    <img src={icon} alt="Logo" />
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mr-3">
+                    <span className="text-white text-sm font-semibold">CP</span>
                   </div>
-                  <div className="ml-3">
-                    <h1 className="text-lg font-bold text-white">
-                      Cresci e Perdi
-                    </h1>
-                    <p className="text-xs text-gray-400">Sistema de Cobrança</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">Sistema</p>
+                    <p className="text-xs text-gray-500 truncate">Cresci e Perdi</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setMobileOpen(false)}
-                  className="p-2 rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-300" />
+                <button className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                  <MoreHorizontal className="w-4 h-4 text-gray-400" />
                 </button>
               </div>
-              <nav className="flex-1 p-4 space-y-1 overflow-y-scroll">
-                {filteredMenuItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  return (
-                    <button key={item.id} onClick={() => { onTabChange(item.id); setMobileOpen(false); }}
-                      className={`w-full flex items-center px-3 py-3 rounded-xl text-left transition-all duration-200 ${
-                        isActive
-                          ? "bg-gradient-to-r from-[#FFC31A] to-[#eeb414] text-white shadow-lg shadow-yellow-500/25 transform scale-[1.02]"
-                          : "text-gray-300 hover:bg-gray-800 hover:text-white"
-                      }`}
-                    >
-                      <div
-                        className={`p-2 rounded-lg mr-3 ${
-                          isActive ? "bg-white/10" : "bg-gray-700/50"
-                        }`}
-                      >
-                        <Icon className="w-5 h-5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <span className="font-medium text-sm block truncate">
-                          {item.label}
-                        </span>
-                        <span className="text-xs text-white block truncate">
-                          {item.description}
-                        </span>
-                      </div>
-                      {isActive && (
-                        <div className="w-2 h-2 bg-white rounded-full opacity-75"></div>
-                      )}
-                    </button>
-                  );
-                })}
-              </nav>
             </div>
           </div>
         </div>
