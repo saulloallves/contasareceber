@@ -45,6 +45,7 @@ export function Header({ user }: HeaderProps) {
             setResultadoImportacao(novoAlerta);
 
             // Dispara um evento global para que outras partes da aplicação saibam que precisam se atualizar.
+          }
           // Dispara evento global para atualização
           window.dispatchEvent(new CustomEvent("cobrancasAtualizadas"));
         }
