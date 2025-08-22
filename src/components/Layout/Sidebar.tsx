@@ -242,94 +242,6 @@ export function Sidebar({
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {/* Seção Notificações */}
-        {!collapsed && (
-          <div className="px-3 py-2">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Notificações</p>
-          </div>
-        )}
-        
-        {/* Botão de Notificações */}
-        <div className="relative">
-          <button
-            onClick={() => {
-              setShowNotifications(!showNotifications);
-              fetchAlertas();
-            }}
-            className={`w-full flex items-center px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
-              showNotifications
-                ? "bg-blue-50 text-blue-700 border border-blue-200"
-                : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-            }`}
-            title={collapsed ? "Notificações" : undefined}
-          >
-            <div className={`flex items-center justify-center w-5 h-5 ${collapsed ? "mx-auto" : "mr-3"} relative`}>
-              <Bell className="w-5 h-5" />
-              {alertas.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                  {alertas.length > 9 ? "9+" : alertas.length}
-                </span>
-              )}
-            </div>
-            {!collapsed && (
-              <div className="flex-1 flex items-center justify-between min-w-0">
-                <span className="font-medium text-sm truncate">
-                  Notificações
-                </span>
-                {alertas.length > 0 && (
-                  <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-red-500 text-white rounded-full">
-                    {alertas.length > 9 ? "9+" : alertas.length}
-                  </span>
-                )}
-              </div>
-            )}
-          </button>
-
-          {/* Dropdown de Notificações */}
-          {showNotifications && !collapsed && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-80 overflow-y-auto">
-              <div className="p-3 border-b border-gray-100">
-                <h4 className="font-semibold text-gray-800 text-sm">Notificações</h4>
-              </div>
-              {alertas.length === 0 ? (
-                <div className="p-4 text-center text-gray-500 text-sm">
-                  <Bell className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-                  Nenhuma notificação nova
-                </div>
-              ) : (
-                <div className="max-h-64 overflow-y-auto">
-                  {alertas.map((alerta) => (
-                    <div key={alerta.id} className="p-3 border-b border-gray-100 hover:bg-gray-50">
-                      <div className="flex items-start space-x-3">
-                        <div
-                          className={`w-2 h-2 rounded-full mt-1.5 ${getUrgencyColor(alerta.nivel_urgencia)}`}
-                        ></div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-800 font-medium truncate">{alerta.titulo}</p>
-                          <p className="text-xs text-gray-600 mt-1 line-clamp-2">{normalizeUsDateInText(alerta.descricao)}</p>
-                          <div className="text-xs text-gray-500 mt-1">
-                            CNPJ: {alerta.cnpj_unidade ? formatarCNPJCPF(alerta.cnpj_unidade) : "N/A"}
-                          </div>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMarcarComoResolvido(alerta.id);
-                          }}
-                          className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-full"
-                          title="Marcar como resolvido"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
         {/* Seção Principal */}
         {!collapsed && (
           <div className="px-3 py-2">
@@ -433,6 +345,94 @@ export function Sidebar({
             </div>
           );
         })}
+
+        {/* Seção Notificações */}
+        {!collapsed && (
+          <div className="px-3 py-2 mt-6">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Notificações</p>
+          </div>
+        )}
+        
+        {/* Botão de Notificações */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setShowNotifications(!showNotifications);
+              fetchAlertas();
+            }}
+            className={`w-full flex items-center px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
+              showNotifications
+                ? "bg-blue-50 text-blue-700 border border-blue-200"
+                : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+            }`}
+            title={collapsed ? "Notificações" : undefined}
+          >
+            <div className={`flex items-center justify-center w-5 h-5 ${collapsed ? "mx-auto" : "mr-3"} relative`}>
+              <Bell className="w-5 h-5" />
+              {alertas.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
+                  {alertas.length > 9 ? "9+" : alertas.length}
+                </span>
+              )}
+            </div>
+            {!collapsed && (
+              <div className="flex-1 flex items-center justify-between min-w-0">
+                <span className="font-medium text-sm truncate">
+                  Notificações
+                </span>
+                {alertas.length > 0 && (
+                  <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-red-500 text-white rounded-full">
+                    {alertas.length > 9 ? "9+" : alertas.length}
+                  </span>
+                )}
+              </div>
+            )}
+          </button>
+
+          {/* Dropdown de Notificações */}
+          {showNotifications && !collapsed && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-80 overflow-y-auto">
+              <div className="p-3 border-b border-gray-100">
+                <h4 className="font-semibold text-gray-800 text-sm">Notificações</h4>
+              </div>
+              {alertas.length === 0 ? (
+                <div className="p-4 text-center text-gray-500 text-sm">
+                  <Bell className="w-8 h-8 mx-auto text-gray-300 mb-2" />
+                  Nenhuma notificação nova
+                </div>
+              ) : (
+                <div className="max-h-64 overflow-y-auto">
+                  {alertas.map((alerta) => (
+                    <div key={alerta.id} className="p-3 border-b border-gray-100 hover:bg-gray-50">
+                      <div className="flex items-start space-x-3">
+                        <div
+                          className={`w-2 h-2 rounded-full mt-1.5 ${getUrgencyColor(alerta.nivel_urgencia)}`}
+                        ></div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-800 font-medium truncate">{alerta.titulo}</p>
+                          <p className="text-xs text-gray-600 mt-1 line-clamp-2">{normalizeUsDateInText(alerta.descricao)}</p>
+                          <div className="text-xs text-gray-500 mt-1">
+                            CNPJ: {alerta.cnpj_unidade ? formatarCNPJCPF(alerta.cnpj_unidade) : "N/A"}
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMarcarComoResolvido(alerta.id);
+                          }}
+                          className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-full"
+                          title="Marcar como resolvido"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* Footer com perfil do usuário */}
