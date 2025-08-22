@@ -295,16 +295,16 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
       <div className="space-y-6">
         {/* Linha Superior - 2 Cards em Destaque */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl shadow-lg p-8 border border-red-200">
+          <div className="bg-white rounded-xl shadow-lg p-8 border-l-4 border-red-400 hover:shadow-xl transition-all duration-300">
             <div className="flex items-start space-x-6 min-h-[120px]">
-              <div className="p-3 bg-red-500 rounded-full flex-shrink-0">
-                <TrendingUp className="w-8 h-8 text-white" />
+              <div className="p-3 bg-red-50 rounded-xl flex-shrink-0 border border-red-100">
+                <TrendingUp className="w-8 h-8 text-red-500" />
               </div>
               <div className="monetary-container">
-                <p className="text-lg font-medium text-red-700 mb-2">Valor com Juros e Multa</p>
+                <p className="text-lg font-medium text-gray-700 mb-2">Valor com Juros e Multa</p>
                 {renderMonetaryValue(
                   indicadores.totalEmAbertoAtualizado ?? indicadores.totalEmAberto,
-                  "text-red-600"
+                  "text-gray-900"
                 )}
                 <div className="mt-3 flex items-center text-base">
                   <span
@@ -316,24 +316,24 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
                     {getVariacaoIcon(indicadores.variacaoEmAberto)}
                     {formatarPercentual(Math.abs(indicadores.variacaoEmAberto))}
                   </span>
-                  <span className="text-gray-500 ml-2">vs. mês anterior</span>
+                  <span className="text-gray-400 ml-2">vs. mês anterior</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl shadow-lg p-8 border border-emerald-200">
+          <div className="bg-white rounded-xl shadow-lg p-8 border-l-4 border-emerald-400 hover:shadow-xl transition-all duration-300">
             <div className="flex items-start space-x-6 min-h-[120px]">
-              <div className="p-3 bg-emerald-500 rounded-full flex-shrink-0">
-                <TrendingUp className="w-8 h-8 text-white" />
+              <div className="p-3 bg-emerald-50 rounded-xl flex-shrink-0 border border-emerald-100">
+                <TrendingUp className="w-8 h-8 text-emerald-500" />
               </div>
               <div className="monetary-container">
-                <p className="text-lg font-medium text-emerald-700 mb-2">Valor Original (Sem Juros/Multa)</p>
+                <p className="text-lg font-medium text-gray-700 mb-2">Valor Original (Sem Juros/Multa)</p>
                 {renderMonetaryValue(
                   indicadores.totalEmAbertoOriginal ?? indicadores.totalEmAberto,
-                  "text-emerald-600"
+                  "text-gray-900"
                 )}
-                <div className="mt-3 text-sm text-emerald-700">
+                <div className="mt-3 text-sm text-gray-500">
                   Soma dos valores originais das cobranças em aberto e negociando
                 </div>
               </div>
@@ -343,16 +343,16 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
 
         {/* Linha Inferior - 3 Cards Distribuídos */}
         <div className="flex flex-col lg:flex-row gap-6 lg:justify-between">
-          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-lg p-6 border border-green-200 flex-1">
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-400 flex-1 hover:shadow-xl transition-all duration-300">
             <div className="flex items-start space-x-4 min-h-[80px]">
-              <div className="p-2 bg-green-500 rounded-full flex-shrink-0">
-                <CheckCircle className="w-6 h-6 text-white" />
+              <div className="p-2 bg-green-50 rounded-lg flex-shrink-0 border border-green-100">
+                <CheckCircle className="w-6 h-6 text-green-500" />
               </div>
               <div className="monetary-container">
-                <p className="text-sm font-medium text-green-700">
+                <p className="text-sm font-medium text-gray-700">
                   Valor Recuperado
                 </p>
-                {renderMonetaryValue(indicadores.totalQuitado, "text-green-600")}
+                {renderMonetaryValue(indicadores.totalQuitado, "text-gray-900")}
                 <div className="mt-2 flex items-center text-sm">
                   <span
                     className={`font-semibold ${getVariacaoColor(
@@ -362,24 +362,24 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
                     {getVariacaoIcon(indicadores.variacaoQuitado)}
                     {formatarPercentual(Math.abs(indicadores.variacaoQuitado))}
                   </span>
-                  <span className="text-gray-500 ml-2">vs. mês anterior</span>
+                  <span className="text-gray-400 ml-2">vs. mês anterior</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl shadow-lg p-6 border border-yellow-200 flex-1">
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-yellow-400 flex-1 hover:shadow-xl transition-all duration-300">
             <div className="flex items-start space-x-4 min-h-[80px]">
-              <div className="p-2 bg-yellow-500 rounded-full flex-shrink-0">
-                <Clock className="w-6 h-6 text-white" />
+              <div className="p-2 bg-yellow-50 rounded-lg flex-shrink-0 border border-yellow-100">
+                <Clock className="w-6 h-6 text-yellow-500" />
               </div>
               <div className="monetary-container">
-                <p className="text-sm font-medium text-yellow-700">
+                <p className="text-sm font-medium text-gray-700">
                   Em Negociação
                 </p>
                 {renderMonetaryValue(
                   indicadores.totalNegociando,
-                  "text-yellow-600"
+                  "text-gray-900"
                 )}
                 <div className="mt-2 flex items-center text-sm">
                   <span
@@ -390,25 +390,25 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
                     {getVariacaoIcon(indicadores.variacaoNegociando)}
                     {formatarPercentual(Math.abs(indicadores.variacaoNegociando))}
                   </span>
-                  <span className="text-gray-500 ml-2">vs. mês anterior</span>
+                  <span className="text-gray-400 ml-2">vs. mês anterior</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg p-6 border border-blue-200 flex-1">
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-400 flex-1 hover:shadow-xl transition-all duration-300">
             <div className="flex items-start space-x-4 min-h-[80px]">
-              <div className="p-2 bg-blue-500 rounded-full flex-shrink-0">
-                <Users className="w-6 h-6 text-white" />
+              <div className="p-2 bg-blue-50 rounded-lg flex-shrink-0 border border-blue-100">
+                <Users className="w-6 h-6 text-blue-500" />
               </div>
               <div className="monetary-container">
-                <p className="text-sm font-medium text-blue-700">
+                <p className="text-sm font-medium text-gray-700">
                   Unidades Inadimplentes
                 </p>
-                <p className="monetary-value text-blue-600">
+                <p className="monetary-value text-gray-900">
                   {indicadores.unidadesInadimplentes ?? 0}
                 </p>
-                <p className="text-xs text-blue-500 mt-1">
+                <p className="text-xs text-gray-500 mt-1">
                   Ticket médio:
                   <span className="font-semibold ml-1">
                     {formatarMoeda(indicadores.ticketMedio ?? 0)}
@@ -424,7 +424,7 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
                     {getVariacaoIcon(indicadores.variacaoUnidades)}
                     {formatarPercentual(Math.abs(indicadores.variacaoUnidades))}
                   </span>
-                  <span className="text-gray-500 ml-2">vs. mês anterior</span>
+                  <span className="text-gray-400 ml-2">vs. mês anterior</span>
                 </div>
               </div>
             </div>
@@ -433,9 +433,9 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
       </div>
 
       {/* Acesso Rápido */}
-      <div className="bg-white rounded-xl shadow p-6 border border-gray-100">
+      <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300">
         <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-          <div className="p-2 bg-cyan-100 rounded-lg mr-3">
+          <div className="p-2 bg-gray-50 rounded-lg mr-3 border border-gray-100">
             <Zap className="w-6 h-6 text-cyan-600" />
           </div>
           Acesso Rápido
@@ -443,45 +443,45 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
           <button
             onClick={() => onNavigate?.("cobrancas")}
-            className="flex items-center gap-3 p-4 rounded-xl border border-blue-200 hover:bg-blue-50 transition-colors"
+            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-gray-50 transition-all duration-200"
             aria-label="Kanban Cobranças"
           >
             <CircleDollarSign className="w-5 h-5 text-blue-600" />
-            <span className="text-blue-700 font-medium">Kanban Cobranças</span>
+            <span className="text-gray-700 font-medium">Kanban Cobranças</span>
           </button>
           <button
             onClick={() => onNavigate?.("cobrancas-lista")}
-            className="flex items-center gap-3 p-4 rounded-xl border border-emerald-200 hover:bg-emerald-50 transition-colors"
+            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-emerald-300 hover:bg-gray-50 transition-all duration-200"
             aria-label="Gestão Cobranças"
           >
             <Receipt className="w-5 h-5 text-emerald-600" />
-            <span className="text-emerald-700 font-medium">
+            <span className="text-gray-700 font-medium">
               Gestão Cobranças
             </span>
           </button>
           <button
             onClick={() => onNavigate?.("simulacao-parcelamento")}
-            className="flex items-center gap-3 p-4 rounded-xl border border-indigo-200 hover:bg-indigo-50 transition-colors"
+            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-indigo-300 hover:bg-gray-50 transition-all duration-200"
             aria-label="Simulação de Parcelamento"
           >
             <Calculator className="w-5 h-5 text-indigo-600" />
-            <span className="text-indigo-700 font-medium">Parcelamento</span>
+            <span className="text-gray-700 font-medium">Parcelamento</span>
           </button>
           <button
             onClick={() => onNavigate?.("unidades")}
-            className="flex items-center gap-3 p-4 rounded-xl border border-orange-200 hover:bg-orange-50 transition-colors"
+            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-orange-300 hover:bg-gray-50 transition-all duration-200"
             aria-label="Unidades"
           >
             <Building2 className="w-5 h-5 text-orange-600" />
-            <span className="text-orange-700 font-medium">Unidades</span>
+            <span className="text-gray-700 font-medium">Unidades</span>
           </button>
           <button
             onClick={() => onNavigate?.("franqueados")}
-            className="flex items-center gap-3 p-4 rounded-xl border border-pink-200 hover:bg-pink-50 transition-colors"
+            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-pink-300 hover:bg-gray-50 transition-all duration-200"
             aria-label="Franqueados"
           >
             <Users className="w-5 h-5 text-pink-600" />
-            <span className="text-pink-700 font-medium">Franqueados</span>
+            <span className="text-gray-700 font-medium">Franqueados</span>
           </button>
           <button
             onClick={() => {
@@ -504,58 +504,58 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
               );
               // onNavigate?.('reunioes'); // pronto para quando implementarmos
             }}
-            className="flex items-center gap-3 p-4 rounded-xl border border-purple-200 hover:bg-purple-50 transition-colors"
+            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-purple-300 hover:bg-gray-50 transition-all duration-200"
             aria-label="Reuniões"
           >
             <Calendar className="w-5 h-5 text-purple-600" />
-            <span className="text-purple-700 font-medium">Reuniões</span>
+            <span className="text-gray-700 font-medium">Reuniões</span>
           </button>
         </div>
       </div>
 
       {/* Próximas Reuniões */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300">
           <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
-            <div className="p-2 bg-purple-100 rounded-lg mr-3">
+            <div className="p-2 bg-gray-50 rounded-lg mr-3 border border-gray-100">
               <Clock className="w-6 h-6 text-purple-600" />
             </div>
             Próximas Reuniões
           </h3>
-          <div className="text-center py-10 text-gray-600">
+          <div className="text-center py-10 text-gray-500">
             O agendamento de reuniões ainda não foi implementado no sistema.
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300">
           <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg mr-3">
+            <div className="p-2 bg-gray-50 rounded-lg mr-3 border border-gray-100">
               <CheckCircle className="w-6 h-6 text-green-600" />
             </div>
             Últimos Envios
           </h3>
           <div className="space-y-4">
             {carregandoMensagens ? (
-              <div className="flex items-center justify-center py-8 text-gray-500">
+              <div className="flex items-center justify-center py-8 text-gray-400">
                 <RefreshCw className="w-5 h-5 animate-spin mr-2" />{" "}
                 Carregando...
               </div>
             ) : ultimasMensagens.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-400">
                 <p>Nenhuma mensagem enviada ainda.</p>
               </div>
             ) : (
               ultimasMensagens.map((m) => (
                 <div
                   key={`${m.canal}-${m.id}`}
-                  className="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:shadow-md transition-shadow"
+                  className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:border-gray-200 hover:shadow-md transition-all duration-200"
                 >
                   <div className="flex items-start">
                     <div
                       className={`p-2 rounded-full mr-4 ${
                         m.canal === "whatsapp"
-                          ? "bg-emerald-100"
-                          : "bg-blue-100"
+                          ? "bg-emerald-50 border border-emerald-100"
+                          : "bg-blue-50 border border-blue-100"
                       }`}
                     >
                       {m.canal === "whatsapp" ? (
@@ -569,10 +569,10 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
                         {m.canal === "whatsapp" ? "WhatsApp" : "E-mail"} •{" "}
                         {m.destinatario}
                       </p>
-                      <p className="text-sm text-gray-600 line-clamp-2">
+                      <p className="text-sm text-gray-500 line-clamp-2">
                         {m.mensagem}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-gray-400 mt-1">
                         {formatarDataHora(m.data)}
                       </p>
                     </div>
@@ -580,8 +580,8 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
                   <span
                     className={`px-3 py-1 text-xs font-medium rounded-full ${
                       m.status === "sucesso"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
+                        ? "bg-green-50 text-green-600 border border-green-200"
+                        : "bg-red-50 text-red-600 border border-red-200"
                     }`}
                   >
                     {m.status === "sucesso" ? "Enviado" : "Falha"}
