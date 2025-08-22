@@ -72,7 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshUser = () => {
-    loadUser();
+    // Força recarregamento completo para garantir sincronização
+    window.location.reload();
   };
 
   const value = {

@@ -246,8 +246,9 @@ export function UserSettingsModal({ user, isOpen, onClose }: UserSettingsModalPr
       // Fecha modal após 2 segundos
       setTimeout(() => {
         setSuccess(false);
-        onClose();
-        // Não precisa recarregar, o AuthProvider vai atualizar automaticamente
+        
+        // Força refresh da página para atualizar todos os componentes
+        window.location.reload();
       }, 2000);
 
     } catch (error: any) {
