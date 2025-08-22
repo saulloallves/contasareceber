@@ -675,7 +675,8 @@ export function Sidebar({
                     ))}
                   </div>
                 )}
-            </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -818,148 +819,20 @@ export function Sidebar({
                     <p className="text-sm font-medium text-gray-900 truncate">Sistema</p>
                     <p className="text-xs text-gray-500 truncate">Cresci e Perdi</p>
                   </div>
-          <div className="flex flex-col items-center space-y-2">
-            {/* Avatar colapsado */}
-            <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="relative"
-              title={user?.name || "Menu do usuário"}
-            >
-              {user?.avatar_url ? (
-                <img
-                  src={user.avatar_url}
-                  alt={user.name}
-                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                  <span className="text-white text-sm font-semibold">
-                    {user ? getInitials(user.name) : "CP"}
-                  </span>
                 </div>
-              )}
-            </button>
-            
-            {/* Notificações colapsado */}
-            <button
-              onClick={() => {
-                setShowNotifications(!showNotifications);
-                fetchAlertas();
-              }}
-              className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Notificações"
-            >
-              <Bell className="w-5 h-5" />
-              {alertas.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                  {alertas.length > 9 ? "9+" : alertas.length}
-                </span>
-              )}
-            </button>
-
-            {/* Menu do usuário colapsado */}
-            {showUserMenu && (
-              <div className="absolute bottom-full right-full mr-2 mb-2 bg-white rounded-lg shadow-lg border border-gray-200 z-50 w-64">
-                <div className="p-3 border-b border-gray-100">
-                  <div className="flex items-center space-x-3">
-                    {user?.avatar_url ? (
-                      <img
-                        src={user.avatar_url}
-                        alt={user.name}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                        <span className="text-white text-sm font-semibold">
-                          {user ? getInitials(user.name) : "CP"}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-gray-900 truncate">
-                        {user?.name || "Sistema"}
-                      </div>
-                      <div className="text-xs text-gray-500 truncate">
-                        {user?.email || "sistema@crescieperdi.com"}
-                      </div>
-                      {user?.role && (
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mt-1 ${getRoleColor(user.role)}`}>
-                          {user.role}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="py-2">
-                  <button
-                    onClick={() => {
-                      setShowSettingsModal(true);
-                      setShowUserMenu(false);
-                    }}
-                    className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <Settings className="w-4 h-4 mr-3 text-gray-400" />
-                    Configurações da Conta
-                  </button>
-
-                  <div className="border-t border-gray-100 my-2"></div>
-
-                  <button
-                    onClick={handleLogout}
-                    disabled={loggingOut}
-                    className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
-                  >
-                    <LogOut className="w-4 h-4 mr-3" />
-                    {loggingOut ? 'Saindo...' : 'Sair da Conta'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Notificações colapsado */}
-            {showNotifications && (
-              <div className="absolute bottom-full right-full mr-2 mb-2 bg-white rounded-lg shadow-lg border border-gray-200 z-50 w-80">
-                <div className="p-3 border-b border-gray-100">
-                  <h4 className="font-semibold text-gray-800">Notificações</h4>
-                </div>
-                {alertas.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">
-                    <Bell className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-                    <p className="text-sm">Nenhuma notificação nova</p>
-                  </div>
-                ) : (
-                  <div className="max-h-64 overflow-y-auto">
-                    {alertas.map((alerta) => (
-                      <div key={alerta.id} className="p-3 border-b border-gray-100 hover:bg-gray-50">
-                        <div className="flex items-start space-x-3">
-                          <div
-                            className={`w-2 h-2 rounded-full mt-1.5 ${getUrgencyColor(alerta.nivel_urgencia)}`}
-                          ></div>
-                          <div className="flex-1">
-                            <p className="text-sm text-gray-800 font-medium">{alerta.titulo}</p>
-                            <p className="text-xs text-gray-600 mt-1">{normalizeUsDateInText(alerta.descricao)}</p>
-                            <div className="text-xs text-gray-500 mt-1">
-                              CNPJ: {alerta.cnpj_unidade ? formatarCNPJCPF(alerta.cnpj_unidade) : "N/A"}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleMarcarComoResolvido(alerta.id)}
-                            className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-full"
-                            title="Marcar como resolvido"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                <button
+                  onClick={handleLogout}
+                  disabled={loggingOut}
+                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                  title={loggingOut ? 'Saindo...' : 'Sair da conta'}
+                >
+                  <LogOut className="w-5 h-5" />
                 </button>
               </div>
-            )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Configurações do Usuário */}
       {showSettingsModal && user && (
