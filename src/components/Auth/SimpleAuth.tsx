@@ -132,7 +132,7 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
             ativo: true,
             ultimo_acesso: new Date().toISOString()
           }, {
-            onConflict: 'email'
+            onConflict: 'id'
           });
 
         if (insertError) {
