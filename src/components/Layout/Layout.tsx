@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Sidebar } from "./Sidebar";
-import { Header } from "./Header";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -40,8 +39,6 @@ export function Layout({
           collapsed ? "lg:ml-20" : "lg:ml-72"
         }`}
       >
-        <Header user={user} />
-
         <main className="flex-1 p-4 lg:p-6">{children}</main>
       </div>
     </div>
