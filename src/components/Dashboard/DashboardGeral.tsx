@@ -232,7 +232,7 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
     const { formatted, className, shouldTruncate } = formatMonetaryResponsive(
       value,
       {
-        compact: value >= 1000000, // Use compact notation for values >= 1M
+        compact: false, // Sempre mostra valor completo
       }
     );
 
@@ -411,11 +411,7 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
                 <p className="text-xs text-blue-500 mt-1">
                   Ticket médio:
                   <span className="font-semibold ml-1">
-                    {
-                      formatMonetaryResponsive(indicadores.ticketMedio ?? 0, {
-                        compact: true,
-                      }).formatted
-                    }
+                    {formatarMoeda(indicadores.ticketMedio ?? 0)}
                   </span>
                 </p>
                 <div className="mt-2 flex items-center text-sm">
