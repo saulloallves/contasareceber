@@ -125,14 +125,9 @@ export function Header({ user }: HeaderProps) {
 
           {/* User Account Dropdown */}
           <div className="pl-4 flex flex-col items-end border-l border-gray-200">
-            {user ? (
-              <UserAccountDropdown user={user} />
-            ) : (
-              <div className="flex items-center space-x-2 text-gray-500">
-                <div className="w-8 h-8 rounded-full bg-gray-300 animate-pulse"></div>
-                <span className="text-sm">Carregando...</span>
-              </div>
-            )}
+            <div className="text-sm text-gray-600">
+              Sistema de Cobrança
+            </div>
           </div>
           {/* Modal que será exibido quando a importação terminar */}
           {resultadoImportacao && (
