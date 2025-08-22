@@ -55,7 +55,7 @@ export function useUserProfile(userId?: string) {
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!userId || !profile) {
-      throw new Error('Usuário não autenticado');
+      throw new Error('Perfil do usuário não carregado. Tente fazer login novamente.');
     }
 
     try {
@@ -83,7 +83,7 @@ export function useUserProfile(userId?: string) {
 
   const updateAvatar = async (file: File): Promise<string> => {
     if (!userId) {
-      throw new Error('Usuário não autenticado');
+      throw new Error('Perfil do usuário não carregado. Tente fazer login novamente.');
     }
 
     try {

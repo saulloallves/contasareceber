@@ -27,6 +27,8 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
       if (error) {
         setError(error.message);
       } else {
+        // Garantir que existe um perfil na tabela usuarios_sistema
+        await ensureUserProfile();
         onAuthSuccess();
       }
     } catch {
@@ -81,6 +83,9 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
               setError("Erro no login após criação: " + loginError.message);
               return;
             }
+            
+            // Garantir que existe um perfil na tabela usuarios_sistema
+            await ensureUserProfile();
           } else {
             setError("Credenciais inválidas");
             return;
@@ -91,12 +96,51 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
         }
       }
 
+      // Garantir que existe um perfil na tabela usuarios_sistema
+      await ensureUserProfile();
       onAuthSuccess();
     } catch (error) {
       console.error('❌ Erro no login:', error);
       setError("Erro ao fazer login");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const ensureUserProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) return;
+
+      // Verifica se já existe um perfil
+      const { data: existingProfile } = await supabase
+        .from('usuarios_sistema')
+        .select('id')
+        .eq('email', user.email)
+        .maybeSingle();
+
+      if (!existingProfile) {
+        // Cria um novo perfil se não existir
+        const { error: insertError } = await supabase
+          .from('usuarios_sistema')
+          .upsert({
+            id: user.id,
+            email: user.email || '',
+            nome_completo: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Usuário',
+            nivel_permissao: 'observador',
+            ativo: true,
+            ultimo_acesso: new Date().toISOString()
+          }, {
+            onConflict: 'email'
+          });
+
+        if (insertError) {
+          console.error('Erro ao criar perfil do usuário:', insertError);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao garantir perfil do usuário:', error);
     }
   };
 
