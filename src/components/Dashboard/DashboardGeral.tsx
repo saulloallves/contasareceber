@@ -342,7 +342,7 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
         </div>
 
         {/* Linha Inferior - 3 Cards Distribuídos */}
-        <div className="flex flex-col lg:flex-row gap-6 lg:justify-between">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-400 flex-1 hover:shadow-xl transition-all duration-300">
             <div className="flex items-start space-x-4 min-h-[80px]">
               <div className="p-2 bg-green-50 rounded-lg flex-shrink-0 border border-green-100">
@@ -389,40 +389,6 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
                   >
                     {getVariacaoIcon(indicadores.variacaoNegociando)}
                     {formatarPercentual(Math.abs(indicadores.variacaoNegociando))}
-                  </span>
-                  <span className="text-gray-400 ml-2">vs. mês anterior</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-400 flex-1 hover:shadow-xl transition-all duration-300">
-            <div className="flex items-start space-x-4 min-h-[80px]">
-              <div className="p-2 bg-blue-50 rounded-lg flex-shrink-0 border border-blue-100">
-                <Users className="w-6 h-6 text-blue-500" />
-              </div>
-              <div className="monetary-container">
-                <p className="text-sm font-medium text-gray-700">
-                  Unidades Inadimplentes
-                </p>
-                <p className="monetary-value text-gray-900">
-                  {indicadores.unidadesInadimplentes ?? 0}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Ticket médio:
-                  <span className="font-semibold ml-1">
-                    {formatarMoeda(indicadores.ticketMedio ?? 0)}
-                  </span>
-                </p>
-                <div className="mt-2 flex items-center text-sm">
-                  <span
-                    className={`font-semibold ${getVariacaoColor(
-                      indicadores.variacaoUnidades,
-                      false // aumento de unidades inadimplentes é ruim
-                    )}`}
-                  >
-                    {getVariacaoIcon(indicadores.variacaoUnidades)}
-                    {formatarPercentual(Math.abs(indicadores.variacaoUnidades))}
                   </span>
                   <span className="text-gray-400 ml-2">vs. mês anterior</span>
                 </div>
