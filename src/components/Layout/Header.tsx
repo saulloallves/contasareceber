@@ -2,8 +2,6 @@ import { Bell } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Alerta } from "../../types/alertas";
 import { alertasService } from "../../services/alertasService";
-import { NotificationsDropdown } from "./NotificationsDropdown";
-import { UserAccountDropdown } from "./UserAccountDropdown";
 import { supabase } from "../../lib/supabaseClient";
 import logoheader from "../../assets/logo cresci-header.png";
 
@@ -21,30 +19,12 @@ interface HeaderProps {
 }
 
 export function Header({ user }: HeaderProps) {
-  const [alertas, setAlertas] = useState<Alerta[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
   // Estado para controlar o modal de conclusão da importação
   const [resultadoImportacao, setResultadoImportacao] = useState<Alerta | null>(
     null
   );
 
-  const fetchAlertas = async () => {
-    try {
-      const data = await alertasService.getAlertasAtivos();
-      setAlertas(data);
-    } catch (error) {
-      console.error("Falha ao carregar alertas no header:", error);
-    }
-  };
-
   useEffect(() => {
-    // Busca os alertas iniciais ao carregar
-    fetchAlertas();
-
-  // Também ouvimos um evento global para forçar refresh (ex.: quando o watcher detecta a conclusão)
-  const onAtualizar = () => fetchAlertas();
-  window.addEventListener("cobrancasAtualizadas", onAtualizar as EventListener);
-
     // Cria a "escuta" em tempo real na tabela de alertas
     const channel = supabase
       .channel("alertas_sistema_realtime")
@@ -65,9 +45,8 @@ export function Header({ user }: HeaderProps) {
             setResultadoImportacao(novoAlerta);
 
             // Dispara um evento global para que outras partes da aplicação saibam que precisam se atualizar.
-            console.log("Disparando evento: cobrancasAtualizadas");
-            window.dispatchEvent(new CustomEvent("cobrancasAtualizadas"));
-          }
+          // Dispara evento global para atualização
+          window.dispatchEvent(new CustomEvent("cobrancasAtualizadas"));
         }
       )
       .subscribe();
@@ -75,7 +54,6 @@ export function Header({ user }: HeaderProps) {
     // Função de limpeza para remover a "escuta" quando o usuário sai da página
     return () => {
       supabase.removeChannel(channel);
-  window.removeEventListener("cobrancasAtualizadas", onAtualizar as EventListener);
     };
   }, []); // O array vazio garante que isso rode apenas uma vez
 
@@ -85,11 +63,9 @@ export function Header({ user }: HeaderProps) {
     if (!resultadoImportacao || !user) return;
     try {
       // Marcar o alerta como resolvido para não aparecer de novo
-  await alertasService.marcarComoResolvido(resultadoImportacao.id);
+      await alertasService.marcarComoResolvido(resultadoImportacao.id);
       // Limpa o estado para fechar o modal
       setResultadoImportacao(null);
-      // Atualiza a lista de alertas (remove o que acabamos de resolver)
-      fetchAlertas();
     } catch (error) {
       console.error("Erro ao resolver alerta do modal:", error);
       // Mesmo com erro, fecha o modal para o usuário não ficar preso
@@ -108,44 +84,14 @@ export function Header({ user }: HeaderProps) {
           />
         </div>
 
-        <div className="flex items-center space-x-2">
-          {/* Notifications */}
-          <button
-            onClick={async () => {
-              // Abre/fecha o dropdown e força atualização para refletir novos inserts
-              setShowNotifications((v) => !v);
-              await fetchAlertas();
-            }}
-            className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Notificações"
-          >
-            <Bell className="w-5 h-5" />
-            {alertas.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
-                {alertas.length > 9 ? "9+" : alertas.length}
-              </span>
-            )}
-          </button>
-
-          {showNotifications && (
-            <NotificationsDropdown
-              alertas={alertas}
-              onClose={() => setShowNotifications(false)}
-              onUpdate={fetchAlertas}
-            />
-          )}
-
-          {/* User Account Dropdown */}
-          <div className="pl-4 flex flex-col items-end border-l border-gray-200">
-            {user ? (
-              <UserAccountDropdown user={user} />
-            ) : (
-              <div className="flex items-center space-x-2 text-gray-500">
-                <div className="w-8 h-8 rounded-full bg-gray-300 animate-pulse"></div>
-                <span className="text-sm">Carregando...</span>
-              </div>
-            )}
+        <div className="flex items-center">
+          {/* Espaço reservado para futuras funcionalidades do header */}
+          <div className="text-sm text-gray-500">
+            {/* Funcionalidades migradas para o sidebar */}
           </div>
+        </div>
+        
+        <div className="flex items-center space-x-2">
           {/* Modal que será exibido quando a importação terminar */}
           {resultadoImportacao && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

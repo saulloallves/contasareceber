@@ -32,6 +32,7 @@ export function Layout({
         activeTab={activeTab}
         onTabChange={onTabChange}
         userPermissions={userPermissions}
+        user={user}
       />
 
       <div
