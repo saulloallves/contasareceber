@@ -483,6 +483,21 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
     usuarioLogado: string
   ): Promise<Usuario> {
     try {
+      // Primeiro verifica se o usuário existe
+      const { data: usuarioExiste, error: errorExiste } = await supabase
+        .from('usuarios_sistema')
+        .select('id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (errorExiste) {
+        throw new Error(`Erro ao verificar usuário: ${errorExiste.message}`);
+      }
+
+      if (!usuarioExiste) {
+        throw new Error('Usuário não encontrado para atualização');
+      }
+
       // Busca dados atuais
       const { data: usuarioAtual } = await supabase
         .from('usuarios_sistema')
@@ -495,10 +510,14 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
         .update(dadosAtualizacao)
         .eq('id', id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) {
         throw new Error(`Erro ao atualizar usuário: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new Error('Usuário não foi atualizado - verifique as permissões');
       }
 
       // Registra log
