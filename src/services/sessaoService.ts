@@ -30,6 +30,8 @@ export class SessaoService {
    * Cria nova sessão quando usuário faz login
    */
   async criarSessao(usuarioId: string): Promise<string> {
+    console.log('🔄 Iniciando criação de sessão para usuário:', usuarioId);
+    
     // Verifica se já existe uma sessão ativa no sessionStorage
     const sessionKey = `active_session_${usuarioId}`;
     const existingToken = sessionStorage.getItem(sessionKey);
@@ -59,7 +61,7 @@ export class SessaoService {
     }
     
     try {
-      console.log('🔄 Criando sessão para usuário:', usuarioId);
+      console.log('🆕 Criando nova sessão no banco de dados...');
       
       // Primeiro, desativa todas as sessões anteriores do usuário
       console.log('🔄 Desativando sessões anteriores...');
@@ -77,7 +79,6 @@ export class SessaoService {
       const userAgent = navigator.userAgent;
 
       // Cria nova sessão
-      console.log('🆕 Criando nova sessão...');
       const { data, error } = await supabase
         .from('sessoes_usuario')
         .insert({
@@ -273,7 +274,7 @@ export class SessaoService {
    */
   async limparSessoesExpiradas(): Promise<number> {
     try {
-      // Considera expirada se último acesso foi há mais de 120 segundos (2 minutos)
+      // Considera expirada se último acesso foi há mais de 120 segundos
       const limiteExpiracao = new Date();
       limiteExpiracao.setSeconds(limiteExpiracao.getSeconds() - 120);
       
@@ -346,7 +347,7 @@ export class SessaoService {
 
     console.log('💓 Iniciando heartbeat para token:', tokenSessao.substring(0, 20) + '...');
     
-    // Atualiza último acesso a cada 60 segundos para manter sessão ativa
+    // Atualiza último acesso a cada 60 segundos (sessão expira em 120s)
     this.heartbeatInterval = window.setInterval(() => {
       this.atualizarUltimoAcesso(tokenSessao);
     }, 60 * 1000); // 60 segundos

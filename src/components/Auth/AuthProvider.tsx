@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
+import { sessaoService } from "../../services/sessaoService";
 
 interface AuthContextType {
   user: User | null;
@@ -59,11 +60,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('🚪 Fazendo logout...');
       
-      // Limpa sessionStorage
+      // Encerra sessão no banco e limpa storage
       if (user?.id) {
-        sessionStorage.removeItem(`active_session_${user.id}`);
+        try {
+          await sessaoService.encerrarSessao();
+          console.log('✅ Sessão encerrada no banco');
+        } catch (sessionError) {
+          console.warn('⚠️ Erro ao encerrar sessão no banco:', sessionError);
+          // Limpa manualmente se falhar
+          sessionStorage.removeItem(`active_session_${user.id}`);
+          localStorage.removeItem('session_token');
+        }
       }
-      localStorage.removeItem('session_token');
     } catch (error) {
       console.warn('⚠️ Erro ao limpar sessão:', error);
     }
