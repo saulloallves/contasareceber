@@ -20,12 +20,24 @@ const Franqueados = lazy(() => import("./components/Franqueados").then(m => ({ d
 const PainelIndicadoresEstrategicos = lazy(() => import("./components/PainelIndicadoresEstrategicos").then(m => ({ default: m.PainelIndicadoresEstrategicos })));
 import { Layout } from "./components/Layout/Layout";
 import { useUserProfile } from "./hooks/useUserProfile";
+import { connectionService } from "./services/connectionService";
 
 function AppContent() {
   const { user, loading } = useAuth();
   const { profile } = useUserProfile(user?.id);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // Monitora status de conexão
+  useEffect(() => {
+    const removeListener = connectionService.addStatusListener((status) => {
+      if (!status.isConnected) {
+        console.warn('⚠️ Conexão perdida detectada no App');
+      }
+    });
+    
+    return removeListener;
+  }, []);
 
   // Simula dados do usuário logado
   const userPermissions = ["admin"];
@@ -64,16 +76,33 @@ function AppContent() {
   // Controla inicialização para evitar loops
   useEffect(() => {
     if (!loading && user) {
-      // Aguarda um pouco para garantir que o perfil seja carregado
-      const timer = setTimeout(() => {
+      // Verifica se perfil está carregado ou se já passou tempo suficiente
+      if (profile || Date.now() - (user.created_at ? new Date(user.created_at).getTime() : 0) > 5000) {
         setIsInitialized(true);
-      }, 1000);
-      
-      return () => clearTimeout(timer);
+      } else {
+        // Aguarda um pouco para garantir que o perfil seja carregado
+        const timer = setTimeout(() => {
+          setIsInitialized(true);
+        }, 2000);
+        
+        return () => clearTimeout(timer);
+      }
     } else if (!loading && !user) {
       setIsInitialized(true);
     }
-  }, [loading, user]);
+  }, [loading, user, profile]);
+
+  // Força inicialização após 10 segundos para evitar loops infinitos
+  useEffect(() => {
+    const forceInitTimer = setTimeout(() => {
+      if (!isInitialized) {
+        console.warn('⚠️ Forçando inicialização após timeout');
+        setIsInitialized(true);
+      }
+    }, 10000);
+      
+    return () => clearTimeout(forceInitTimer);
+  }, [isInitialized]);
 
   // Se ainda está carregando ou não foi inicializado, mostra loading
   if (loading || !isInitialized) {

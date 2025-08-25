@@ -12,6 +12,7 @@ import { supabase } from "../../lib/supabaseClient";
 import { alertasService } from "../../services/alertasService";
 import { Alerta } from "../../types/alertas";
 import { formatarCNPJCPF } from "../../utils/formatters";
+import { connectionService, ConnectionStatus } from "../../services/connectionService";
 import { useEffect } from "react";
 import icon from "../../assets/cabeca.png";
 
@@ -42,6 +43,12 @@ export function Sidebar({
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({
+    isConnected: true,
+    lastCheck: new Date(),
+    reconnectAttempts: 0,
+    maxReconnectAttempts: 3
+  });
   
   const { signOut } = useAuth();
   const { profile } = useUserProfile(user?.id);
@@ -59,22 +66,33 @@ export function Sidebar({
   useEffect(() => {
     fetchAlertas();
 
-    // Escuta em tempo real para novos alertas
-    const channel = supabase
-      .channel("alertas_sistema_sidebar")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "alertas_sistema" },
-        () => {
-          fetchAlertas();
-        }
-      )
-      .subscribe();
+    // Monitora status de conexão
+    const removeConnectionListener = connectionService.addStatusListener((status) => {
+      setConnectionStatus(status);
+    });
+
+    // Escuta em tempo real para novos alertas (apenas se conectado)
+    let channel: any = null;
+    if (connectionStatus.isConnected) {
+      channel = supabase
+        .channel("alertas_sistema_sidebar")
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "alertas_sistema" },
+          () => {
+            fetchAlertas();
+          }
+        )
+        .subscribe();
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      removeConnectionListener();
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
-  }, []);
+  }, [connectionStatus.isConnected]);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -283,6 +301,9 @@ export function Sidebar({
               {collapsed && (
                 <div className="absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-[#fe9821] text-white px-3 py-2 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
                   <div className="font-medium text-sm">{item.label}</div>
+                  {!connectionStatus.isConnected && (
+                    <div className="text-xs text-red-200">Sem conexão</div>
+                  )}
                   <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-[#fe9821]"></div>
                 </div>
               )}
@@ -346,6 +367,18 @@ export function Sidebar({
         {!collapsed && (
           <div className="px-3 py-2 mt-6">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Notificações</p>
+            {!connectionStatus.isConnected && (
+              <div className="flex items-center mt-2 px-2 py-1 bg-red-50 rounded-lg">
+                <div className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
+                <span className="text-xs text-red-600">Sem conexão</span>
+                <button
+                  onClick={() => connectionService.forceReconnect()}
+                  className="ml-auto text-xs text-red-600 hover:text-red-800"
+                >
+                  Reconectar
+                </button>
+              </div>
+            )}
           </div>
         )}
         

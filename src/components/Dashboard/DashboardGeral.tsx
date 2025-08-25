@@ -13,6 +13,7 @@ import { DashboardService } from "../../services/dashboardService";
 import { formatMonetaryResponsive } from "../../utils/monetaryUtils";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "react-hot-toast";
+import { connectionService } from "../../services/connectionService";
 
 type DashboardGeralProps = {
   onNavigate?: (tab: string) => void;
@@ -141,24 +142,24 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
     setCarregandoMensagens(true);
     try {
       // WhatsApp
-      const { data: whats, error: errW } = await supabase
+      const { data: whats, error: errW } = await connectionService.query(() => supabase
         .from("logs_envio_whatsapp")
         .select(
           "id, destinatario, mensagem_enviada, sucesso, erro_detalhes, data_envio, created_at"
         )
         .order("data_envio", { ascending: false })
-        .limit(5);
+        .limit(5));
 
       if (errW) console.warn("Falha ao buscar WhatsApp:", errW);
 
       // E-mail
-      const { data: emails, error: errE } = await supabase
+      const { data: emails, error: errE } = await connectionService.query(() => supabase
         .from("logs_envio_email")
         .select(
           "id, destinatario, mensagem, sucesso, erro_detalhes, data_envio, created_at"
         )
         .order("data_envio", { ascending: false })
-        .limit(5);
+        .limit(5));
 
       if (errE) console.warn("Falha ao buscar E-mail:", errE);
 

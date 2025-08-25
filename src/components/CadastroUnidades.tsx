@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../services/databaseService";
 import { formatarCNPJCPF } from "../utils/formatters";
+import { connectionService } from "../services/connectionService";
 
 // ====== Utilitário (escopo de módulo, hoisted) ======
 function soDigitos(s: string): string {
@@ -62,7 +63,7 @@ export function CadastroUnidades() {
   const carregarDados = async () => {
     setCarregando(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await connectionService.query(() => supabase
       .from("unidades_franqueadas")
       .select(
         `
@@ -80,7 +81,7 @@ export function CadastroUnidades() {
         )
       `
       )
-        .order("nome_unidade");
+        .order("nome_unidade"));
 
       if (error) {
         console.error('Erro ao carregar unidades:', error);
@@ -208,42 +209,42 @@ export function CadastroUnidades() {
     try {
       let unidadeId = formData.id;
       if (!unidadeSelecionada) {
-        const { data, error } = await supabase
+        const { data, error } = await connectionService.query(() => supabase
           .from("unidades_franqueadas")
           .insert(formData)
           .select()
-          .single();
+          .single());
         if (error) throw error;
         unidadeId = data.id;
       } else {
         const { id, franqueado_unidades, ...dadosParaAtualizar } = formData;
-        const { error } = await supabase
+        const { error } = await connectionService.query(() => supabase
           .from("unidades_franqueadas")
           .update({
             ...dadosParaAtualizar,
             updated_at: new Date().toISOString()
           })
-          .eq("id", unidadeSelecionada.id);
+          .eq("id", unidadeSelecionada.id));
         if (error) throw error;
         unidadeId = unidadeSelecionada.id;
       }
       if (unidadeId) {
-        const { error: errorDesativar } = await supabase
+        const { error: errorDesativar } = await connectionService.query(() => supabase
           .from("franqueado_unidades")
           .update({ ativo: false })
           .eq("unidade_id", unidadeId)
-          .eq("ativo", true);
+          .eq("ativo", true));
         if (errorDesativar) {
           console.warn("Erro ao desativar vínculos anteriores:", errorDesativar);
         }
         if (franqueadoVinculo) {
-          const { error: errorVinculo } = await supabase
+          const { error: errorVinculo } = await connectionService.query(() => supabase
             .from("franqueado_unidades")
             .insert({
             unidade_id: unidadeId,
             franqueado_id: franqueadoVinculo,
             ativo: true,
-          });
+          }));
           if (errorVinculo) {
             console.warn("Erro ao criar vínculo:", errorVinculo);
           }

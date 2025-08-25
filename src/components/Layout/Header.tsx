@@ -4,6 +4,7 @@ import { Alerta } from "../../types/alertas";
 import { alertasService } from "../../services/alertasService";
 import { supabase } from "../../lib/supabaseClient";
 import logoheader from "../../assets/logo cresci-header.png";
+import { connectionService } from "../../services/connectionService";
 
 interface HeaderProps {
   user?: {
@@ -28,7 +29,20 @@ export function Header({ user }: HeaderProps) {
 
   const fetchAlertas = async () => {
     try {
-      const alertasData = await alertasService.listarAlertas();
+      // Usa connectionService para buscar alertas com retry automático
+      const { data: alertasData, error } = await connectionService.query(() => 
+        supabase
+          .from("alertas_sistema")
+          .select("*")
+          .eq("resolvido", false)
+          .order("data_criacao", { ascending: false })
+      );
+      
+      if (error) {
+        console.error("Erro ao buscar alertas:", error);
+        return;
+      }
+      
       setAlertas(alertasData);
     } catch (error) {
       console.error("Erro ao buscar alertas:", error);
@@ -37,35 +51,53 @@ export function Header({ user }: HeaderProps) {
 
   useEffect(() => {
     // Cria a "escuta" em tempo real na tabela de alertas
-    const channel = supabase
-      .channel("alertas_sistema_realtime")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "alertas_sistema" },
-        (payload) => {
-          console.log("Novo alerta recebido do Supabase!", payload.new);
+    let channel: any = null;
+    
+    // Monitora status de conexão
+    const removeConnectionListener = connectionService.addStatusListener((status) => {
+      if (status.isConnected && !channel) {
+        // Reconecta realtime quando conexão é restaurada
+        channel = supabase
+          .channel("alertas_sistema_realtime")
+          .on(
+            "postgres_changes",
+            { event: "INSERT", schema: "public", table: "alertas_sistema" },
+            (payload) => {
+              console.log("Novo alerta recebido do Supabase!", payload.new);
 
-          // Quando um novo alerta chega, buscamos a lista inteira novamente
-          // para manter o sino de notificações atualizado.
-          fetchAlertas();
+              // Quando um novo alerta chega, buscamos a lista inteira novamente
+              // para manter o sino de notificações atualizado.
+              fetchAlertas();
 
-          // Verifica se é a notificação que estamos esperando
-          const novoAlerta = payload.new as Alerta;
-          if (novoAlerta.tipo_alerta === "importacao_concluida") {
-            // Guarda os dados do alerta para mostrar o modal de sucesso!
-            setResultadoImportacao(novoAlerta);
+              // Verifica se é a notificação que estamos esperando
+              const novoAlerta = payload.new as Alerta;
+              if (novoAlerta.tipo_alerta === "importacao_concluida") {
+                // Guarda os dados do alerta para mostrar o modal de sucesso!
+                setResultadoImportacao(novoAlerta);
 
-            // Dispara um evento global para que outras partes da aplicação saibam que precisam se atualizar.
-          // Dispara evento global para atualização
-          window.dispatchEvent(new CustomEvent("cobrancasAtualizadas"));
-          }
-        }
-      )
-      .subscribe();
+                // Dispara um evento global para que outras partes da aplicação saibam que precisam se atualizar.
+                // Dispara evento global para atualização
+                window.dispatchEvent(new CustomEvent("cobrancasAtualizadas"));
+              }
+            }
+          )
+          .subscribe();
+      } else if (!status.isConnected && channel) {
+        // Remove canal quando perde conexão
+        supabase.removeChannel(channel);
+        channel = null;
+      }
+    });
+    
+    // Busca alertas iniciais
+    fetchAlertas();
 
     // Função de limpeza para remover a "escuta" quando o usuário sai da página
     return () => {
-      supabase.removeChannel(channel);
+      removeConnectionListener();
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, []); // O array vazio garante que isso rode apenas uma vez
 
