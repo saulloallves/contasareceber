@@ -59,16 +59,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listener de mudanças de sessão
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        console.log('🔄 Auth state change:', event, session?.user?.id);
+        
         saveSessionToStorage(session);
         if (session?.user) {
           setUser(session.user);
           
           // Cria sessão no sistema para novos logins
           if (event === 'SIGNED_IN') {
+            console.log('✅ Usuário logado, criando sessão...');
             try {
               await sessaoService.criarSessao(session.user.id);
+              console.log('✅ Sessão criada com sucesso');
             } catch (error) {
-              console.warn('Erro ao criar sessão do usuário:', error);
+              console.warn('⚠️ Erro ao criar sessão do usuário:', error);
             }
           }
         } else {
@@ -76,10 +80,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           // Encerra sessão no sistema quando usuário faz logout
           if (event === 'SIGNED_OUT') {
+            console.log('🚪 Usuário saiu, encerrando sessão...');
             try {
               await sessaoService.encerrarSessao();
+              console.log('✅ Sessão encerrada com sucesso');
             } catch (error) {
-              console.warn('Erro ao encerrar sessão do usuário:', error);
+              console.warn('⚠️ Erro ao encerrar sessão do usuário:', error);
             }
           }
         }

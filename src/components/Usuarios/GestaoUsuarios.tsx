@@ -54,12 +54,12 @@ export function GestaoUsuarios() {
   useEffect(() => {
     carregarDados();
     
-    // Atualiza dados a cada 30 segundos para manter status online atualizado
+    // Atualiza dados a cada 15 segundos para manter status online atualizado
     const interval = setInterval(() => {
       if (abaSelecionada === 'sessoes' || abaSelecionada === 'usuarios') {
         carregarDados();
       }
-    }, 30000);
+    }, 15000); // 15 segundos
 
     return () => clearInterval(interval);
   }, [carregarDados]);

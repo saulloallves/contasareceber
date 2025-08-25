@@ -29,6 +29,8 @@ export class SessaoService {
    */
   async criarSessao(usuarioId: string): Promise<string> {
     try {
+      console.log('🔄 Criando sessão para usuário:', usuarioId);
+      
       // Gera token único para a sessão
       const tokenSessao = this.gerarTokenSessao();
       
@@ -36,7 +38,7 @@ export class SessaoService {
       const ipOrigem = await this.obterIP();
       const userAgent = navigator.userAgent;
 
-      // Desativa sessões anteriores do mesmo usuário
+      // Desativa sessões anteriores do mesmo usuário (evita múltiplas sessões ativas)
       await this.desativarSessoesAnteriores(usuarioId);
 
       // Cria nova sessão
@@ -58,6 +60,8 @@ export class SessaoService {
         throw new Error(`Erro ao criar sessão: ${error.message}`);
       }
 
+      console.log('✅ Sessão criada com sucesso:', data.id);
+      
       // Salva token no localStorage para manter sessão
       localStorage.setItem('session_token', tokenSessao);
 
@@ -79,6 +83,8 @@ export class SessaoService {
       const token = tokenSessao || localStorage.getItem('session_token');
       if (!token) return;
 
+      console.log('💓 Atualizando heartbeat para token:', token.substring(0, 20) + '...');
+      
       const { error } = await supabase
         .from('sessoes_usuario')
         .update({
@@ -88,10 +94,12 @@ export class SessaoService {
         .eq('ativa', true);
 
       if (error) {
-        console.warn('Erro ao atualizar último acesso:', error);
+        console.warn('⚠️ Erro ao atualizar último acesso:', error);
+      } else {
+        console.log('✅ Heartbeat atualizado com sucesso');
       }
     } catch (error) {
-      console.warn('Erro ao atualizar último acesso:', error);
+      console.warn('⚠️ Erro ao atualizar último acesso:', error);
     }
   }
 
@@ -101,7 +109,12 @@ export class SessaoService {
   async encerrarSessao(tokenSessao?: string): Promise<void> {
     try {
       const token = tokenSessao || localStorage.getItem('session_token');
-      if (!token) return;
+      if (!token) {
+        console.log('⚠️ Nenhum token encontrado para encerrar sessão');
+        return;
+      }
+      
+      console.log('🔚 Encerrando sessão para token:', token.substring(0, 20) + '...');
 
       const { error } = await supabase
         .from('sessoes_usuario')
@@ -111,7 +124,9 @@ export class SessaoService {
         .eq('token_sessao', token);
 
       if (error) {
-        console.warn('Erro ao encerrar sessão:', error);
+        console.warn('⚠️ Erro ao encerrar sessão:', error);
+      } else {
+        console.log('✅ Sessão encerrada com sucesso');
       }
 
       // Remove token do localStorage
@@ -120,7 +135,7 @@ export class SessaoService {
       // Para heartbeat
       this.pararHeartbeat();
     } catch (error) {
-      console.warn('Erro ao encerrar sessão:', error);
+      console.warn('⚠️ Erro ao encerrar sessão:', error);
     }
   }
 
@@ -129,9 +144,11 @@ export class SessaoService {
    */
   async buscarUsuariosOnline(): Promise<UsuarioOnline[]> {
     try {
-      // Considera online se último acesso foi há menos de 5 minutos
+      // Considera online se último acesso foi há menos de 10 minutos (mais tolerante)
       const limiteOnline = new Date();
-      limiteOnline.setMinutes(limiteOnline.getMinutes() - 5);
+      limiteOnline.setMinutes(limiteOnline.getMinutes() - 10);
+      
+      console.log('🔍 Buscando usuários online desde:', limiteOnline.toISOString());
 
       const { data, error } = await supabase
         .from('sessoes_usuario')
@@ -155,12 +172,16 @@ export class SessaoService {
         throw new Error(`Erro ao buscar usuários online: ${error.message}`);
       }
 
+      console.log('👥 Sessões ativas encontradas:', data?.length || 0);
+      
       return data?.map(sessao => {
         const usuario = (sessao as any).usuarios_sistema;
         const inicioSessao = new Date(sessao.data_inicio);
         const agora = new Date();
         const tempoSessaoMinutos = Math.floor((agora.getTime() - inicioSessao.getTime()) / (1000 * 60));
 
+        console.log(`👤 Usuário online: ${usuario?.nome_completo || 'Desconhecido'} - Último acesso: ${sessao.data_ultimo_acesso}`);
+        
         return {
           usuario_id: sessao.usuario_id,
           nome_completo: usuario?.nome_completo || 'Usuário Desconhecido',
@@ -184,7 +205,7 @@ export class SessaoService {
   async verificarUsuarioOnline(usuarioId: string): Promise<boolean> {
     try {
       const limiteOnline = new Date();
-      limiteOnline.setMinutes(limiteOnline.getMinutes() - 5);
+      limiteOnline.setMinutes(limiteOnline.getMinutes() - 10);
 
       const { data, error } = await supabase
         .from('sessoes_usuario')
@@ -211,9 +232,11 @@ export class SessaoService {
    */
   async limparSessoesExpiradas(): Promise<number> {
     try {
-      // Considera expirada se último acesso foi há mais de 2 horas
+      // Considera expirada se último acesso foi há mais de 4 horas
       const limiteExpiracao = new Date();
-      limiteExpiracao.setHours(limiteExpiracao.getHours() - 2);
+      limiteExpiracao.setHours(limiteExpiracao.getHours() - 4);
+      
+      console.log('🧹 Limpando sessões expiradas antes de:', limiteExpiracao.toISOString());
 
       const { data, error } = await supabase
         .from('sessoes_usuario')
@@ -226,6 +249,7 @@ export class SessaoService {
         throw new Error(`Erro ao limpar sessões: ${error.message}`);
       }
 
+      console.log('✅ Sessões limpas:', data?.length || 0);
       return data?.length || 0;
     } catch (error) {
       console.error('Erro ao limpar sessões expiradas:', error);
@@ -237,7 +261,7 @@ export class SessaoService {
    * Métodos auxiliares privados
    */
   private gerarTokenSessao(): string {
-    return `sess_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `sess_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   private async obterIP(): Promise<string> {
@@ -253,13 +277,17 @@ export class SessaoService {
 
   private async desativarSessoesAnteriores(usuarioId: string): Promise<void> {
     try {
+      console.log('🔄 Desativando sessões anteriores para usuário:', usuarioId);
+      
       await supabase
         .from('sessoes_usuario')
         .update({ ativa: false })
         .eq('usuario_id', usuarioId)
         .eq('ativa', true);
+        
+      console.log('✅ Sessões anteriores desativadas');
     } catch (error) {
-      console.warn('Erro ao desativar sessões anteriores:', error);
+      console.warn('⚠️ Erro ao desativar sessões anteriores:', error);
     }
   }
 
@@ -269,14 +297,17 @@ export class SessaoService {
     // Para heartbeat anterior se existir
     this.pararHeartbeat();
 
-    // Atualiza último acesso a cada 2 minutos
+    console.log('💓 Iniciando heartbeat para token:', tokenSessao.substring(0, 20) + '...');
+    
+    // Atualiza último acesso a cada 1 minuto (mais frequente)
     this.heartbeatInterval = window.setInterval(() => {
       this.atualizarUltimoAcesso(tokenSessao);
-    }, 2 * 60 * 1000); // 2 minutos
+    }, 1 * 60 * 1000); // 1 minuto
   }
 
   private pararHeartbeat(): void {
     if (this.heartbeatInterval) {
+      console.log('🛑 Parando heartbeat');
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
     }
@@ -287,6 +318,8 @@ export class SessaoService {
    */
   async forcarLogoutUsuario(usuarioId: string): Promise<void> {
     try {
+      console.log('🚫 Forçando logout do usuário:', usuarioId);
+      
       const { error } = await supabase
         .from('sessoes_usuario')
         .update({ ativa: false })
@@ -296,6 +329,8 @@ export class SessaoService {
       if (error) {
         throw new Error(`Erro ao forçar logout: ${error.message}`);
       }
+      
+      console.log('✅ Logout forçado com sucesso');
     } catch (error) {
       console.error('Erro ao forçar logout:', error);
       throw error;
@@ -315,7 +350,7 @@ export class SessaoService {
       const agora = new Date();
       const inicioHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
       const limiteOnline = new Date();
-      limiteOnline.setMinutes(limiteOnline.getMinutes() - 5);
+      limiteOnline.setMinutes(limiteOnline.getMinutes() - 10);
 
       const [sessoes, sessoesHoje] = await Promise.all([
         supabase
@@ -343,6 +378,13 @@ export class SessaoService {
 
       const tempoMedioSessao = sessoesAtivas > 0 ? Math.round(tempoMedio / sessoesAtivas) : 0;
 
+      console.log('📊 Estatísticas de sessões:', {
+        usuarios_online: usuariosOnline,
+        sessoes_ativas: sessoesAtivas,
+        tempo_medio_sessao: tempoMedioSessao,
+        picos_acesso_hoje: sessoesHoje.data?.length || 0
+      });
+      
       return {
         usuarios_online: usuariosOnline,
         sessoes_ativas: sessoesAtivas,
@@ -357,6 +399,31 @@ export class SessaoService {
         tempo_medio_sessao: 0,
         picos_acesso_hoje: 0
       };
+    }
+  }
+  
+  /**
+   * Limpa todas as sessões inativas (limpeza manual)
+   */
+  async limparTodasSessoesInativas(): Promise<number> {
+    try {
+      console.log('🧹 Limpando todas as sessões inativas...');
+      
+      const { data, error } = await supabase
+        .from('sessoes_usuario')
+        .delete()
+        .eq('ativa', false)
+        .select('id');
+
+      if (error) {
+        throw new Error(`Erro ao limpar sessões inativas: ${error.message}`);
+      }
+
+      console.log('✅ Sessões inativas removidas:', data?.length || 0);
+      return data?.length || 0;
+    } catch (error) {
+      console.error('Erro ao limpar sessões inativas:', error);
+      return 0;
     }
   }
 }
