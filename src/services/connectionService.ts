@@ -247,6 +247,21 @@ export class ConnectionService {
         lastError = result.error;
         console.warn(`⚠️ Erro na tentativa ${attempt}:`, result.error);
         
+        // Verifica se é erro de sessão inválida
+        if (result.error?.code === 'session_not_found' || 
+            (result.error?.message && result.error.message.includes('Session from session_id claim in JWT does not exist'))) {
+          console.error('❌ Sessão JWT inválida detectada, fazendo logout...');
+          toast.error('Sua sessão expirou. Redirecionando para login...', {
+            duration: 3000,
+            id: 'session-expired'
+          });
+          
+          // Limpa sessão do Supabase e recarrega
+          await supabase.auth.signOut();
+          window.location.reload();
+          return { data: null, error: result.error };
+        }
+        
         // Se não é a última tentativa, aguarda antes de tentar novamente
         if (attempt <= maxRetries) {
           const delay = 1000 * attempt; // Delay progressivo
