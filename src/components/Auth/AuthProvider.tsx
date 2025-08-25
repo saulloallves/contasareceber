@@ -76,15 +76,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Cria sessão apenas no login bem-sucedido e se não foi criada na inicialização
         if (event === 'SIGNED_IN' && session?.user) {
-          // Só cria sessão se não foi criada na inicialização
-          if (!sessionStorage.getItem(initKey)) {
-            console.log('✅ Login detectado, criando sessão...');
-            try {
-              await sessaoService.criarSessao(session.user.id);
-              console.log('✅ Sessão criada com sucesso');
-            } catch (error) {
-              console.warn('⚠️ Erro ao criar sessão no login:', error);
-            }
+          console.log('✅ Login detectado, criando sessão...');
+          try {
+            await sessaoService.criarSessao(session.user.id);
+            console.log('✅ Sessão criada com sucesso');
+          } catch (error) {
+            console.warn('⚠️ Erro ao criar sessão no login:', error);
           }
         }
         

@@ -30,70 +30,83 @@ export class SessaoService {
    * Cria nova sessão quando usuário faz login
    */
   async criarSessao(usuarioId: string): Promise<string> {
-    // Verifica se já existe uma operação de criação de sessão em andamento
-    const lockKey = `creating_session_${usuarioId}`;
-    if (localStorage.getItem(lockKey)) {
-      console.log('⏳ Criação de sessão já em andamento, aguardando...');
-      return;
-    }
+    // Verifica se já existe uma sessão ativa no sessionStorage
+    const sessionKey = `active_session_${usuarioId}`;
+    const existingToken = sessionStorage.getItem(sessionKey);
     
-    // Define lock temporário
-    localStorage.setItem(lockKey, 'true');
+    if (existingToken) {
+      console.log('🔄 Verificando sessão existente no sessionStorage...');
+      
+      // Verifica se a sessão ainda é válida no banco
+      const { data: sessaoValida, error } = await supabase
+        .from('sessoes_usuario')
+        .select('id, token_sessao')
+        .eq('token_sessao', existingToken)
+        .eq('ativa', true)
+        .eq('usuario_id', usuarioId)
+        .maybeSingle();
+      
+      if (!error && sessaoValida) {
+        console.log('✅ Sessão existente válida, reutilizando...');
+        // Atualiza último acesso da sessão existente
+        await this.atualizarUltimoAcesso(existingToken);
+        this.iniciarHeartbeat(existingToken);
+        return existingToken;
+      } else {
+        console.log('⚠️ Sessão no sessionStorage inválida, removendo...');
+        sessionStorage.removeItem(sessionKey);
+      }
+    }
     
     try {
       console.log('🔄 Criando sessão para usuário:', usuarioId);
       
-      try {
-        // Primeiro, desativa todas as sessões anteriores do usuário
-        console.log('🔄 Desativando sessões anteriores...');
-        await supabase
-          .from('sessoes_usuario')
-          .update({ ativa: false })
-          .eq('usuario_id', usuarioId)
-          .eq('ativa', true);
-        
-        // Gera token único para a sessão
-        const tokenSessao = this.gerarTokenSessao();
-        
-        // Obtém informações do navegador
-        const ipOrigem = await this.obterIP();
-        const userAgent = navigator.userAgent;
+      // Primeiro, desativa todas as sessões anteriores do usuário
+      console.log('🔄 Desativando sessões anteriores...');
+      await supabase
+        .from('sessoes_usuario')
+        .update({ ativa: false })
+        .eq('usuario_id', usuarioId)
+        .eq('ativa', true);
+      
+      // Gera token único para a sessão
+      const tokenSessao = this.gerarTokenSessao();
+      
+      // Obtém informações do navegador
+      const ipOrigem = await this.obterIP();
+      const userAgent = navigator.userAgent;
 
-        // Cria nova sessão
-        console.log('🆕 Criando nova sessão...');
-        const { data, error } = await supabase
-          .from('sessoes_usuario')
-          .insert({
-            usuario_id: usuarioId,
-            token_sessao: tokenSessao,
-            ip_origem: ipOrigem,
-            user_agent: userAgent,
-            data_inicio: new Date().toISOString(),
-            data_ultimo_acesso: new Date().toISOString(),
-            ativa: true
-          })
-          .select()
-          .single();
+      // Cria nova sessão
+      console.log('🆕 Criando nova sessão...');
+      const { data, error } = await supabase
+        .from('sessoes_usuario')
+        .insert({
+          usuario_id: usuarioId,
+          token_sessao: tokenSessao,
+          ip_origem: ipOrigem,
+          user_agent: userAgent,
+          data_inicio: new Date().toISOString(),
+          data_ultimo_acesso: new Date().toISOString(),
+          ativa: true
+        })
+        .select()
+        .single();
 
-        if (error) {
-          throw new Error(`Erro ao criar sessão: ${error.message}`);
-        }
-
-        console.log('✅ Sessão criada com sucesso:', data.id);
-        
-        // Salva token no localStorage para manter sessão
-        localStorage.setItem('session_token', tokenSessao);
-
-        // Inicia heartbeat para manter sessão ativa
-        this.iniciarHeartbeat(tokenSessao);
-
-        return tokenSessao;
-      } finally {
-        // Remove lock
-        localStorage.removeItem(lockKey);
+      if (error) {
+        throw new Error(`Erro ao criar sessão: ${error.message}`);
       }
+
+      console.log('✅ Sessão criada com sucesso:', data.id);
+      
+      // Salva token no sessionStorage para manter sessão apenas durante a aba
+      sessionStorage.setItem(sessionKey, tokenSessao);
+      localStorage.setItem('session_token', tokenSessao);
+
+      // Inicia heartbeat para manter sessão ativa
+      this.iniciarHeartbeat(tokenSessao);
+
+      return tokenSessao;
     } catch (error) {
-      localStorage.removeItem(lockKey);
       console.error('Erro ao criar sessão:', error);
       throw error;
     }
@@ -153,7 +166,11 @@ export class SessaoService {
         console.log('✅ Sessão encerrada com sucesso');
       }
 
-      // Remove token do localStorage
+      // Remove tokens do storage
+      const { data: currentUser } = await supabase.auth.getUser();
+      if (currentUser.user) {
+        sessionStorage.removeItem(`active_session_${currentUser.user.id}`);
+      }
       localStorage.removeItem('session_token');
 
       // Para heartbeat
@@ -256,9 +273,9 @@ export class SessaoService {
    */
   async limparSessoesExpiradas(): Promise<number> {
     try {
-      // Considera expirada se último acesso foi há mais de 2 horas
+      // Considera expirada se último acesso foi há mais de 120 segundos (2 minutos)
       const limiteExpiracao = new Date();
-      limiteExpiracao.setHours(limiteExpiracao.getHours() - 2);
+      limiteExpiracao.setSeconds(limiteExpiracao.getSeconds() - 120);
       
       console.log('🧹 Limpando sessões expiradas antes de:', limiteExpiracao.toISOString());
 
@@ -329,10 +346,10 @@ export class SessaoService {
 
     console.log('💓 Iniciando heartbeat para token:', tokenSessao.substring(0, 20) + '...');
     
-    // Atualiza último acesso a cada 2 minutos
+    // Atualiza último acesso a cada 60 segundos para manter sessão ativa
     this.heartbeatInterval = window.setInterval(() => {
       this.atualizarUltimoAcesso(tokenSessao);
-    }, 2 * 60 * 1000); // 2 minutos
+    }, 60 * 1000); // 60 segundos
     
     // Primeira atualização imediata
     setTimeout(() => {
