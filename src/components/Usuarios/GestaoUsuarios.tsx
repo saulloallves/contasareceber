@@ -53,28 +53,7 @@ export function GestaoUsuarios() {
 
   useEffect(() => {
     carregarDados();
-    
-    // Escuta mudanças em tempo real nas sessões
-    const sessoesChannel = supabase
-      .channel('sessoes_usuario_realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'sessoes_usuario' },
-        (payload) => {
-          console.log('🔄 Mudança detectada em sessões:', payload);
-          // Só recarrega usuários online se estiver na aba de sessões
-          if (abaSelecionada === 'sessoes') {
-            sessaoService.buscarUsuariosOnline().then(setUsuariosOnline);
-            sessaoService.buscarEstatisticasSessoes().then(setEstatisticasSessoes);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(sessoesChannel);
-    };
-  }, [carregarDados, abaSelecionada]);
+  }, [carregarDados]);
 
   // removido: usamos a versão memoizada acima
 
@@ -244,7 +223,7 @@ export function GestaoUsuarios() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-  } catch {
+    } catch {
       alert('Erro ao exportar dados');
     }
   };
