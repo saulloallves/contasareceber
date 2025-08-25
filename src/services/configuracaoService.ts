@@ -1347,4 +1347,18 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
     
     return valorOriginal + multa + juros;
   }
+
+  /**
+   * Retorna estatísticas vazias em caso de erro
+   */
+  private getEstatisticasVazias(): EstatisticasUsuarios {
+    return {
+      total_usuarios: 0,
+      usuarios_ativos: 0,
+      usuarios_inativos: 0,
+      por_nivel: {},
+      logins_mes_atual: 0,
+      tentativas_bloqueadas: 0
+    };
+  }
 }
