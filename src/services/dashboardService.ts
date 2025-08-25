@@ -25,12 +25,14 @@ export class DashboardService {
 
       // Calcular indicadores
       const abertas = (cobrancas as Cobranca[] | null)
-        ?.filter(c => ['em_aberto', 'em_atraso', 'negociando', 'cobrado', 'em_tratativa_juridica', 'em_tratativa_critica'].includes(c.status)) || [];
+        ?.filter(c => !['quitado', 'perda'].includes(c.status)) || [];
 
-      const totalEmAbertoOriginal = abertas
+      const totalEmAbertoOriginal = (cobrancas as Cobranca[] | null)
+        ?.filter(c => !['quitado', 'perda'].includes(c.status))
         .reduce((sum, c) => sum + (Number(c.valor_original) || 0), 0);
 
-      const totalEmAbertoAtualizado = abertas
+      const totalEmAbertoAtualizado = (cobrancas as Cobranca[] | null)
+        ?.filter(c => !['quitado', 'perda'].includes(c.status))
         .reduce((sum, c) => sum + (Number(c.valor_atualizado ?? c.valor_original) || 0), 0);
 
       // Mantém campo legado (totalEmAberto) como ATUALIZADO para compatibilidade visual anterior
@@ -45,7 +47,7 @@ export class DashboardService {
         ?.reduce((sum, c) => sum + (Number(c.valor_atualizado) || Number(c.valor_original) || 0), 0) || 0;
 
       const unidadesInadimplentes = new Set(
-  (cobrancas as Cobranca[] | null)?.filter(c => ['em_aberto', 'em_atraso', 'negociando', 'cobrado', 'em_tratativa_juridica', 'em_tratativa_critica', 'em_negociacao'].includes(c.status))?.map(c => c.cnpj || '')
+        (cobrancas as Cobranca[] | null)?.filter(c => !['quitado', 'perda'].includes(c.status))?.map(c => c.cnpj || '')
       ).size;
 
       const ticketMedio = unidadesInadimplentes > 0 ? totalEmAberto / unidadesInadimplentes : 0;
