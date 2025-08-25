@@ -1031,7 +1031,7 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
         acao: 'resolver_alerta_seguranca',
         tabela_afetada: 'alertas_seguranca',
         registro_id: alertaId,
-        dados_novos: { acao_tomada }
+        dados_novos: { acaoTomada }
       });
     } catch (error) {
       console.error('Erro ao resolver alerta:', error);
