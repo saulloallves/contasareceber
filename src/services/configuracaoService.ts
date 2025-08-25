@@ -446,30 +446,61 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
    */
   async bloquearUsuario(id: string, motivoBloqueio: string, duracaoHoras: number = 24): Promise<void> {
     try {
-      const dataDesbloqueio = new Date();
-      dataDesbloqueio.setHours(dataDesbloqueio.getHours() + duracaoHoras);
+      console.log('🔒 Bloqueando usuário:', id, 'Motivo:', motivoBloqueio);
+      
+      // Usa Edge Function para admin_master
+      const { data: edgeData, error: edgeError } = await (supabase as any).functions.invoke('admin-update-user', {
+        body: {
+          userId: id,
+          updateData: {
+            ativo: false,
+            bloqueado_ate: new Date(Date.now() + duracaoHoras * 60 * 60 * 1000).toISOString()
+          }
+        }
+      });
 
-      const { error } = await supabase
-        .from('usuarios_sistema')
-        .update({
-          ativo: false,
-          bloqueado_ate: dataDesbloqueio.toISOString()
-        })
-        .eq('id', id);
+      if (edgeError) {
+        console.error('❌ Erro na Edge Function ao bloquear:', edgeError);
+        throw new Error(edgeError.message || 'Erro ao bloquear usuário');
+      }
 
-      if (error) {
-        throw new Error(`Erro ao bloquear usuário: ${error.message}`);
+      if (!edgeData?.success) {
+        console.error('❌ Edge Function retornou falha ao bloquear:', edgeData);
+        throw new Error(edgeData?.error || 'Falha ao bloquear usuário');
+      }
+
+      console.log('✅ Usuário bloqueado com sucesso via Edge Function');
+
+      // Força logout de todas as sessões ativas do usuário
+      try {
+        const { error: logoutError } = await supabase
+          .from('sessoes_usuario')
+          .update({ ativa: false })
+          .eq('usuario_id', id)
+          .eq('ativa', true);
+
+        if (logoutError) {
+          console.warn('⚠️ Erro ao forçar logout das sessões:', logoutError);
+        } else {
+          console.log('✅ Sessões do usuário encerradas');
+        }
+      } catch (sessionError) {
+        console.warn('⚠️ Erro ao encerrar sessões:', sessionError);
       }
 
       // Registra log de segurança
-      await this.registrarLogSeguranca({
-        usuario_id: id,
-        email_tentativa: '',
-        ip_origem: 'sistema',
-        tipo_evento: 'bloqueio_automatico',
-        detalhes: motivoBloqueio,
-        data_evento: new Date().toISOString()
-      });
+      try {
+        await this.registrarLogSeguranca({
+          usuario_id: id,
+          email_tentativa: '',
+          ip_origem: 'sistema',
+          tipo_evento: 'bloqueio_automatico',
+          detalhes: motivoBloqueio,
+          data_evento: new Date().toISOString()
+        });
+      } catch (logError) {
+        console.warn('⚠️ Erro ao registrar log de segurança:', logError);
+      }
     } catch (error) {
       console.error('Erro ao bloquear usuário:', error);
       throw error;

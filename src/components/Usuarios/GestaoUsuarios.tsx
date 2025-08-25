@@ -195,11 +195,14 @@ export function GestaoUsuarios() {
     if (!motivo) return;
 
     try {
+      console.log('🔒 Iniciando bloqueio do usuário:', id);
       await configuracaoService.bloquearUsuario(id, motivo, 24);
-      alert('Usuário bloqueado por 24 horas');
+      console.log('✅ Usuário bloqueado com sucesso');
+      alert('Usuário bloqueado por 24 horas com sucesso!');
       carregarDados();
-    } catch (error) {
-      alert(`Erro ao bloquear usuário: ${error}`);
+    } catch (error: any) {
+      console.error('❌ Erro ao bloquear usuário:', error);
+      alert(`Erro ao bloquear usuário: ${error?.message || error}`);
     }
   };
 
