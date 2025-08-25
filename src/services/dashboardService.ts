@@ -97,13 +97,21 @@ export class DashboardService {
       const currNegociando = sum(currByVenc.filter(c => NEGOTIATING_STATUSES.includes(c.status)), c => Number(c.valor_atualizado) || Number(c.valor_original) || 0);
       const prevNegociando = sum(prevByVenc.filter(c => NEGOTIATING_STATUSES.includes(c.status)), c => Number(c.valor_atualizado) || Number(c.valor_original) || 0);
 
+      // Debug para verificar valores de negociação
+      console.log('Debug negociando:', {
+        currNegociando,
+        prevNegociando,
+        totalNegociando,
+        currByVenc: currByVenc.filter(c => NEGOTIATING_STATUSES.includes(c.status)).length,
+        prevByVenc: prevByVenc.filter(c => NEGOTIATING_STATUSES.includes(c.status)).length
+      });
+
       // Unidades inadimplentes por mês (distintas por CNPJ) usando mês de vencimento para status em aberto
       const currUnidades = new Set(currByVenc.filter(c => OPEN_STATUSES.includes(c.status)).map(c => c.cnpj || '')).size;
       const prevUnidades = new Set(prevByVenc.filter(c => OPEN_STATUSES.includes(c.status)).map(c => c.cnpj || '')).size;
 
       const pctChange = (curr: number, prev: number) => {
         if (!prev && !curr) return 0;
-        if (!prev && curr > 0) return 100; // crescimento a partir de zero
         if (prev === 0 && curr > 0) return 100; // crescimento a partir de zero
         if (prev > 0) return ((curr - prev) / prev) * 100;
         return 0;
@@ -111,14 +119,14 @@ export class DashboardService {
 
       const variacaoEmAberto = pctChange(currEmAberto, prevEmAberto);
       const variacaoQuitado = pctChange(currQuitadoVal, prevQuitadoVal);
-      const variacaoNegociando = pctChange(currNegociando, prevNegociando);
+      // Para negociação, usar o total atual vs total anterior baseado em status atual
+      const variacaoNegociando = pctChange(totalNegociando, prevNegociando);
       const variacaoUnidades = pctChange(currUnidades, prevUnidades);
 
-      console.log('Debug variação negociando:', {
-        currNegociando,
+      console.log('Debug variação negociando final:', {
+        totalNegociando,
         prevNegociando,
-        variacaoNegociando,
-        totalNegociando
+        variacaoNegociando
       });
 
       return {
