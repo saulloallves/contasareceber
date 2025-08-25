@@ -70,7 +70,8 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
       totalNegociando: pickNum(
         data?.totalNegociando,
         data?.total_negociando,
-        data?.total_negociando_mes
+        data?.total_negociando_mes,
+        data?.total_pago_mes // fallback adicional se necessário
       ),
 
       // Variações (aceita camelCase, snake_case e mapeia do comparativo_mes_anterior)

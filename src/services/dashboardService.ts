@@ -41,11 +41,11 @@ export class DashboardService {
         ?.reduce((sum, c) => sum + (Number(c.valor_recebido) || Number(c.valor_original) || 0), 0) || 0;
 
       const totalNegociando = (cobrancas as Cobranca[] | null)
-        ?.filter(c => ['negociando', 'cobrado', 'em_tratativa_juridica', 'em_tratativa_critica'].includes(c.status))
+        ?.filter(c => ['negociando', 'cobrado', 'em_tratativa_juridica', 'em_tratativa_critica', 'em_negociacao'].includes(c.status))
         ?.reduce((sum, c) => sum + (Number(c.valor_atualizado) || Number(c.valor_original) || 0), 0) || 0;
 
       const unidadesInadimplentes = new Set(
-  (cobrancas as Cobranca[] | null)?.filter(c => ['em_aberto', 'em_atraso', 'negociando', 'cobrado', 'em_tratativa_juridica', 'em_tratativa_critica'].includes(c.status))?.map(c => c.cnpj || '')
+  (cobrancas as Cobranca[] | null)?.filter(c => ['em_aberto', 'em_atraso', 'negociando', 'cobrado', 'em_tratativa_juridica', 'em_tratativa_critica', 'em_negociacao'].includes(c.status))?.map(c => c.cnpj || '')
       ).size;
 
       const ticketMedio = unidadesInadimplentes > 0 ? totalEmAberto / unidadesInadimplentes : 0;
