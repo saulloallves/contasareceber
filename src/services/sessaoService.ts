@@ -186,9 +186,9 @@ export class SessaoService {
    */
   async buscarUsuariosOnline(): Promise<UsuarioOnline[]> {
     try {
-      // Considera online se último acesso foi há menos de 5 minutos E sessão está ativa
+      // Considera online se último acesso foi há menos de 6 minutos E sessão está ativa
       const limiteOnline = new Date();
-      limiteOnline.setMinutes(limiteOnline.getMinutes() - 5);
+      limiteOnline.setMinutes(limiteOnline.getMinutes() - 6);
       
       console.log('🔍 Buscando usuários online desde:', limiteOnline.toISOString());
 
@@ -293,7 +293,7 @@ export class SessaoService {
   async verificarUsuarioOnline(usuarioId: string): Promise<boolean> {
     try {
       const limiteOnline = new Date();
-      limiteOnline.setMinutes(limiteOnline.getMinutes() - 5);
+      limiteOnline.setMinutes(limiteOnline.getMinutes() - 6);
 
       const { data, error } = await supabase
         .from('sessoes_usuario')
@@ -320,9 +320,9 @@ export class SessaoService {
    */
   async limparSessoesExpiradas(): Promise<number> {
     try {
-      // Considera expirada se último acesso foi há mais de 120 segundos
+      // Considera expirada se último acesso foi há mais de 300 segundos (5 minutos)
       const limiteExpiracao = new Date();
-      limiteExpiracao.setSeconds(limiteExpiracao.getSeconds() - 120);
+      limiteExpiracao.setSeconds(limiteExpiracao.getSeconds() - 300);
       
       console.log('🧹 Limpando sessões expiradas antes de:', limiteExpiracao.toISOString());
 
