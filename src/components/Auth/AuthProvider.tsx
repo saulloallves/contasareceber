@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 import { connectionService } from "../../services/connectionService";
+import { sessaoService } from "../../services/sessaoService";
 
 interface AuthContextType {
   user: User | null;
@@ -28,7 +29,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Busca sessão inicial e define loading como false
     const initializeAuth = async () => {
       if (isInitializing) {
-        console.log('⚠️ Inicialização já em andamento, ignorando...');
         return;
       }
       
@@ -36,13 +36,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
-        console.log('🔍 Sessão inicial:', session?.user?.email || 'Nenhuma');
         
         if (error) {
           console.error('❌ Erro ao buscar sessão:', error);
         }
         
         setUser(session?.user ?? null);
+        
+        // Se há sessão ativa mas não há sessão no sistema, cria uma
+        if (session?.user) {
+          try {
+            await sessaoService.criarSessao(session.user.id);
+          } catch (error) {
+            console.warn('⚠️ Erro ao criar sessão inicial:', error);
+          }
+        }
       } catch (error) {
         console.error('❌ Erro na inicialização:', error);
         setUser(null);
@@ -58,11 +66,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listener para mudanças de estado
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔄 Auth state change:', event, session?.user?.email);
+        console.log('🔄 Auth state change:', event, session?.user?.email || 'Nenhum usuário');
         
         // Evita processamento duplicado de eventos
         if (isInitializing) {
-          console.log('⚠️ Inicialização em andamento, ignorando auth state change');
           return;
         }
         
@@ -72,33 +79,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (event === 'SIGNED_IN' && session?.user) {
           console.log('✅ Login detectado, criando sessão...');
           try {
-            // Aguarda um pouco para evitar condições de corrida
-            await new Promise(resolve => setTimeout(resolve, 200));
-            
-            const { sessaoService } = await import('../../services/sessaoService');
             await sessaoService.criarSessao(session.user.id);
             console.log('✅ Sessão criada com sucesso');
           } catch (error) {
-            console.warn('⚠️ Erro ao criar sessão:', error);
+            console.error('❌ Erro ao criar sessão no login:', error);
           }
-        }
         
         // Encerra sessão no logout
         if (event === 'SIGNED_OUT') {
-          console.log('🚪 Logout detectado, encerrando sessão...');
           try {
-            const { sessaoService } = await import('../../services/sessaoService');
             await sessaoService.encerrarSessao();
-            console.log('✅ Sessão encerrada');
           } catch (error) {
-            console.warn('⚠️ Erro ao encerrar sessão:', error);
           }
-        }
-      }
     );
     
     return () => {
-      console.log('🧹 Removendo listener de auth state');
+            console.error('❌ Erro ao criar sessão no login:', error);
       subscription.unsubscribe();
       connectionService.stopMonitoring();
     };
@@ -110,7 +106,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Para monitoramento de conexão
       connectionService.stopMonitoring();
       
-      const { sessaoService } = await import('../../services/sessaoService');
       await sessaoService.encerrarSessao();
     } catch (error) {
       console.warn('Erro ao encerrar sessão:', error);

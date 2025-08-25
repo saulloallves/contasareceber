@@ -61,8 +61,14 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
         // Garantir que existe um perfil na tabela usuarios_sistema
         await ensureUserProfile(data.user);
         
-        // Aguarda um pouco antes de chamar onAuthSuccess para dar tempo do AuthProvider processar
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Cria sessão explicitamente aqui também para garantir
+        try {
+          console.log('🔄 Criando sessão no SimpleAuth...');
+          await sessaoService.criarSessao(data.user.id);
+          console.log('✅ Sessão criada no SimpleAuth');
+        } catch (sessionError) {
+          console.warn('⚠️ Erro ao criar sessão no SimpleAuth:', sessionError);
+        }
         
         onAuthSuccess();
       }

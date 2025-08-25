@@ -85,7 +85,7 @@ export class SessaoService {
 
         // Cria nova sessão
         console.log('🆕 Criando nova sessão...');
-        const { data, error } = await connectionService.query(() => supabase
+        const { data, error } = await supabase
           .from('sessoes_usuario')
           .insert({
             usuario_id: usuarioId,
@@ -97,7 +97,7 @@ export class SessaoService {
             ativa: true
           })
           .select()
-          .single());
+          .single();
 
         if (error) {
           throw new Error(`Erro ao criar sessão: ${error.message}`);
@@ -119,7 +119,7 @@ export class SessaoService {
     } catch (error) {
       console.error('Erro ao criar sessão:', error);
       // Remove lock em caso de erro
-      localStorage.removeItem(`session_lock_${usuarioId}`);
+      sessionStorage.removeItem(`creating_session_${usuarioId}`);
       throw error;
     }
   }
