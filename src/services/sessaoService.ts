@@ -1,3 +1,37 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { supabase } from './databaseService';
+
+export interface SessaoUsuario {
+  id?: string;
+  usuario_id: string;
+  token_sessao: string;
+  ip_origem: string;
+  user_agent?: string;
+  data_inicio: string;
+  data_ultimo_acesso: string;
+  ativa: boolean;
+  created_at?: string;
+}
+
+export interface UsuarioOnline {
+  usuario_id: string;
+  nome_completo: string;
+  email: string;
+  avatar_url?: string;
+  data_ultimo_acesso: string;
+  ip_origem: string;
+  tempo_sessao_minutos: number;
+  ativa: boolean;
+}
+
+export class SessaoService {
+  /**
+   * Cria nova sessão quando usuário faz login
+   */
+  async criarSessao(usuarioId: string): Promise<string> {
+    try {
+      console.log('🔄 Criando sessão para usuário:', usuarioId);
+      
       // Desativa TODAS as sessões anteriores primeiro
       console.log('🔄 Desativando todas as sessões anteriores...');
       const { error: errorDesativar } = await supabase
@@ -9,6 +43,27 @@
         console.warn('⚠️ Erro ao desativar sessões anteriores:', errorDesativar);
       } else {
         console.log('✅ Sessões anteriores desativadas');
+      }
+
+      // Verifica se ainda existe sessão ativa (não deveria existir após desativação)
+      const { data: sessaoExistente, error: errorVerificacao } = await supabase
+        .from('sessoes_usuario')
+        .select('id, token_sessao, ativa')
+        .eq('usuario_id', usuarioId)
+        .eq('ativa', true)
+        .maybeSingle();
+
+      if (errorVerificacao) {
+        console.warn('⚠️ Erro ao verificar sessão existente:', errorVerificacao);
+      }
+
+      // Se ainda existe sessão ativa após desativação, algo está errado
+      if (sessaoExistente) {
+        console.warn('⚠️ Sessão ativa ainda existe após desativação, forçando desativação:', sessaoExistente.id);
+        await supabase
+          .from('sessoes_usuario')
+          .update({ ativa: false })
+          .eq('id', sessaoExistente.id);
       }
 
       // Gera token único para a sessão
@@ -411,6 +466,5 @@
     }
   }
 }
-    try {
 
 export const sessaoService = new SessaoService();
