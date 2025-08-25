@@ -598,18 +598,12 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
     try {
       let query = supabase
         .from('logs_sistema')
-        .select(`
-          *,
-          usuarios_sistema (
-            nome_completo,
-            email
-          )
-        `)
+        .select('*')
         .order('data_acao', { ascending: false })
         .limit(filtros.limite || 100);
 
       if (filtros.usuario) {
-        query = query.ilike('usuarios_sistema.nome_completo', `%${filtros.usuario}%`);
+        query = query.ilike('usuario_id', `%${filtros.usuario}%`);
       }
 
       if (filtros.acao) {
