@@ -411,5 +411,6 @@
     }
   }
 }
+    try {
 
 export const sessaoService = new SessaoService();
