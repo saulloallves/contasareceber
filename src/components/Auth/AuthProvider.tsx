@@ -84,6 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } catch (error) {
             console.error('❌ Erro ao criar sessão no login:', error);
           }
+        }
         
         // Encerra sessão no logout
         if (event === 'SIGNED_OUT') {
@@ -91,6 +92,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await sessaoService.encerrarSessao();
           } catch (error) {
           }
+        }
+      }
     );
     
     return () => {
