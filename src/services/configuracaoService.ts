@@ -558,8 +558,21 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
    */
   async registrarLogSeguranca(log: Omit<LogSeguranca, 'id'>): Promise<void> {
     try {
-      // Logs de segurança serão implementados quando a tabela for criada
-      console.log('Log de segurança registrado:', log);
+      const { error } = await supabase
+        .from('tentativas_login')
+        .insert({
+          email_tentativa: log.email_tentativa,
+          ip_origem: log.ip_origem,
+          user_agent: log.user_agent,
+          sucesso: log.tipo_evento === 'login_sucesso',
+          motivo_falha: log.tipo_evento === 'login_sucesso' ? null : log.detalhes,
+          data_tentativa: log.data_evento,
+          bloqueado_automaticamente: log.tipo_evento === 'bloqueio_automatico'
+        });
+
+      if (error) {
+        console.error('Erro ao registrar log de segurança:', error);
+      }
     } catch (error) {
       console.error('Erro ao registrar log de segurança:', error);
     }
@@ -576,12 +589,159 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
     limite?: number;
   } = {}): Promise<LogSeguranca[]> {
     try {
-      // Logs de segurança serão implementados quando a tabela for criada
-      console.log('Buscando logs de segurança com filtros:', filtros);
-      return [];
+      let query = supabase
+        .from('tentativas_login')
+        .select('*')
+        .order('data_tentativa', { ascending: false })
+        .limit(filtros.limite || 100);
+
+      if (filtros.dataInicio) {
+        query = query.gte('data_tentativa', filtros.dataInicio);
+      }
+
+      if (filtros.dataFim) {
+        query = query.lte('data_tentativa', filtros.dataFim);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw new Error(`Erro ao buscar logs de segurança: ${error.message}`);
+      }
+
+      // Mapeia para o formato LogSeguranca
+      return data?.map(tentativa => ({
+        id: tentativa.id,
+        usuario_id: tentativa.email_tentativa, // Usando email como identificador
+        email_tentativa: tentativa.email_tentativa,
+        ip_origem: tentativa.ip_origem,
+        user_agent: tentativa.user_agent,
+        tipo_evento: tentativa.sucesso ? 'login_sucesso' : 'login_falha',
+        detalhes: tentativa.motivo_falha,
+        data_evento: tentativa.data_tentativa
+      })) || [];
     } catch (error) {
       console.error('Erro ao buscar logs de segurança:', error);
       return [];
+    }
+  }
+
+  /**
+   * Registra tentativa de login
+   */
+  async registrarTentativaLogin(
+    email: string,
+    ip: string,
+    userAgent: string,
+    sucesso: boolean,
+    motivoFalha?: string
+  ): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('tentativas_login')
+        .insert({
+          email_tentativa: email,
+          ip_origem: ip,
+          user_agent: userAgent,
+          sucesso,
+          motivo_falha: motivoFalha,
+          data_tentativa: new Date().toISOString(),
+          bloqueado_automaticamente: false
+        });
+
+      if (error) {
+        console.error('Erro ao registrar tentativa de login:', error);
+      }
+    } catch (error) {
+      console.error('Erro ao registrar tentativa de login:', error);
+    }
+  }
+
+  /**
+   * Cria alerta de segurança
+   */
+  async criarAlertaSeguranca(
+    tipo: AlertaSeguranca['tipo'],
+    titulo: string,
+    descricao: string,
+    ipOrigem?: string,
+    usuarioAfetado?: string
+  ): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('alertas_seguranca')
+        .insert({
+          tipo,
+          titulo,
+          descricao,
+          ip_origem: ipOrigem,
+          usuario_afetado: usuarioAfetado,
+          data_deteccao: new Date().toISOString(),
+          resolvido: false
+        });
+
+      if (error) {
+        console.error('Erro ao criar alerta de segurança:', error);
+      }
+    } catch (error) {
+      console.error('Erro ao criar alerta de segurança:', error);
+    }
+  }
+
+  /**
+   * Verifica se IP está na whitelist
+   */
+  async verificarIPWhitelist(ip: string): Promise<boolean> {
+    try {
+      const config = await this.buscarConfiguracaoSeguranca();
+      
+      if (!config.ip_whitelist_ativo) {
+        return true; // Se whitelist não está ativa, permite todos os IPs
+      }
+
+      // Verifica se o IP está na lista de permitidos
+      return config.ips_permitidos.some(ipPermitido => {
+        if (ipPermitido.includes('/')) {
+          // CIDR notation - implementar verificação de subnet se necessário
+          return ip.startsWith(ipPermitido.split('/')[0]);
+        }
+        return ip === ipPermitido;
+      });
+    } catch (error) {
+      console.error('Erro ao verificar whitelist:', error);
+      return true; // Em caso de erro, permite acesso
+    }
+  }
+
+  /**
+   * Verifica se IP está bloqueado
+   */
+  async verificarIPBloqueado(ip: string): Promise<boolean> {
+    try {
+      const config = await this.buscarConfiguracaoSeguranca();
+      
+      // Verifica blacklist de configuração
+      if (config.ip_blacklist_ativo && config.ips_bloqueados.includes(ip)) {
+        return true;
+      }
+
+      // Verifica tabela de IPs bloqueados
+      const { data, error } = await supabase
+        .from('ips_bloqueados')
+        .select('id')
+        .eq('endereco_ip', ip)
+        .eq('ativo', true)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Erro ao verificar IP bloqueado:', error);
+        return false;
+      }
+
+      return !!data;
+    } catch (error) {
+      console.error('Erro ao verificar IP bloqueado:', error);
+      return false;
     }
   }
 
@@ -727,30 +887,17 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
    */
   async buscarTentativasLogin(limite: number = 50): Promise<TentativaLogin[]> {
     try {
-      // Como a tabela tentativas_login pode não existir ainda, simulamos dados
-      // Em produção, isso seria uma query real
-      const tentativasSimuladas: TentativaLogin[] = [
-        {
-          id: '1',
-          email_tentativa: 'admin@teste.com',
-          ip_origem: '192.168.1.100',
-          sucesso: false,
-          motivo_falha: 'Senha incorreta',
-          data_tentativa: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          bloqueado_automaticamente: false
-        },
-        {
-          id: '2',
-          email_tentativa: 'hacker@malicious.com',
-          ip_origem: '45.123.45.67',
-          sucesso: false,
-          motivo_falha: 'Usuário não encontrado',
-          data_tentativa: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-          bloqueado_automaticamente: true
-        }
-      ];
+      const { data, error } = await supabase
+        .from('tentativas_login')
+        .select('*')
+        .order('data_tentativa', { ascending: false })
+        .limit(limite);
 
-      return tentativasSimuladas;
+      if (error) {
+        throw new Error(`Erro ao buscar tentativas de login: ${error.message}`);
+      }
+
+      return data || [];
     } catch (error) {
       console.error('Erro ao buscar tentativas de login:', error);
       return [];
@@ -762,19 +909,17 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
    */
   async buscarIPsBloqueados(): Promise<IPBloqueado[]> {
     try {
-      // Simulação - em produção seria uma query real
-      const ipsSimulados: IPBloqueado[] = [
-        {
-          id: '1',
-          endereco_ip: '45.123.45.67',
-          motivo_bloqueio: 'Múltiplas tentativas de login falhadas',
-          bloqueado_por: 'Sistema Automático',
-          data_bloqueio: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          ativo: true
-        }
-      ];
+      const { data, error } = await supabase
+        .from('ips_bloqueados')
+        .select('*')
+        .eq('ativo', true)
+        .order('data_bloqueio', { ascending: false });
 
-      return ipsSimulados;
+      if (error) {
+        throw new Error(`Erro ao buscar IPs bloqueados: ${error.message}`);
+      }
+
+      return data || [];
     } catch (error) {
       console.error('Erro ao buscar IPs bloqueados:', error);
       return [];
@@ -786,8 +931,19 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
    */
   async bloquearIP(ip: string, motivo: string, usuario: string): Promise<void> {
     try {
-      // Em produção, salvaria na tabela ips_bloqueados
-      console.log(`IP ${ip} bloqueado por ${usuario}. Motivo: ${motivo}`);
+      const { error } = await supabase
+        .from('ips_bloqueados')
+        .insert({
+          endereco_ip: ip,
+          motivo_bloqueio: motivo,
+          bloqueado_por: usuario,
+          data_bloqueio: new Date().toISOString(),
+          ativo: true
+        });
+
+      if (error) {
+        throw new Error(`Erro ao bloquear IP: ${error.message}`);
+      }
       
       // Registra log
       await this.registrarLog({
@@ -807,8 +963,15 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
    */
   async desbloquearIP(ip: string, usuario: string): Promise<void> {
     try {
-      // Em produção, atualizaria na tabela ips_bloqueados
-      console.log(`IP ${ip} desbloqueado por ${usuario}`);
+      const { error } = await supabase
+        .from('ips_bloqueados')
+        .update({ ativo: false })
+        .eq('endereco_ip', ip)
+        .eq('ativo', true);
+
+      if (error) {
+        throw new Error(`Erro ao desbloquear IP: ${error.message}`);
+      }
       
       // Registra log
       await this.registrarLog({
@@ -828,30 +991,17 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
    */
   async buscarAlertasSeguranca(): Promise<AlertaSeguranca[]> {
     try {
-      // Simulação - em produção seria uma query real
-      const alertasSimulados: AlertaSeguranca[] = [
-        {
-          id: '1',
-          tipo: 'tentativa_brute_force',
-          titulo: 'Possível ataque de força bruta detectado',
-          descricao: '10 tentativas de login falhadas do IP 45.123.45.67 em 5 minutos',
-          ip_origem: '45.123.45.67',
-          data_deteccao: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-          resolvido: false
-        },
-        {
-          id: '2',
-          tipo: 'login_fora_horario',
-          titulo: 'Login fora do horário comercial',
-          descricao: 'Usuário admin@teste.com fez login às 02:30',
-          usuario_afetado: 'admin@teste.com',
-          data_deteccao: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-          resolvido: true,
-          acao_tomada: 'Verificado - acesso autorizado'
-        }
-      ];
+      const { data, error } = await supabase
+        .from('alertas_seguranca')
+        .select('*')
+        .order('data_deteccao', { ascending: false })
+        .limit(50);
 
-      return alertasSimulados;
+      if (error) {
+        throw new Error(`Erro ao buscar alertas de segurança: ${error.message}`);
+      }
+
+      return data || [];
     } catch (error) {
       console.error('Erro ao buscar alertas de segurança:', error);
       return [];
@@ -863,8 +1013,17 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
    */
   async resolverAlertaSeguranca(alertaId: string, acaoTomada: string, usuario: string): Promise<void> {
     try {
-      // Em produção, atualizaria na tabela alertas_seguranca
-      console.log(`Alerta ${alertaId} resolvido por ${usuario}. Ação: ${acaoTomada}`);
+      const { error } = await supabase
+        .from('alertas_seguranca')
+        .update({
+          resolvido: true,
+          acao_tomada: acaoTomada
+        })
+        .eq('id', alertaId);
+
+      if (error) {
+        throw new Error(`Erro ao resolver alerta: ${error.message}`);
+      }
       
       // Registra log
       await this.registrarLog({
