@@ -288,7 +288,7 @@ export function Sidebar({
                   </div>
                 )}
                 {isActive && (
-                  <div className="absolute right-2 w-1.5 h-1.5 bg-[#fe9821] rounded-full"></div>
+                  <div className={`absolute right-2 w-1.5 h-1.5 bg-[#fe9821] rounded-full ${collapsed ? 'hidden' : ''}`}></div>
                 )}
               </button>
 
@@ -343,7 +343,7 @@ export function Sidebar({
                   </div>
                 )}
                 {isActive && (
-                  <div className="absolute right-2 w-1.5 h-1.5 bg-[#fe9821] rounded-full"></div>
+                  <div className={`absolute right-2 w-1.5 h-1.5 bg-[#fe9821] rounded-full ${collapsed ? 'hidden' : ''}`}></div>
                 )}
               </button>
 
