@@ -117,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     console.log('🚪 Iniciando logout...');
     try {
-      const { sessaoService } = await import('./sessaoService');
+      const { sessaoService } = await import('../../services/sessaoService');
       await sessaoService.encerrarSessao();
     } catch (error) {
       console.warn('Erro ao encerrar sessão:', error);
