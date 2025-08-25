@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from "react";
 import { LogIn, UserPlus, X } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
@@ -224,17 +225,17 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
     }
   };
 
-  const openSignUpModal = () => {
-    setSignUpData({
-      email: email,
-      password: "",
-      nome_completo: "",
-      telefone: "",
-      cargo: ""
-    });
-    setShowSignUpModal(true);
-    setError("");
-  };
+  // const openSignUpModal = () => {
+  //   setSignUpData({
+  //     email: email,
+  //     password: "",
+  //     nome_completo: "",
+  //     telefone: "",
+  //     cargo: ""
+  //   });
+  //   setShowSignUpModal(true);
+  //   setError("");
+  // };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -302,7 +303,7 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
               {loading ? "Entrando..." : "Entrar"}
             </button>
 
-            <div className="text-center">
+            {/* <div className="text-center">
               <span className="text-sm text-gray-500">Não tem uma conta? </span>
               <button
                 type="button"
@@ -311,7 +312,7 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
               >
                 Cadastre-se
               </button>
-            </div>
+            </div> */}
           </div>
         </form>
       </div>
