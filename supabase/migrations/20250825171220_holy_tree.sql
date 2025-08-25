@@ -1,9 +1,5 @@
 /*
   # Correção do Sistema de Sessões e Limpeza
-
-  1. Limpeza
-    - Remove sessões duplicadas e inativas
-    - Mantém apenas sessões realmente ativas dos últimos 10 minutos
   
   2. Correções
     - Ajusta políticas RLS para melhor performance
@@ -19,6 +15,9 @@ WHERE ativa = true;
 -- Adiciona índice composto para otimizar busca por usuário ativo
 CREATE INDEX IF NOT EXISTS idx_sessoes_usuario_ativo_recente 
 ON sessoes_usuario (usuario_id, ativa, data_ultimo_acesso DESC);
+
+-- Remove a função antiga ANTES de tentar criar a nova com o tipo de retorno diferente.
+DROP FUNCTION IF EXISTS limpar_sessoes_expiradas();
 
 -- Função para limpeza automática de sessões (pode ser chamada periodicamente)
 CREATE OR REPLACE FUNCTION limpar_sessoes_expiradas()
