@@ -232,81 +232,13 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
         });
       } else {
         validacoes.push({
-          campo: 'texto_padrao_mensagem',
-          valido: true
-        });
-      }
-    }
-
-    // Valida link de agendamento
-    if (config.link_base_agendamento !== undefined) {
-      try {
-        new URL(config.link_base_agendamento);
-        validacoes.push({
-          campo: 'link_base_agendamento',
-          valido: true
-        });
-      } catch {
-        validacoes.push({
-          campo: 'link_base_agendamento',
-          valido: false,
-          mensagem: 'Link de agendamento deve ser uma URL válida'
-        });
-      }
-    }
-
-    return validacoes;
-  }
-
-  /**
-   * Registra log de alterações
-   */
-  private async registrarLogAlteracoes(
-    configAnterior: ConfiguracaoCobranca,
-    configNova: Partial<ConfiguracaoCobranca>,
-    usuario: string
-  ): Promise<void> {
-    try {
-      const alteracoes = [];
-
-      for (const [campo, valorNovo] of Object.entries(configNova)) {
-        const valorAnterior = (configAnterior as any)[campo];
-        if (valorAnterior !== valorNovo) {
-          alteracoes.push({
-            campo_alterado: campo,
-            valor_anterior: String(valorAnterior),
-            valor_novo: String(valorNovo),
-            usuario,
-            data_alteracao: new Date().toISOString()
-          });
-        }
-      }
-
-      if (alteracoes.length > 0) {
-        await supabase
-          .from('historico_alteracoes_config')
-          .insert(alteracoes);
-      }
+      console.warn('⚠️ Todos os métodos falharam, retornando lista vazia');
+      return [];
     } catch (error) {
-      console.error('Erro ao registrar log de alterações:', error);
+      console.error('Erro geral ao buscar usuários:', error);
+      return [];
     }
   }
-
-  /**
-   * Busca usuários do sistema
-   */
-  async buscarUsuarios(filtros: {
-    nivel?: string;
-    ativo?: boolean;
-    busca?: string;
-  } = {}): Promise<Usuario[]> {
-    try {
-      console.log('🔍 Buscando usuários com filtros:', filtros);
-      
-      // Tenta query direta primeiro (mais confiável)
-      let query = supabase
-        .from('usuarios_sistema')
-        .select('*')
         .order('nome_completo');
 
       if (filtros.nivel) {
