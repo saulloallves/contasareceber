@@ -232,13 +232,68 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
         });
       } else {
         validacoes.push({
-      console.warn('⚠️ Todos os métodos falharam, retornando lista vazia');
-      return [];
+          campo: 'texto_padrao_mensagem',
+          valido: true
+        });
+      }
+    }
+
+    return validacoes;
+  }
+
+  /**
+   * Registra log das alterações de configuração
+   */
+  async registrarLogAlteracoes(
+    configAnterior: ConfiguracaoCobranca,
+    configNova: Partial<ConfiguracaoCobranca>,
+    usuario: string
+  ): Promise<void> {
+    try {
+      const alteracoes: Record<string, { anterior: any; novo: any }> = {};
+
+      Object.keys(configNova).forEach(chave => {
+        const valorAnterior = (configAnterior as any)[chave];
+        const valorNovo = (configNova as any)[chave];
+        
+        if (valorAnterior !== valorNovo) {
+          alteracoes[chave] = {
+            anterior: valorAnterior,
+            novo: valorNovo
+          };
+        }
+      });
+
+      if (Object.keys(alteracoes).length > 0) {
+        await this.registrarLog({
+          usuario_id: usuario,
+          acao: 'atualizar_configuracao',
+          tabela_afetada: 'configuracoes_cobranca',
+          registro_id: 'default',
+          dados_anteriores: configAnterior,
+          dados_novos: configNova
+        });
+      }
     } catch (error) {
-      console.error('Erro geral ao buscar usuários:', error);
-      return [];
+      console.error('Erro ao registrar log de alterações:', error);
     }
   }
+
+  /**
+   * Busca todos os usuários do sistema
+   */
+  async buscarUsuarios(filtros: {
+    nivel?: string;
+    ativo?: boolean;
+    busca?: string;
+  } = {}): Promise<Usuario[]> {
+    try {
+      console.log('🔍 Buscando usuários com filtros:', filtros);
+      
+      // Primeiro tenta query direta (mais confiável)
+      let query = supabase
+        .from('usuarios_sistema')
+        .select('*')
         .order('nome_completo');
 
       if (filtros.nivel) {
@@ -289,16 +344,14 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
             .select('*')
             .eq('id', currentUser.user.id)
             .maybeSingle();
-          .from('usuarios_sistema')
-          .select('*')
-          .eq('id', currentUser.user?.id)
-          .single();
         
           if (!ownError && ownProfile) {
             console.log('✅ Retornando apenas usuário atual como fallback');
             return [ownProfile];
           }
         }
+      } catch (fallbackErr) {
+        console.warn('⚠️ Fallback também falhou:', fallbackErr);
       }
       
       console.warn('⚠️ Todos os métodos falharam, retornando lista vazia');
