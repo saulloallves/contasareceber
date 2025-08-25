@@ -483,54 +483,23 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
     usuarioLogado: string
   ): Promise<Usuario> {
     try {
-      // Primeiro verifica se o usuário existe
-      const { data: usuarioExiste, error: errorExiste } = await supabase
-        .from('usuarios_sistema')
-        .select('id')
-        .eq('id', id)
-        .maybeSingle();
-
-      if (errorExiste) {
-        throw new Error(`Erro ao verificar usuário: ${errorExiste.message}`);
-      }
-
-      if (!usuarioExiste) {
-        throw new Error('Usuário não encontrado para atualização');
-      }
-
-      // Busca dados atuais
-      const { data: usuarioAtual } = await supabase
-        .from('usuarios_sistema')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
-
-      const { data, error } = await supabase
-        .from('usuarios_sistema')
-        .update(dadosAtualizacao)
-        .eq('id', id)
-        .select()
-        .maybeSingle();
-
-      if (error) {
-        throw new Error(`Erro ao atualizar usuário: ${error.message}`);
-      }
-
-      if (!data) {
-        throw new Error('Usuário não foi atualizado - verifique as permissões');
-      }
-
-      // Registra log
-      await this.registrarLog({
-        usuario_id: usuarioLogado,
-        acao: 'atualizar_usuario',
-        tabela_afetada: 'usuarios_sistema',
-        registro_id: id,
-        dados_anteriores: usuarioAtual || {},
-        dados_novos: dadosAtualizacao
+      // Usa Edge Function para atualizar usuário com privilégios elevados
+      const { data, error } = await (supabase as any).functions.invoke('admin-update-user', {
+        body: {
+          userId: id,
+          updateData: dadosAtualizacao
+        }
       });
 
-      return data;
+      if (error) {
+        throw new Error(error.message || 'Erro ao atualizar usuário');
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Falha ao atualizar usuário');
+      }
+
+      return data.user;
     } catch (error) {
       console.error('Erro ao atualizar usuário:', error);
       throw error;
