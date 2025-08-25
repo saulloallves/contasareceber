@@ -3,20 +3,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import {
-  Settings,
-  Save,
-  RotateCcw,
-  Download,
-  CheckCircle,
-  AlertCircle,
-  Info,
-  DollarSign,
-  MessageSquare,
-  Bug,
-  Users,
-  Shield,
-  Bell,
-  Mail,
+  Settings, Save, RotateCcw, Download, CheckCircle,
+  AlertCircle, Info, DollarSign, MessageSquare,
+  Bug, Users, Shield, Bell, Mail,
+  AlertTriangle, Globe, RefreshCw, XCircle,
 } from "lucide-react";
 import { ConfiguracaoService } from "../services/configuracaoService";
 import { ConfiguracaoCobranca, LogSistema } from "../types/configuracao";
@@ -46,10 +36,6 @@ export function ConfiguracaoAdmin() {
   });
   const [configSeguranca, setConfigSeguranca] = useState<any>(null);
   const [tentativasLogin, setTentativasLogin] = useState<any[]>([]);
-  const [ipsBloqueados, setIpsBloqueados] = useState<any[]>([]);
-  const [alertasSeguranca, setAlertasSeguranca] = useState<any[]>([]);
-  const [novoIP, setNovoIP] = useState({ ip: '', motivo: '' });
-  const [salvandoSeguranca, setSalvandoSeguranca] = useState(false);
   const [configNotificacao, setConfigNotificacao] = useState({
     whatsapp_ativo: true,
     email_ativo: true,
