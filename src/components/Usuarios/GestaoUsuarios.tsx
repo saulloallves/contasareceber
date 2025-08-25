@@ -20,6 +20,8 @@ export function GestaoUsuarios() {
   const [formData, setFormData] = useState<Partial<Usuario>>({});
   const [filtros, setFiltros] = useState<FiltrosUsuarios>({});
   const [abaSelecionada, setAbaSelecionada] = useState<'usuarios' | 'sessoes' | 'estatisticas'>('usuarios');
+  const [senhaGerada, setSenhaGerada] = useState('');
+  const [mostrarSenha, setMostrarSenha] = useState(false);
 
   const configuracaoService = useMemo(() => new ConfiguracaoService(), []);
 
@@ -67,6 +69,8 @@ export function GestaoUsuarios() {
       ativo: true,
       verificacao_ip_ativa: false
     });
+    setSenhaGerada('');
+    setMostrarSenha(false);
     setModalAberto('criar');
   };
 
@@ -87,6 +91,8 @@ export function GestaoUsuarios() {
     setModalAberto(null);
     setUsuarioSelecionado(null);
     setFormData({});
+    setSenhaGerada('');
+    setMostrarSenha(false);
   };
 
   const forcarLogout = async (usuarioId: string, nomeUsuario: string) => {
@@ -120,6 +126,77 @@ export function GestaoUsuarios() {
   const obterDadosSessao = (usuarioId: string): UsuarioOnline | null => {
     return usuariosOnline.find(u => u.usuario_id === usuarioId) || null;
   };
+  const gerarSenha = async () => {
+    try {
+      // Busca configurações de segurança para gerar senha conforme as regras
+      const configSeguranca = await configuracaoService.buscarConfiguracaoSeguranca();
+      
+      const comprimento = Math.max(configSeguranca.senha_comprimento_minimo, 12);
+      let caracteres = '';
+      
+      // Caracteres obrigatórios baseados na configuração
+      if (configSeguranca.senha_requer_minuscula) {
+        caracteres += 'abcdefghijklmnopqrstuvwxyz';
+      }
+      if (configSeguranca.senha_requer_maiuscula) {
+        caracteres += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      }
+      if (configSeguranca.senha_requer_numero) {
+        caracteres += '0123456789';
+      }
+      if (configSeguranca.senha_requer_especial) {
+        caracteres += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+      }
+      
+      // Se nenhuma regra específica, usa caracteres básicos
+      if (!caracteres) {
+        caracteres = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      }
+      
+      let senha = '';
+      
+      // Garante pelo menos um caractere de cada tipo obrigatório
+      if (configSeguranca.senha_requer_minuscula) {
+        senha += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)];
+      }
+      if (configSeguranca.senha_requer_maiuscula) {
+        senha += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)];
+      }
+      if (configSeguranca.senha_requer_numero) {
+        senha += '0123456789'[Math.floor(Math.random() * 10)];
+      }
+      if (configSeguranca.senha_requer_especial) {
+        senha += '!@#$%^&*'[Math.floor(Math.random() * 8)];
+      }
+      
+      // Completa o resto da senha com caracteres aleatórios
+      for (let i = senha.length; i < comprimento; i++) {
+        senha += caracteres[Math.floor(Math.random() * caracteres.length)];
+      }
+      
+      // Embaralha a senha para não ter padrão previsível
+      senha = senha.split('').sort(() => Math.random() - 0.5).join('');
+      
+      setSenhaGerada(senha);
+      setMostrarSenha(true);
+    } catch (error) {
+      console.error('Erro ao gerar senha:', error);
+      alert('Erro ao gerar senha. Usando configuração padrão.');
+      
+      // Fallback: gera senha simples se não conseguir buscar configurações
+      const senhaFallback = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-4).toUpperCase() + Math.floor(Math.random() * 100);
+      setSenhaGerada(senhaFallback);
+      setMostrarSenha(true);
+    }
+  };
+
+  const copiarSenha = () => {
+    navigator.clipboard.writeText(senhaGerada).then(() => {
+      alert('Senha copiada para a área de transferência!');
+    }).catch(() => {
+      alert('Não foi possível copiar a senha. Copie manualmente.');
+    });
+  };
 
   const salvarUsuario = async () => {
     if (!formData.nome_completo || !formData.email || !formData.nivel_permissao) {
@@ -129,21 +206,17 @@ export function GestaoUsuarios() {
 
     try {
       if (modalAberto === 'criar') {
-        // Pergunta se deseja enviar convite por e-mail (sem senha)
-        const usarConvite = confirm('Deseja enviar um convite por e-mail para o usuário definir a senha? (OK = convite, Cancelar = definir senha agora)');
-        let password: string | undefined = undefined;
-        if (!usarConvite) {
-          const pwd = prompt('Digite uma senha inicial (mín. 8 caracteres):') || '';
-          if (pwd.length < 8) {
-            alert('Senha muito curta. Tente novamente.');
-            return;
-          }
-          password = pwd;
+        if (!senhaGerada) {
+          alert('Gere uma senha para o usuário antes de criar a conta');
+          return;
         }
+        
         await configuracaoService.criarUsuarioAdmin({
           ...(formData as Omit<Usuario, 'id' | 'created_at' | 'updated_at'>),
-          password,
+          password: senhaGerada,
         });
+        
+        alert(`Usuário criado com sucesso!\n\nSenha gerada: ${senhaGerada}\n\nAnote esta senha e repasse ao usuário com segurança.`);
       } else if (modalAberto === 'editar' && usuarioSelecionado) {
         await configuracaoService.atualizarUsuario(
           usuarioSelecionado.id!,
@@ -820,6 +893,63 @@ export function GestaoUsuarios() {
                   <option value="admin_master">Admin Master</option>
                 </select>
               </div>
+              
+              {modalAberto === 'criar' && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Senha *</label>
+                  <div className="flex space-x-2">
+                    <div className="flex-1 relative">
+                      <input
+                        type={mostrarSenha ? 'text' : 'password'}
+                        value={senhaGerada}
+                        onChange={(e) => setSenhaGerada(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="Clique em 'Gerar Senha' ou digite uma senha"
+                      />
+                      {senhaGerada && (
+                        <button
+                          type="button"
+                          onClick={() => setMostrarSenha(!mostrarSenha)}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          {mostrarSenha ? (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={gerarSenha}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 whitespace-nowrap"
+                    >
+                      Gerar Senha
+                    </button>
+                    {senhaGerada && (
+                      <button
+                        type="button"
+                        onClick={copiarSenha}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"
+                        title="Copiar senha"
+                      >
+                        📋
+                      </button>
+                    )}
+                  </div>
+                  {senhaGerada && (
+                    <p className="text-xs text-green-600 mt-1">
+                      ✅ Senha gerada conforme as regras de segurança do sistema
+                    </p>
+                  )}
+                </div>
+              )}
               
             </div>
             
