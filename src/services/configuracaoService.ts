@@ -301,85 +301,76 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
     busca?: string;
   } = {}): Promise<Usuario[]> {
     try {
-      // Tenta primeiro com service_role para admin_master
-      const { data: currentUser } = await supabase.auth.getUser();
+      console.log('🔍 Buscando usuários com filtros:', filtros);
       
-      // Busca o perfil do usuário atual para verificar se é admin_master
-      const { data: userProfile } = await supabase
+      // Tenta query direta primeiro (mais confiável)
+      let query = supabase
         .from('usuarios_sistema')
-        .select('nivel_permissao')
-        .eq('id', currentUser.user?.id)
-        .single();
+        .select('*')
+        .order('nome_completo');
 
-      // Se não é admin_master, retorna apenas o próprio usuário
-      if (!userProfile || userProfile.nivel_permissao !== 'admin_master') {
-        console.log('🔒 Usuário não é admin_master, retornando apenas próprio perfil');
-        const { data: ownProfile, error } = await supabase
+      if (filtros.nivel) {
+        query = query.eq('nivel_permissao', filtros.nivel);
+      }
+
+      if (filtros.ativo !== undefined) {
+        query = query.eq('ativo', filtros.ativo);
+      }
+
+      if (filtros.busca) {
+        query = query.or(`nome_completo.ilike.%${filtros.busca}%,email.ilike.%${filtros.busca}%,cargo.ilike.%${filtros.busca}%`);
+      }
+
+      const { data: directData, error: directError } = await query;
+      
+      if (!directError && directData) {
+        console.log('✅ Usuários encontrados via query direta:', directData.length);
+        return directData;
+      }
+      
+      console.warn('⚠️ Query direta falhou, tentando RPC:', directError?.message);
+      
+      // Fallback: tenta RPC function
+      try {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_users_admin', {
+          p_nivel_filtro: filtros.nivel || null,
+          p_ativo_filtro: filtros.ativo,
+          p_busca_filtro: filtros.busca || null
+        });
+
+        if (!rpcError && rpcData) {
+          console.log('✅ Usuários encontrados via RPC:', rpcData.length);
+          return rpcData;
+        }
+        
+        console.warn('⚠️ RPC também falhou:', rpcError?.message);
+      } catch (rpcErr) {
+        console.warn('⚠️ Erro na RPC:', rpcErr);
+      }
+      
+      // Último fallback: retorna apenas usuário atual
+      try {
+        const { data: currentUser } = await supabase.auth.getUser();
+        if (currentUser.user) {
+          const { data: ownProfile, error: ownError } = await supabase
+            .from('usuarios_sistema')
+            .select('*')
+            .eq('id', currentUser.user.id)
+            .maybeSingle();
           .from('usuarios_sistema')
           .select('*')
           .eq('id', currentUser.user?.id)
           .single();
         
-        if (error) {
-          console.error('❌ Erro ao buscar próprio perfil:', error);
-          return [];
+          if (!ownError && ownProfile) {
+            console.log('✅ Retornando apenas usuário atual como fallback');
+            return [ownProfile];
+          }
         }
-        
-        return ownProfile ? [ownProfile] : [];
       }
-
-      // Para admin_master, usa RPC function que bypassa RLS
-      console.log('👑 Usuário é admin_master, buscando todos os usuários via RPC');
       
-      const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_users_admin', {
-        p_nivel_filtro: filtros.nivel || null,
-        p_ativo_filtro: filtros.ativo,
-        p_busca_filtro: filtros.busca || null
-      });
-
-      if (rpcError) {
-        console.error('❌ Erro na RPC function, tentando query direta:', rpcError);
-        
-        // Fallback: tenta query direta (pode falhar devido ao RLS)
-        let query = supabase
-          .from('usuarios_sistema')
-          .select('*')
-          .order('nome_completo');
-
-        if (filtros.nivel) {
-          query = query.eq('nivel_permissao', filtros.nivel);
-        }
-
-        if (filtros.ativo !== undefined) {
-          query = query.eq('ativo', filtros.ativo);
-        }
-
-        if (filtros.busca) {
-          query = query.or(`nome_completo.ilike.%${filtros.busca}%,email.ilike.%${filtros.busca}%,cargo.ilike.%${filtros.busca}%`);
-        }
-
-        const { data: fallbackData, error: fallbackError } = await query;
-        
-        if (fallbackError) {
-          console.error('❌ Erro no fallback:', fallbackError.message);
-          console.log('⚠️ Retornando apenas usuário atual devido às políticas RLS');
-          
-          // Se tudo falhar, retorna apenas o usuário atual
-          const { data: currentUserData } = await supabase
-            .from('usuarios_sistema')
-            .select('*')
-            .eq('id', currentUser.user?.id)
-            .single();
-          
-          return currentUserData ? [currentUserData] : [];
-        }
-        
-        console.log('✅ Usuários encontrados via fallback:', fallbackData?.length || 0);
-        return fallbackData || [];
-      }
-
-      console.log('✅ Usuários encontrados via RPC:', rpcData?.length || 0);
-      return rpcData || [];
+      console.warn('⚠️ Todos os métodos falharam, retornando lista vazia');
+      return [];
     } catch (error) {
       console.error('Erro geral ao buscar usuários:', error);
       return [];
@@ -483,23 +474,53 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
     usuarioLogado: string
   ): Promise<Usuario> {
     try {
-      // Usa Edge Function para atualizar usuário com privilégios elevados
-      const { data, error } = await (supabase as any).functions.invoke('admin-update-user', {
-        body: {
-          userId: id,
-          updateData: dadosAtualizacao
-        }
-      });
+      console.log('🔄 Tentando atualizar usuário:', id, dadosAtualizacao);
+      
+      // Primeiro tenta query direta (mais simples e confiável)
+      const { data, error } = await supabase
+        .from('usuarios_sistema')
+        .update({
+          ...dadosAtualizacao,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .maybeSingle();
 
       if (error) {
-        throw new Error(error.message || 'Erro ao atualizar usuário');
+        console.error('❌ Erro na query direta, tentando Edge Function:', error);
+        
+        // Fallback: tenta Edge Function se query direta falhar
+        try {
+          const { data: edgeData, error: edgeError } = await (supabase as any).functions.invoke('admin-update-user', {
+            body: {
+              userId: id,
+              updateData: dadosAtualizacao
+            }
+          });
+
+          if (edgeError) {
+            throw new Error(edgeError.message || 'Erro na Edge Function');
+          }
+
+          if (!edgeData?.success) {
+            throw new Error(edgeData?.error || 'Falha na Edge Function');
+          }
+
+          console.log('✅ Usuário atualizado via Edge Function');
+          return edgeData.user;
+        } catch (edgeErr) {
+          console.error('❌ Edge Function também falhou:', edgeErr);
+          throw new Error(`Erro ao atualizar usuário: ${error.message}`);
+        }
       }
 
-      if (!data.success) {
-        throw new Error(data.error || 'Falha ao atualizar usuário');
+      if (!data) {
+        throw new Error('Usuário não encontrado ou não foi possível atualizar');
       }
 
-      return data.user;
+      console.log('✅ Usuário atualizado via query direta');
+      return data;
     } catch (error) {
       console.error('Erro ao atualizar usuário:', error);
       throw error;

@@ -192,26 +192,72 @@ export class SessaoService {
       
       console.log('🔍 Buscando usuários online desde:', limiteOnline.toISOString());
 
-      const { data, error } = await supabase
-        .from('sessoes_usuario')
-        .select(`
-          usuario_id,
-          ip_origem,
-          data_inicio,
-          data_ultimo_acesso,
-          ativa,
-          usuarios_sistema (
-            nome_completo,
-            email,
-            avatar_url
-          )
-        `)
-        .eq('ativa', true)
-        .gte('data_ultimo_acesso', limiteOnline.toISOString())
-        .order('data_ultimo_acesso', { ascending: false });
+      // Tenta buscar sessões ativas com join
+      let data, error;
+      
+      try {
+        const result = await supabase
+          .from('sessoes_usuario')
+          .select(`
+            usuario_id,
+            ip_origem,
+            data_inicio,
+            data_ultimo_acesso,
+            ativa,
+            usuarios_sistema (
+              nome_completo,
+              email,
+              avatar_url
+            )
+          `)
+          .eq('ativa', true)
+          .gte('data_ultimo_acesso', limiteOnline.toISOString())
+          .order('data_ultimo_acesso', { ascending: false });
+          
+        data = result.data;
+        error = result.error;
+      } catch (fetchError) {
+        console.warn('⚠️ Erro ao buscar sessões com join, tentando sem join:', fetchError);
+        
+        // Fallback: busca apenas sessões sem join
+        try {
+          const sessionsResult = await supabase
+            .from('sessoes_usuario')
+            .select('usuario_id, ip_origem, data_inicio, data_ultimo_acesso, ativa')
+            .eq('ativa', true)
+            .gte('data_ultimo_acesso', limiteOnline.toISOString())
+            .order('data_ultimo_acesso', { ascending: false });
+            
+          if (sessionsResult.error) {
+            throw sessionsResult.error;
+          }
+          
+          // Busca dados dos usuários separadamente
+          const usuariosIds = sessionsResult.data?.map(s => s.usuario_id) || [];
+          const usuariosResult = await supabase
+            .from('usuarios_sistema')
+            .select('id, nome_completo, email, avatar_url')
+            .in('id', usuariosIds);
+            
+          // Combina os dados manualmente
+          data = sessionsResult.data?.map(sessao => ({
+            ...sessao,
+            usuarios_sistema: usuariosResult.data?.find(u => u.id === sessao.usuario_id) || {
+              nome_completo: 'Usuário Desconhecido',
+              email: '',
+              avatar_url: null
+            }
+          }));
+          error = null;
+        } catch (fallbackError) {
+          console.error('❌ Fallback também falhou:', fallbackError);
+          return [];
+        }
+      }
 
       if (error) {
-        throw new Error(`Erro ao buscar usuários online: ${error.message}`);
+        console.error('❌ Erro ao buscar usuários online:', error);
+        return [];
       }
 
       console.log('👥 Sessões ativas encontradas:', data?.length || 0);

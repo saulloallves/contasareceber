@@ -174,14 +174,19 @@ export function GestaoUsuarios() {
 
   const alterarStatus = async (id: string, novoStatus: boolean) => {
     try {
+      console.log('🔄 Alterando status do usuário:', id, 'para:', novoStatus);
+      
       await configuracaoService.atualizarUsuario(
         id,
         { ativo: novoStatus },
         'usuario_atual'
       );
+      
+      console.log('✅ Status alterado com sucesso');
       carregarDados();
     } catch (e) {
-      alert(`Erro ao alterar status: ${e}`);
+      console.error('❌ Erro ao alterar status:', e);
+      alert(`Erro ao alterar status do usuário: ${e instanceof Error ? e.message : 'Erro desconhecido'}`);
     }
   };
 
