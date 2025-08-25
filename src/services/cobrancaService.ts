@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "../lib/supabaseClient";
+import { connectionService } from "./connectionService";
 import {
   CobrancaFranqueado,
   QuitacaoCobranca,
@@ -95,86 +96,88 @@ export class CobrancaService {
   ): Promise<CobrancaFranqueado[]> {
   // Observação: joins embutidos removidos para evitar ambiguidade de relacionamentos no PostgREST
   // Caso precise de dados de unidade/franqueado, a UI resolve via serviços dedicados após o fetch.
-  let query = supabase.from("cobrancas_franqueados").select("*");
+    const queryFn = () => {
+      let query = supabase.from("cobrancas_franqueados").select("*");
 
-    // Filtros básicos
-    if (filtros.status) {
-      query = query.eq("status", filtros.status);
-    }
-
-    if (filtros.dataInicio) {
-      query = query.gte("data_vencimento", filtros.dataInicio);
-    }
-
-    if (filtros.dataFim) {
-      query = query.lte("data_vencimento", filtros.dataFim);
-    }
-
-    if (filtros.cnpj) {
-      const cnpjFiltro = String(filtros.cnpj);
-      const cnpjNumerico = cnpjFiltro.replace(/\D/g, "");
-      // Aplica filtro exato apenas quando CNPJ completo (14 dígitos)
-      if (cnpjNumerico.length === 14) {
-        query = query.eq("cnpj", cnpjNumerico);
+      // Filtros básicos
+      if (filtros.status) {
+        query = query.eq("status", filtros.status);
       }
-      // Para valores parciais, não filtra no banco (o front aplica includes em dígitos)
-    }
-    if ((filtros as any).cpf) {
-      const cpfFiltro = String((filtros as any).cpf);
-      const cpfNumerico = cpfFiltro.replace(/\D/g, "");
-      // Aplica filtro exato apenas quando CPF completo (11 dígitos)
-      if (cpfNumerico.length === 11) {
-        query = query.eq("cpf", cpfNumerico);
+
+      if (filtros.dataInicio) {
+        query = query.gte("data_vencimento", filtros.dataInicio);
       }
-      // Para valores parciais, não filtra no banco (o front aplica includes em dígitos)
-    }
 
-    // Filtro por tipo de documento (cpf/cnpj)
-    if ((filtros as any).tipoDocumento === "cpf") {
-      // CPF válido: coluna 'cpf' NÃO nula e NÃO vazia
-      query = query.not("cpf", "is", null).neq("cpf", "");
-    } else if ((filtros as any).tipoDocumento === "cnpj") {
-      // CNPJ: registros onde 'cpf' é nulo OU vazio (dados antigos podem ter "")
-      query = query.or("cpf.is.null,cpf.eq.");
-    }
-
-    // Filtros de valor
-    if (filtros.valorMin) {
-      const valorMin = typeof filtros.valorMin === 'string' 
-        ? parseFloat(filtros.valorMin) 
-        : filtros.valorMin;
-      if (!isNaN(valorMin as number)) {
-        query = query.gte("valor_atualizado", valorMin);
+      if (filtros.dataFim) {
+        query = query.lte("data_vencimento", filtros.dataFim);
       }
-    }
 
-    if (filtros.valorMax) {
-      const valorMax = typeof filtros.valorMax === 'string' 
-        ? parseFloat(filtros.valorMax) 
-        : filtros.valorMax;
-      if (!isNaN(valorMax as number)) {
-        query = query.lte("valor_atualizado", valorMax);
+      if (filtros.cnpj) {
+        const cnpjFiltro = String(filtros.cnpj);
+        const cnpjNumerico = cnpjFiltro.replace(/\D/g, "");
+        // Aplica filtro exato apenas quando CNPJ completo (14 dígitos)
+        if (cnpjNumerico.length === 14) {
+          query = query.eq("cnpj", cnpjNumerico);
+        }
+        // Para valores parciais, não filtra no banco (o front aplica includes em dígitos)
       }
-    }
+      if ((filtros as any).cpf) {
+        const cpfFiltro = String((filtros as any).cpf);
+        const cpfNumerico = cpfFiltro.replace(/\D/g, "");
+        // Aplica filtro exato apenas quando CPF completo (11 dígitos)
+        if (cpfNumerico.length === 11) {
+          query = query.eq("cpf", cpfNumerico);
+        }
+        // Para valores parciais, não filtra no banco (o front aplica includes em dígitos)
+      }
 
-    // Filtro por tipo de cobrança
-    if (filtros.tipoCobranca || filtros.tipo_debito) {
-      const tipo = filtros.tipoCobranca || filtros.tipo_debito;
-      query = query.eq("tipo_cobranca", tipo);
-    }
+      // Filtro por tipo de documento (cpf/cnpj)
+      if ((filtros as any).tipoDocumento === "cpf") {
+        // CPF válido: coluna 'cpf' NÃO nula e NÃO vazia
+        query = query.not("cpf", "is", null).neq("cpf", "");
+      } else if ((filtros as any).tipoDocumento === "cnpj") {
+        // CNPJ: registros onde 'cpf' é nulo OU vazio (dados antigos podem ter "")
+        query = query.or("cpf.is.null,cpf.eq.");
+      }
 
-    // Filtro apenas inadimplentes
-    if (filtros.apenasInadimplentes) {
-      query = query.neq("status", "quitado");
-    }
+      // Filtros de valor
+      if (filtros.valorMin) {
+        const valorMin = typeof filtros.valorMin === 'string' 
+          ? parseFloat(filtros.valorMin) 
+          : filtros.valorMin;
+        if (!isNaN(valorMin as number)) {
+          query = query.gte("valor_atualizado", valorMin);
+        }
+      }
 
-    // Ordenação
-    const colunaOrdenacao = filtros.colunaOrdenacao as string || "data_vencimento";
-    const direcaoOrdenacao = filtros.direcaoOrdenacao as string || "desc";
-    
-    query = query.order(colunaOrdenacao, { ascending: direcaoOrdenacao === "asc" });
+      if (filtros.valorMax) {
+        const valorMax = typeof filtros.valorMax === 'string' 
+          ? parseFloat(filtros.valorMax) 
+          : filtros.valorMax;
+        if (!isNaN(valorMax as number)) {
+          query = query.lte("valor_atualizado", valorMax);
+        }
+      }
 
-    const { data, error } = await query;
+      // Filtro por tipo de cobrança
+      if (filtros.tipoCobranca || filtros.tipo_debito) {
+        const tipo = filtros.tipoCobranca || filtros.tipo_debito;
+        query = query.eq("tipo_cobranca", tipo);
+      }
+
+      // Filtro apenas inadimplentes
+      if (filtros.apenasInadimplentes) {
+        query = query.neq("status", "quitado");
+      }
+
+      // Ordenação
+      const colunaOrdenacao = filtros.colunaOrdenacao as string || "data_vencimento";
+      const direcaoOrdenacao = filtros.direcaoOrdenacao as string || "desc";
+      
+      return query.order(colunaOrdenacao, { ascending: direcaoOrdenacao === "asc" });
+    };
+
+    const { data, error } = await connectionService.query(queryFn);
 
     if (error) {
       throw new Error(`Erro ao buscar cobranças: ${error.message}`);
@@ -216,11 +219,11 @@ export class CobrancaService {
       usuario,
     } = dados;
 
-    const { data: cobranca, error: cobrancaError } = await supabase
+    const { data: cobranca, error: cobrancaError } = await connectionService.query(() => supabase
       .from("cobrancas_franqueados")
       .select("*")
       .eq("id", cobrancaId)
-      .single();
+      .single());
 
     if (cobrancaError || !cobranca) {
       throw new Error(`Erro ao buscar cobrança: ${cobrancaError?.message}`);
@@ -234,7 +237,7 @@ export class CobrancaService {
     const novaObservacao = `\n[${new Date().toLocaleString("pt-BR")}] Pagamento registrado: ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valorPago)} via ${formaPagamento}${observacoes ? ` - ${observacoes}` : ""}. Usuário: ${usuario}`;
     observacoesConsolidadas += novaObservacao;
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await connectionService.query(() => supabase
       .from("cobrancas_franqueados")
       .update({
         valor_recebido: (cobranca.valor_recebido || 0) + valorPago,
@@ -242,7 +245,7 @@ export class CobrancaService {
         data_ultima_atualizacao: new Date().toISOString(),
         observacoes: observacoesConsolidadas,
       })
-      .eq("id", cobrancaId);
+      .eq("id", cobrancaId));
 
     if (updateError) {
       throw new Error(`Erro ao atualizar cobrança: ${updateError.message}`);
@@ -260,17 +263,19 @@ export class CobrancaService {
   }
 
   async registrarTratativa(tratativa: TrativativaCobranca): Promise<void> {
-    const { error } = await supabase.from("tratativas").insert(tratativa);
+    const { error } = await connectionService.query(() => 
+      supabase.from("tratativas").insert(tratativa)
+    );
 
     if (error) {
       throw new Error(`Erro ao registrar tratativa: ${error.message}`);
     }
 
     if (tratativa.status_cobranca_resultante) {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await connectionService.query(() => supabase
         .from("cobrancas_franqueados")
         .update({ status: tratativa.status_cobranca_resultante })
-        .eq("id", tratativa.titulo_id);
+        .eq("id", tratativa.titulo_id));
 
       if (updateError) {
         throw new Error(
@@ -281,9 +286,9 @@ export class CobrancaService {
   }
 
   async enviarMensagemCobranca(mensagem: EnvioMensagem): Promise<void> {
-    const { error } = await supabase
+    const { error } = await connectionService.query(() => supabase
       .from("mensagens_enviadas")
-      .insert(mensagem);
+      .insert(mensagem));
 
     if (error) {
       throw new Error(`Erro ao registrar mensagem enviada: ${error.message}`);
@@ -303,11 +308,11 @@ export class CobrancaService {
 
     for (const cobrancaId of cobrancas) {
       try {
-        const { data: cobranca, error } = await supabase
+        const { data: cobranca, error } = await connectionService.query(() => supabase
           .from("cobrancas_franqueados")
           .select("*")
           .eq("id", cobrancaId)
-          .single();
+          .single());
 
         if (error || !cobranca) {
           throw new Error(`Erro ao buscar cobrança: ${error?.message}`);
@@ -351,10 +356,10 @@ export class CobrancaService {
     dados: Partial<CobrancaFranqueado>
   ): Promise<void> {
     const payload = this.sanitizeUpdatePayload(dados);
-    const { error } = await supabase
+    const { error } = await connectionService.query(() => supabase
       .from("cobrancas_franqueados")
       .update({ ...payload, data_ultima_atualizacao: new Date().toISOString() })
-      .eq("id", id);
+      .eq("id", id));
 
     if (error) {
       throw new Error(`Erro ao atualizar cobrança: ${error.message}`);
@@ -370,11 +375,11 @@ export class CobrancaService {
 
     // 1) Logs de WhatsApp via n8n em 'logs_envio_whatsapp'
     try {
-      const { data, error } = await supabase
+      const { data, error } = await connectionService.query(() => supabase
         .from("logs_envio_whatsapp")
         .select("id, destinatario, mensagem_enviada, instancia_evolution, sucesso, evolution_message_id, erro_detalhes, data_envio, created_at, cobranca_id")
         .eq("cobranca_id", cobrancaId)
-        .order("data_envio", { ascending: false });
+        .order("data_envio", { ascending: false }));
 
       if (!error && data) {
         historico.push(
@@ -400,11 +405,11 @@ export class CobrancaService {
 
     // 2) Logs de e-mail via n8n em 'logs_envio_email'
     try {
-      const { data, error } = await supabase
+      const { data, error } = await connectionService.query(() => supabase
         .from("logs_envio_email")
         .select("id, destinatario, mensagem, sucesso, message_id, erro_detalhes, data_envio, created_at, cobranca_id")
         .eq("cobranca_id", cobrancaId)
-        .order("data_envio", { ascending: false });
+        .order("data_envio", { ascending: false }));
 
       if (!error && data) {
         historico.push(

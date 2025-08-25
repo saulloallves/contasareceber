@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
+import { connectionService } from "../../services/connectionService";
 
 interface AuthContextType {
   user: User | null;
@@ -17,6 +18,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     console.log('🎧 Configurando listener de auth state...');
+    
+    // Inicia monitoramento de conexão
+    connectionService.startMonitoring();
     
     // Flag para evitar múltiplas execuções simultâneas
     let isInitializing = false;
@@ -96,12 +100,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       console.log('🧹 Removendo listener de auth state');
       subscription.unsubscribe();
+      connectionService.stopMonitoring();
     };
   }, []);
 
   const signOut = async () => {
     console.log('🚪 Iniciando logout...');
     try {
+      // Para monitoramento de conexão
+      connectionService.stopMonitoring();
+      
       const { sessaoService } = await import('../../services/sessaoService');
       await sessaoService.encerrarSessao();
     } catch (error) {

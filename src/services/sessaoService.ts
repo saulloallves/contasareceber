@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from './databaseService';
+import { connectionService } from './connectionService';
 
 export interface SessaoUsuario {
   id?: string;
@@ -32,64 +33,47 @@ export class SessaoService {
     try {
       console.log('🔄 Criando sessão para usuário:', usuarioId);
       
-      // Implementa controle de concorrência com lock otimista
-      const lockKey = `session_lock_${usuarioId}`;
-      const lockValue = Date.now().toString();
+      // Verifica se já existe uma sessão sendo criada
+      const lockKey = `creating_session_${usuarioId}`;
+      const existingLock = sessionStorage.getItem(lockKey);
       
-      // Tenta adquirir lock usando localStorage como semáforo simples
-      const existingLock = localStorage.getItem(lockKey);
-      if (existingLock && (Date.now() - parseInt(existingLock)) < 5000) {
-        console.log('🔒 Criação de sessão já em andamento, aguardando...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Verifica se sessão foi criada por outro processo
-        const tokenExistente = localStorage.getItem('session_token');
-        if (tokenExistente) {
-          console.log('✅ Sessão já criada por outro processo');
-          return tokenExistente;
+      if (existingLock) {
+        const lockTime = parseInt(existingLock);
+        if (Date.now() - lockTime < 10000) { // 10 segundos
+          console.log('🔒 Sessão já sendo criada, aguardando...');
+          
+          // Aguarda até 5 segundos pela conclusão
+          for (let i = 0; i < 50; i++) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            const token = localStorage.getItem('session_token');
+            if (token) {
+              console.log('✅ Sessão criada por outro processo');
+              return token;
+            }
+          }
         }
       }
       
       // Adquire lock
-      localStorage.setItem(lockKey, lockValue);
+      sessionStorage.setItem(lockKey, Date.now().toString());
       
       try {
-        // Desativa TODAS as sessões anteriores de forma atômica
-        console.log('🔄 Desativando todas as sessões anteriores...');
-        const { error: errorDesativar } = await supabase
-          .from('sessoes_usuario')
-          .update({ ativa: false })
-          .eq('usuario_id', usuarioId)
-          .eq('ativa', true);
-
-        if (errorDesativar) {
-          console.warn('⚠️ Erro ao desativar sessões anteriores:', errorDesativar);
-        } else {
-          console.log('✅ Sessões anteriores desativadas');
-        }
-
-        // Aguarda um pouco para garantir que a operação foi processada
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Verifica novamente se existe sessão ativa
-        const { data: sessaoExistente, error: errorVerificacao } = await supabase
-          .from('sessoes_usuario')
-          .select('id, token_sessao, ativa')
-          .eq('usuario_id', usuarioId)
-          .eq('ativa', true)
-          .maybeSingle();
-
-        if (errorVerificacao) {
-          console.warn('⚠️ Erro ao verificar sessão existente:', errorVerificacao);
-        }
-
-        // Se ainda existe sessão ativa, força desativação
-        if (sessaoExistente) {
-          console.warn('⚠️ Sessão ativa ainda existe, forçando desativação:', sessaoExistente.id);
-          await supabase
+        // Verifica se já existe sessão ativa ANTES de tentar criar
+        console.log('🔍 Verificando sessões existentes...');
+        const { data: sessaoExistente } = await connectionService.query(() =>
+          supabase
             .from('sessoes_usuario')
-            .update({ ativa: false })
-            .eq('id', sessaoExistente.id);
+            .select('token_sessao, ativa')
+            .eq('usuario_id', usuarioId)
+            .eq('ativa', true)
+            .maybeSingle()
+        );
+        
+        if (sessaoExistente.data) {
+          console.log('✅ Sessão ativa já existe, reutilizando:', sessaoExistente.data.token_sessao);
+          localStorage.setItem('session_token', sessaoExistente.data.token_sessao);
+          this.iniciarHeartbeat(sessaoExistente.data.token_sessao);
+          return sessaoExistente.data.token_sessao;
         }
 
         // Gera token único para a sessão
@@ -101,7 +85,7 @@ export class SessaoService {
 
         // Cria nova sessão
         console.log('🆕 Criando nova sessão...');
-        const { data, error } = await supabase
+        const { data, error } = await connectionService.query(() => supabase
           .from('sessoes_usuario')
           .insert({
             usuario_id: usuarioId,
@@ -113,7 +97,7 @@ export class SessaoService {
             ativa: true
           })
           .select()
-          .single();
+          .single());
 
         if (error) {
           throw new Error(`Erro ao criar sessão: ${error.message}`);
@@ -130,7 +114,7 @@ export class SessaoService {
         return tokenSessao;
       } finally {
         // Remove lock
-        localStorage.removeItem(lockKey);
+        sessionStorage.removeItem(lockKey);
       }
     } catch (error) {
       console.error('Erro ao criar sessão:', error);
@@ -148,23 +132,26 @@ export class SessaoService {
       const token = tokenSessao || localStorage.getItem('session_token');
       if (!token) return;
 
-      console.log('💓 Atualizando heartbeat para token:', token.substring(0, 20) + '...');
+      // console.log('💓 Atualizando heartbeat para token:', token.substring(0, 20) + '...');
       
-      const { error } = await supabase
+      const { error } = await connectionService.query(() => supabase
         .from('sessoes_usuario')
         .update({
           data_ultimo_acesso: new Date().toISOString()
         })
         .eq('token_sessao', token)
-        .eq('ativa', true);
+        .eq('ativa', true));
 
       if (error) {
-        console.warn('⚠️ Erro ao atualizar último acesso:', error);
+        console.warn('⚠️ Erro ao atualizar último acesso, tentando reconectar...', error);
+        // Força verificação de conexão se heartbeat falhar
+        connectionService.checkConnection();
       } else {
-        console.log('✅ Heartbeat atualizado com sucesso');
+        // console.log('✅ Heartbeat atualizado com sucesso');
       }
     } catch (error) {
       console.warn('⚠️ Erro ao atualizar último acesso:', error);
+      connectionService.checkConnection();
     }
   }
 
@@ -215,7 +202,7 @@ export class SessaoService {
       
       console.log('🔍 Buscando usuários online desde:', limiteOnline.toISOString());
 
-      const { data, error } = await supabase
+      const { data, error } = await connectionService.query(() => supabase
         .from('sessoes_usuario')
         .select(`
           usuario_id,
@@ -231,7 +218,7 @@ export class SessaoService {
         `)
         .eq('ativa', true)
         .gte('data_ultimo_acesso', limiteOnline.toISOString())
-        .order('data_ultimo_acesso', { ascending: false });
+        .order('data_ultimo_acesso', { ascending: false }));
 
       if (error) {
         throw new Error(`Erro ao buscar usuários online: ${error.message}`);
@@ -272,13 +259,13 @@ export class SessaoService {
       const limiteOnline = new Date();
       limiteOnline.setMinutes(limiteOnline.getMinutes() - 5);
 
-      const { data, error } = await supabase
+      const { data, error } = await connectionService.query(() => supabase
         .from('sessoes_usuario')
         .select('id')
         .eq('usuario_id', usuarioId)
         .eq('ativa', true)
         .gte('data_ultimo_acesso', limiteOnline.toISOString())
-        .limit(1);
+        .limit(1));
 
       if (error) {
         console.warn('Erro ao verificar usuário online:', error);
@@ -303,12 +290,12 @@ export class SessaoService {
       
       console.log('🧹 Limpando sessões expiradas antes de:', limiteExpiracao.toISOString());
 
-      const { data, error } = await supabase
+      const { data, error } = await connectionService.query(() => supabase
         .from('sessoes_usuario')
         .update({ ativa: false })
         .eq('ativa', true)
         .lt('data_ultimo_acesso', limiteExpiracao.toISOString())
-        .select('id');
+        .select('id'));
 
       if (error) {
         throw new Error(`Erro ao limpar sessões: ${error.message}`);
@@ -370,10 +357,15 @@ export class SessaoService {
 
     console.log('💓 Iniciando heartbeat para token:', tokenSessao.substring(0, 20) + '...');
     
-    // Atualiza último acesso a cada 1 minuto (mais frequente)
+    // Atualiza último acesso a cada 2 minutos
     this.heartbeatInterval = window.setInterval(() => {
       this.atualizarUltimoAcesso(tokenSessao);
-    }, 1 * 60 * 1000); // 1 minuto
+    }, 2 * 60 * 1000); // 2 minutos
+    
+    // Primeira atualização imediata
+    setTimeout(() => {
+      this.atualizarUltimoAcesso(tokenSessao);
+    }, 5000); // 5 segundos após login
   }
 
   private pararHeartbeat(): void {
@@ -391,11 +383,11 @@ export class SessaoService {
     try {
       console.log('🚫 Forçando logout do usuário:', usuarioId);
       
-      const { error } = await supabase
+      const { error } = await connectionService.query(() => supabase
         .from('sessoes_usuario')
         .update({ ativa: false })
         .eq('usuario_id', usuarioId)
-        .eq('ativa', true);
+        .eq('ativa', true));
 
       if (error) {
         throw new Error(`Erro ao forçar logout: ${error.message}`);
@@ -424,16 +416,16 @@ export class SessaoService {
       limiteOnline.setMinutes(limiteOnline.getMinutes() - 10);
 
       const [sessoes, sessoesHoje] = await Promise.all([
-        supabase
+        connectionService.query(() => supabase
           .from('sessoes_usuario')
           .select('usuario_id, data_inicio, data_ultimo_acesso, ativa')
           .eq('ativa', true)
-          .gte('data_ultimo_acesso', limiteOnline.toISOString()),
+          .gte('data_ultimo_acesso', limiteOnline.toISOString())),
         
-        supabase
+        connectionService.query(() => supabase
           .from('sessoes_usuario')
           .select('data_inicio')
-          .gte('data_inicio', inicioHoje.toISOString())
+          .gte('data_inicio', inicioHoje.toISOString()))
       ]);
 
       const usuariosOnline = new Set(sessoes.data?.map(s => s.usuario_id)).size;
@@ -480,11 +472,11 @@ export class SessaoService {
     try {
       console.log('🧹 Limpando todas as sessões inativas...');
       
-      const { data, error } = await supabase
+      const { data, error } = await connectionService.query(() => supabase
         .from('sessoes_usuario')
         .delete()
         .eq('ativa', false)
-        .select('id');
+        .select('id'));
 
       if (error) {
         throw new Error(`Erro ao limpar sessões inativas: ${error.message}`);

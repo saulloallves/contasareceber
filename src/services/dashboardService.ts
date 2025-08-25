@@ -1,5 +1,6 @@
 import { supabase } from './databaseService';
 import { IndicadoresMensais, UnidadeRisco, AlertaAutomatico, DashboardData } from '../types/dashboard';
+import { connectionService } from './connectionService';
 
 type Cobranca = {
   status: string;
@@ -17,9 +18,9 @@ export class DashboardService {
   async buscarIndicadoresMensais(): Promise<IndicadoresMensais> {
     try {
       // Buscar dados de cobranças
-      const { data: cobrancas, error: cobrancasError } = await supabase
+      const { data: cobrancas, error: cobrancasError } = await connectionService.query(() => supabase
         .from('cobrancas_franqueados')
-  .select('*');
+        .select('*'));
 
       if (cobrancasError) throw cobrancasError;
 
@@ -170,28 +171,32 @@ export class DashboardService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async buscarDadosDashboard(filtros: any) {
     try {
-      let query = supabase
+      const queryFn = () => {
+        let query = supabase
         .from('cobrancas_franqueados')
         .select('*');
 
-      // Aplicar filtros
-      if (filtros.status) {
-        query = query.eq('status', filtros.status);
-      }
+        // Aplicar filtros
+        if (filtros.status) {
+          query = query.eq('status', filtros.status);
+        }
 
-      if (filtros.tipo) {
-        query = query.eq('tipo_cobranca', filtros.tipo);
-      }
+        if (filtros.tipo) {
+          query = query.eq('tipo_cobranca', filtros.tipo);
+        }
 
-      // Filtro de período
-      if (filtros.periodo) {
-        const diasAtras = parseInt(filtros.periodo);
-        const dataLimite = new Date();
-        dataLimite.setDate(dataLimite.getDate() - diasAtras);
-        query = query.gte('created_at', dataLimite.toISOString());
-      }
+        // Filtro de período
+        if (filtros.periodo) {
+          const diasAtras = parseInt(filtros.periodo);
+          const dataLimite = new Date();
+          dataLimite.setDate(dataLimite.getDate() - diasAtras);
+          query = query.gte('created_at', dataLimite.toISOString());
+        }
 
-  const { data, error } = await query as unknown as { data: Cobranca[] | null; error: unknown };
+        return query;
+      };
+      
+      const { data, error } = await connectionService.query(queryFn) as unknown as { data: Cobranca[] | null; error: unknown };
 
       if (error) throw error;
 
