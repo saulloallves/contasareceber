@@ -712,7 +712,7 @@ export function Sidebar({
       {/* Desktop Sidebar */}
       <div
         className={`hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:z-50 transition-all duration-300 ${
-          collapsed ? "lg:w-24" : "lg:w-72"
+          collapsed ? "lg:w-15" : "lg:w-72"
         }`}
       >
         <SidebarContent />
