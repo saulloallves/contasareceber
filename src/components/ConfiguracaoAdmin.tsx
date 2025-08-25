@@ -59,7 +59,6 @@ export function ConfiguracaoAdmin() {
     template_email_assunto: "",
     template_email_corpo: "",
   });
-  const [tentativasLogin, setTentativasLogin] = useState<any[]>([]);
   const [ipsBloqueados, setIpsBloqueados] = useState<any[]>([]);
   const [alertasSeguranca, setAlertasSeguranca] = useState<any[]>([]);
   const [novoIP, setNovoIP] = useState({ ip: '', motivo: '' });
