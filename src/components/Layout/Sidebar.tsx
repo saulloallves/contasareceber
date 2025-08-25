@@ -754,7 +754,7 @@ export function Sidebar({
               </button>
             </div>
 
-            <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+            <nav className="flex-1 p-3 space-y-1 overflow-y-hidden">
               {/* Seção Principal Mobile */}
               <div className="px-3 py-2">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Principal</p>
