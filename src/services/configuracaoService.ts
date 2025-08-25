@@ -94,7 +94,7 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
           .from('configuracoes_cobranca')
           .insert(configPadrao);
           
-        return configPadrao;
+          // Fallback: query direta simples
       }
 
       return data;
@@ -115,7 +115,85 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
       // Busca configuração atual para log
       const configAtual = await this.buscarConfiguracao();
 
-      // Valida os dados antes de salvar
+            console.error('❌ Erro no fallback:', fallbackError.message);
+            console.log('⚠️ Retornando apenas usuário atual devido às políticas RLS');
+            
+            // Se tudo falhar, retorna apenas o usuário atual
+            const { data: currentUserData } = await supabase
+              .from('usuarios_sistema')
+              .select('*')
+              .eq('id', currentUser.user?.id)
+              .single();
+            
+            return currentUserData ? [currentUserData] : [];
+          }
+          
+          console.log('✅ Usuários encontrados via fallback:', fallbackData?.length || 0);
+          return fallbackData || [];
+        }
+
+        console.log('✅ Usuários encontrados via RPC:', rpcData?.length || 0);
+        return rpcData || [];
+      }
+
+      // Para outros usuários, retorna apenas o próprio perfil
+      console.log('🔒 Usuário não é admin_master, retornando apenas próprio perfil');
+      const { data: ownProfile, error } = await supabase
+        .from('usuarios_sistema')
+        .select('*')
+        .eq('id', currentUser.user?.id)
+        .single();
+      
+      if (error) {
+        console.error('❌ Erro ao buscar próprio perfil:', error);
+        return [];
+      }
+      
+      return ownProfile ? [ownProfile] : [];
+    } catch (error) {
+      console.error('Erro geral ao buscar usuários:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Busca estatísticas dos usuários
+   */
+  async buscarEstatisticasUsuarios(): Promise<EstatisticasUsuarios> {
+    try {
+      // Para estatísticas, vamos usar os dados que conseguimos buscar
+      const usuarios = await this.buscarUsuarios();
+      
+      console.log('📊 Calculando estatísticas para:', usuarios?.length || 0, 'usuários');
+
+      const stats: EstatisticasUsuarios = {
+        total_usuarios: usuarios?.length || 0,
+        usuarios_ativos: usuarios?.filter(u => u.ativo).length || 0,
+        usuarios_inativos: usuarios?.filter(u => !u.ativo).length || 0,
+        por_nivel: {},
+        logins_mes_atual: 0, // Será implementado quando logs_seguranca existir
+        tentativas_bloqueadas: 0 // Será implementado quando logs_seguranca existir
+      };
+
+      // Estatísticas por nível
+      usuarios?.forEach(u => {
+        stats.por_nivel[u.nivel_permissao] = (stats.por_nivel[u.nivel_permissao] || 0) + 1;
+      });
+
+      console.log('📈 Estatísticas calculadas:', stats);
+      return stats;
+    } catch (error) {
+      console.error('Erro ao buscar estatísticas:', error);
+      return {
+        total_usuarios: 0,
+        usuarios_ativos: 0,
+        usuarios_inativos: 0,
+        por_nivel: {},
+        logins_mes_atual: 0,
+        tentativas_bloqueadas: 0
+      };
+    }
+  }
       const validacoes = this.validarConfiguracao(configuracao);
       const erros = validacoes.filter(v => !v.valido);
       
@@ -398,7 +476,7 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
         // Admin master pode ver estatísticas de todos
         const { data: allUsers, error } = await supabase.rpc('get_all_users_admin');
         
-        if (error) {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_users_admin', {
           console.warn('⚠️ Erro na RPC para estatísticas, usando fallback');
           // Fallback para query direta
           const { data: fallbackUsers } = await supabase
@@ -674,7 +752,8 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
         });
     } catch (error) {
       console.error('Erro ao registrar log:', error);
-    }
+          console.error('❌ Erro na RPC function:', rpcError.message);
+          console.log('🔄 Tentando query direta com service_role...');
   }
 
   /**
