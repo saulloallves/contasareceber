@@ -69,9 +69,7 @@ function AppContent() {
           "Usuário",
         email: profile?.email || user.email || "",
         role:
-          profile?.nivel_permissao ||
-          user.user_metadata?.nivel_permissao ||
-          "Admin",
+          profile?.nivel_permissao || "observador",
         id: user.id,
         avatar_url: profile?.avatar_url || user.user_metadata?.avatar_url,
       }
@@ -91,31 +89,26 @@ function AppContent() {
 
   // Controla inicialização para evitar loops
   useEffect(() => {
-    if (!loading && user) {
-      // Verifica se perfil está carregado ou se já passou tempo suficiente
-      if (profile || Date.now() - (user.created_at ? new Date(user.created_at).getTime() : 0) > 5000) {
+    if (!loading) {
+      // Se tem usuário, inicializa imediatamente (não aguarda perfil)
+      if (user) {
+        console.log('✅ Usuário logado, inicializando sistema...');
         setIsInitialized(true);
       } else {
-        // Aguarda um pouco para garantir que o perfil seja carregado
-        const timer = setTimeout(() => {
-          setIsInitialized(true);
-        }, 2000);
-        
-        return () => clearTimeout(timer);
+        // Se não tem usuário, também inicializa (vai mostrar tela de login)
+        console.log('❌ Usuário não logado, inicializando tela de login...');
+        setIsInitialized(true);
       }
-    } else if (!loading && !user) {
-      setIsInitialized(true);
     }
-  }, [loading, user, profile]);
+  }, [loading, user]);
 
-  // Força inicialização após 10 segundos para evitar loops infinitos
+  // Timer de segurança mais curto para evitar loops
   useEffect(() => {
     const forceInitTimer = setTimeout(() => {
       if (!isInitialized) {
-        console.warn('⚠️ Forçando inicialização após timeout');
-        setIsInitialized(true);
-      }
-    }, 10000);
+        console.warn('⚠️ Forçando inicialização após 3 segundos');
+      setIsInitialized(true);
+    }, 3000); // Reduzido de 10s para 3s
       
     return () => clearTimeout(forceInitTimer);
   }, [isInitialized]);
