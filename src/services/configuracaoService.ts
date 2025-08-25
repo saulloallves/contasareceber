@@ -9,8 +9,7 @@ export class ConfiguracaoService {
    */
   async criarUsuarioAdmin(
     payload: Omit<Usuario, 'id' | 'created_at' | 'updated_at'> & { password?: string }
-  ): Promise<{ id: string; invited: boolean }>
-  {
+  ): Promise<{ id: string; invited: boolean }> {
     try {
       // Validações rápidas no front
       if (!payload.nome_completo || !payload.email || !payload.cargo || !payload.nivel_permissao) {
@@ -50,6 +49,7 @@ export class ConfiguracaoService {
       throw err;
     }
   }
+
   /**
    * Busca a configuração atual do sistema
    */
@@ -115,85 +115,6 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
       // Busca configuração atual para log
       const configAtual = await this.buscarConfiguracao();
 
-            console.error('❌ Erro no fallback:', fallbackError.message);
-            console.log('⚠️ Retornando apenas usuário atual devido às políticas RLS');
-            
-            // Se tudo falhar, retorna apenas o usuário atual
-            const { data: currentUserData } = await supabase
-              .from('usuarios_sistema')
-              .select('*')
-              .eq('id', currentUser.user?.id)
-              .single();
-            
-            return currentUserData ? [currentUserData] : [];
-          }
-          
-          console.log('✅ Usuários encontrados via fallback:', fallbackData?.length || 0);
-          return fallbackData || [];
-        }
-
-        console.log('✅ Usuários encontrados via RPC:', rpcData?.length || 0);
-        return rpcData || [];
-      }
-
-      // Para outros usuários, retorna apenas o próprio perfil
-      console.log('🔒 Usuário não é admin_master, retornando apenas próprio perfil');
-      const { data: ownProfile, error } = await supabase
-        .from('usuarios_sistema')
-        .select('*')
-        .eq('id', currentUser.user?.id)
-        .single();
-      
-      if (error) {
-        console.error('❌ Erro ao buscar próprio perfil:', error);
-        return [];
-      }
-      
-      return ownProfile ? [ownProfile] : [];
-    } catch (error) {
-      console.error('Erro geral ao buscar usuários:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Busca estatísticas dos usuários
-   */
-  async buscarEstatisticasUsuarios(): Promise<EstatisticasUsuarios> {
-    try {
-      // Para estatísticas, vamos usar os dados que conseguimos buscar
-      const usuarios = await this.buscarUsuarios();
-      
-      console.log('📊 Calculando estatísticas para:', usuarios?.length || 0, 'usuários');
-
-      const stats: EstatisticasUsuarios = {
-        total_usuarios: usuarios?.length || 0,
-        usuarios_ativos: usuarios?.filter(u => u.ativo).length || 0,
-        usuarios_inativos: usuarios?.filter(u => !u.ativo).length || 0,
-        por_nivel: {},
-        logins_mes_atual: 0, // Será implementado quando logs_seguranca existir
-        tentativas_bloqueadas: 0 // Será implementado quando logs_seguranca existir
-      };
-
-      // Estatísticas por nível
-      usuarios?.forEach(u => {
-        stats.por_nivel[u.nivel_permissao] = (stats.por_nivel[u.nivel_permissao] || 0) + 1;
-      });
-
-      console.log('📈 Estatísticas calculadas:', stats);
-      return stats;
-    } catch (error) {
-      console.error('Erro ao buscar estatísticas:', error);
-      return {
-        total_usuarios: 0,
-        usuarios_ativos: 0,
-        usuarios_inativos: 0,
-        por_nivel: {},
-        logins_mes_atual: 0,
-        tentativas_bloqueadas: 0
-      };
-    }
-  }
       const validacoes = this.validarConfiguracao(configuracao);
       const erros = validacoes.filter(v => !v.valido);
       
@@ -410,14 +331,14 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
       // Para admin_master, usa RPC function que bypassa RLS
       console.log('👑 Usuário é admin_master, buscando todos os usuários via RPC');
       
-      const { data, error } = await supabase.rpc('get_all_users_admin', {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_users_admin', {
         p_nivel_filtro: filtros.nivel || null,
         p_ativo_filtro: filtros.ativo,
         p_busca_filtro: filtros.busca || null
       });
 
-      if (error) {
-        console.error('❌ Erro na RPC function, tentando query direta:', error);
+      if (rpcError) {
+        console.error('❌ Erro na RPC function, tentando query direta:', rpcError);
         
         // Fallback: tenta query direta (pode falhar devido ao RLS)
         let query = supabase
@@ -440,18 +361,27 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
         const { data: fallbackData, error: fallbackError } = await query;
         
         if (fallbackError) {
-          console.error('❌ Erro no fallback também:', fallbackError);
-          return [];
+          console.error('❌ Erro no fallback:', fallbackError.message);
+          console.log('⚠️ Retornando apenas usuário atual devido às políticas RLS');
+          
+          // Se tudo falhar, retorna apenas o usuário atual
+          const { data: currentUserData } = await supabase
+            .from('usuarios_sistema')
+            .select('*')
+            .eq('id', currentUser.user?.id)
+            .single();
+          
+          return currentUserData ? [currentUserData] : [];
         }
         
         console.log('✅ Usuários encontrados via fallback:', fallbackData?.length || 0);
         return fallbackData || [];
       }
 
-      console.log('✅ Usuários encontrados via RPC:', data?.length || 0);
-      return data || [];
+      console.log('✅ Usuários encontrados via RPC:', rpcData?.length || 0);
+      return rpcData || [];
     } catch (error) {
-      console.error('Erro ao buscar usuários:', error);
+      console.error('Erro geral ao buscar usuários:', error);
       return [];
     }
   }
@@ -461,48 +391,18 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
    */
   async buscarEstatisticasUsuarios(): Promise<EstatisticasUsuarios> {
     try {
-      // Tenta usar RPC function para admin_master
-      const { data: currentUser } = await supabase.auth.getUser();
+      // Para estatísticas, vamos usar os dados que conseguimos buscar
+      const usuarios = await this.buscarUsuarios();
       
-      const { data: userProfile } = await supabase
-        .from('usuarios_sistema')
-        .select('nivel_permissao')
-        .eq('id', currentUser.user?.id)
-        .single();
-
-      let usuarios: any[] = [];
-
-      if (userProfile?.nivel_permissao === 'admin_master') {
-        // Admin master pode ver estatísticas de todos
-        const { data: allUsers, error } = await supabase.rpc('get_all_users_admin');
-        
-        const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_users_admin', {
-          console.warn('⚠️ Erro na RPC para estatísticas, usando fallback');
-          // Fallback para query direta
-          const { data: fallbackUsers } = await supabase
-            .from('usuarios_sistema')
-            .select('nivel_permissao, ativo, ultimo_acesso');
-          usuarios = fallbackUsers || [];
-        } else {
-          usuarios = allUsers || [];
-        }
-      } else {
-        // Outros usuários veem apenas estatísticas básicas
-        usuarios = userProfile ? [userProfile] : [];
-      }
-
-      console.log('📊 Dados para estatísticas:', usuarios?.length || 0, usuarios);
-
-      // Logs de segurança serão implementados quando a tabela for criada
-      const logsSeguranca: any[] = [];
+      console.log('📊 Calculando estatísticas para:', usuarios?.length || 0, 'usuários');
 
       const stats: EstatisticasUsuarios = {
         total_usuarios: usuarios?.length || 0,
         usuarios_ativos: usuarios?.filter(u => u.ativo).length || 0,
         usuarios_inativos: usuarios?.filter(u => !u.ativo).length || 0,
         por_nivel: {},
-        logins_mes_atual: logsSeguranca?.filter(l => l.tipo_evento === 'login_sucesso').length || 0,
-        tentativas_bloqueadas: logsSeguranca?.filter(l => l.tipo_evento === 'bloqueio_automatico').length || 0
+        logins_mes_atual: 0, // Será implementado quando logs_seguranca existir
+        tentativas_bloqueadas: 0 // Será implementado quando logs_seguranca existir
       };
 
       // Estatísticas por nível
@@ -752,8 +652,7 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
         });
     } catch (error) {
       console.error('Erro ao registrar log:', error);
-          console.error('❌ Erro na RPC function:', rpcError.message);
-          console.log('🔄 Tentando query direta com service_role...');
+    }
   }
 
   /**
