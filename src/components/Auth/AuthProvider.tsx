@@ -97,7 +97,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
     
     return () => {
-            console.error('❌ Erro ao criar sessão no login:', error);
       subscription.unsubscribe();
       connectionService.stopMonitoring();
     };
