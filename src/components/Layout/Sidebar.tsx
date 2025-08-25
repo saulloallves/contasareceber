@@ -142,6 +142,8 @@ export function Sidebar({
     }
   };
 
+  // Verifica se o usuário tem permissão de admin_master
+  const isAdminMaster = profile?.nivel_permissao === 'admin_master';
   const menuItems = [
     { 
       id: "dashboard", 
@@ -185,13 +187,14 @@ export function Sidebar({
       permissions: ["admin", "financeiro"],
       badge: null
     },
-    { 
+    // Configurações - apenas para admin_master
+    ...(isAdminMaster ? [{ 
       id: "admin", 
       label: "Configurações", 
       icon: Settings, 
       permissions: ["admin"],
       badge: null
-    },
+    }] : []),
   ];
 
   const hasPermission = (itemPermissions: string[]) => {
