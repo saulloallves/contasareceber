@@ -1,82 +1,112 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
+interface UpdateUserRequest {
+  userId: string;
+  updateData: {
+    nome_completo?: string;
+    email?: string;
+    telefone?: string;
+    cargo?: string;
+    nivel_permissao?: string;
+    ativo?: boolean;
+    verificacao_ip_ativa?: boolean;
+    [key: string]: any;
+  };
 }
 
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Create Supabase client with service role key
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
-
-    // Get the authorization header
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
+    // Verificar se é POST
+    if (req.method !== 'POST') {
       return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+        JSON.stringify({ error: 'Method not allowed' }),
+        { 
+          status: 405, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
-    // Verify the user making the request
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-    
+    // Criar cliente Supabase com service_role (bypass RLS)
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Verificar autenticação
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Authorization header missing' }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Verificar se usuário é admin_master
+    const token = authHeader.replace('Bearer ', '');
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    );
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
     if (authError || !user) {
       return new Response(
         JSON.stringify({ error: 'Invalid token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
-    // Check if the user has admin_master permission
-    const { data: userProfile, error: profileError } = await supabaseAdmin
+    // Verificar se é admin_master
+    const { data: userData, error: userError } = await supabaseAdmin
       .from('usuarios_sistema')
       .select('nivel_permissao')
-      .eq('id', user.id)
-      .single()
+      .eq('email', user.email)
+      .single();
 
-    if (profileError || !userProfile || userProfile.nivel_permissao !== 'admin_master') {
+    if (userError || userData?.nivel_permissao !== 'admin_master') {
       return new Response(
-        JSON.stringify({ error: 'Insufficient permissions' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+        JSON.stringify({ error: 'Acesso negado. Apenas admin_master pode atualizar usuários.' }),
+        { 
+          status: 403, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
-    // Parse request body
-    const { userId, updateData } = await req.json()
+    // Parse do body
+    const { userId, updateData }: UpdateUserRequest = await req.json();
 
-    if (!userId || !updateData) {
+    if (!userId) {
       return new Response(
-        JSON.stringify({ error: 'Missing userId or updateData' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+        JSON.stringify({ error: 'userId é obrigatório' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
-    // Get current user data for logging
-    const { data: currentUserData } = await supabaseAdmin
-      .from('usuarios_sistema')
-      .select('*')
-      .eq('id', userId)
-      .single()
+    console.log('🔄 Atualizando usuário:', userId, updateData);
 
-    // Update the user with service role privileges
+    // Atualizar usuário usando service_role (bypass RLS)
     const { data: updatedUser, error: updateError } = await supabaseAdmin
       .from('usuarios_sistema')
       .update({
@@ -85,30 +115,36 @@ serve(async (req) => {
       })
       .eq('id', userId)
       .select()
-      .single()
+      .single();
 
     if (updateError) {
-      console.error('Error updating user:', updateError)
+      console.error('❌ Erro ao atualizar usuário:', updateError);
       return new Response(
-        JSON.stringify({ error: `Failed to update user: ${updateError.message}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+        JSON.stringify({ 
+          success: false, 
+          error: `Erro ao atualizar usuário: ${updateError.message}` 
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
-    // Log the action
-    await supabaseAdmin
-      .from('logs_sistema')
-      .insert({
-        usuario_id: user.id,
-        acao: 'atualizar_usuario',
-        tabela_afetada: 'usuarios_sistema',
-        registro_id: userId,
-        dados_anteriores: currentUserData || {},
-        dados_novos: updateData,
-        ip_origem: req.headers.get('x-forwarded-for') || 'unknown',
-        user_agent: req.headers.get('user-agent') || 'unknown',
-        data_acao: new Date().toISOString()
-      })
+    if (!updatedUser) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Usuário não encontrado' 
+        }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log('✅ Usuário atualizado com sucesso:', updatedUser.id);
 
     return new Response(
       JSON.stringify({ 
@@ -116,16 +152,21 @@ serve(async (req) => {
         user: updatedUser 
       }),
       { 
-        status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
-    )
+    );
 
   } catch (error) {
-    console.error('Error in admin-update-user function:', error)
+    console.error('❌ Erro na Edge Function admin-update-user:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+      JSON.stringify({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Erro interno do servidor' 
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
   }
-})
+});

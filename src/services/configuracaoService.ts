@@ -415,51 +415,26 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
     try {
       console.log('🔄 Tentando atualizar usuário:', id, dadosAtualizacao);
       
-      // Primeiro tenta query direta (mais simples e confiável)
-      const { data, error } = await supabase
-        .from('usuarios_sistema')
-        .update({
-          ...dadosAtualizacao,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select()
-        .maybeSingle();
-
-      if (error) {
-        console.error('❌ Erro na query direta, tentando Edge Function:', error);
-        
-        // Fallback: tenta Edge Function se query direta falhar
-        try {
-          const { data: edgeData, error: edgeError } = await (supabase as any).functions.invoke('admin-update-user', {
-            body: {
-              userId: id,
-              updateData: dadosAtualizacao
-            }
-          });
-
-          if (edgeError) {
-            throw new Error(edgeError.message || 'Erro na Edge Function');
-          }
-
-          if (!edgeData?.success) {
-            throw new Error(edgeData?.error || 'Falha na Edge Function');
-          }
-
-          console.log('✅ Usuário atualizado via Edge Function');
-          return edgeData.user;
-        } catch (edgeErr) {
-          console.error('❌ Edge Function também falhou:', edgeErr);
-          throw new Error(`Erro ao atualizar usuário: ${error.message}`);
+      // Admin master sempre usa Edge Function para bypass de RLS
+      const { data: edgeData, error: edgeError } = await (supabase as any).functions.invoke('admin-update-user', {
+        body: {
+          userId: id,
+          updateData: dadosAtualizacao
         }
+      });
+
+      if (edgeError) {
+        console.error('❌ Erro na Edge Function:', edgeError);
+        throw new Error(edgeError.message || 'Erro ao atualizar usuário');
       }
 
-      if (!data) {
-        throw new Error('Usuário não encontrado ou não foi possível atualizar');
+      if (!edgeData?.success) {
+        console.error('❌ Edge Function retornou falha:', edgeData);
+        throw new Error(edgeData?.error || 'Falha ao atualizar usuário');
       }
 
-      console.log('✅ Usuário atualizado via query direta');
-      return data;
+      console.log('✅ Usuário atualizado via Edge Function');
+      return edgeData.user;
     } catch (error) {
       console.error('Erro ao atualizar usuário:', error);
       throw error;
