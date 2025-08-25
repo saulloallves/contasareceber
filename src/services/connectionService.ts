@@ -84,7 +84,7 @@ export class ConnectionService {
         .from('configuracoes_cobranca')
         .select('id')
         .limit(1)
-        .single();
+        .maybeSingle();
 
       const isConnected = !error;
       
