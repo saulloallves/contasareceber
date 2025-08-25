@@ -14,13 +14,12 @@ export function GestaoUsuarios() {
   const [usuariosOnline, setUsuariosOnline] = useState<UsuarioOnline[]>([]);
   const [estatisticasSessoes, setEstatisticasSessoes] = useState<any>(null);
   const [estatisticas, setEstatisticas] = useState<EstatisticasUsuarios | null>(null);
-  const [logsSeguranca, setLogsSeguranca] = useState<LogSeguranca[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [modalAberto, setModalAberto] = useState<'criar' | 'editar' | 'permissoes' | 'logs' | null>(null);
   const [usuarioSelecionado, setUsuarioSelecionado] = useState<Usuario | null>(null);
   const [formData, setFormData] = useState<Partial<Usuario>>({});
   const [filtros, setFiltros] = useState<FiltrosUsuarios>({});
-  const [abaSelecionada, setAbaSelecionada] = useState<'usuarios' | 'sessoes' | 'logs' | 'estatisticas'>('usuarios');
+  const [abaSelecionada, setAbaSelecionada] = useState<'usuarios' | 'sessoes' | 'estatisticas'>('usuarios');
 
   const configuracaoService = useMemo(() => new ConfiguracaoService(), []);
 
@@ -45,14 +44,6 @@ export function GestaoUsuarios() {
       setEstatisticasSessoes(statsSessoesData);
       setEstatisticas(statsData);
 
-      if (abaSelecionada === 'logs') {
-        const logsData = await configuracaoService.buscarLogsSeguranca({
-          dataInicio: filtros.data_inicio,
-          dataFim: filtros.data_fim,
-          limite: 50
-        });
-        setLogsSeguranca(logsData);
-      }
     } catch (e) {
       console.error('Erro ao carregar dados:', e);
     } finally {
@@ -322,14 +313,13 @@ export function GestaoUsuarios() {
           {[
             { id: 'usuarios', label: 'Usuários', icon: Users },
             { id: 'sessoes', label: 'Sessões Online', icon: Wifi },
-            { id: 'logs', label: 'Logs de Segurança', icon: Shield },
             { id: 'estatisticas', label: 'Estatísticas', icon: BarChart3 }
           ].map((aba) => {
             const Icon = aba.icon;
             return (
               <button
                 key={aba.id}
-                onClick={() => setAbaSelecionada(aba.id as 'usuarios' | 'sessoes' | 'logs' | 'estatisticas')}
+                onClick={() => setAbaSelecionada(aba.id as 'usuarios' | 'sessoes' | 'estatisticas')}
                 className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
                   abaSelecionada === aba.id
                     ? 'border-blue-500 text-blue-600'
@@ -725,58 +715,6 @@ export function GestaoUsuarios() {
         </div>
       )}
 
-      {abaSelecionada === 'logs' && (
-        <div className="space-y-6">
-          <h3 className="text-lg font-semibold text-gray-800">Logs de Segurança</h3>
-          
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Data/Hora
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Usuário
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Evento
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    IP
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Detalhes
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {logsSeguranca.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatarData(log.data_evento)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {((log as unknown) as { usuarios_sistema?: { nome_completo?: string } }).usuarios_sistema?.nome_completo || log.email_tentativa}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getTipoEventoColor(log.tipo_evento)}`}>
-                        {log.tipo_evento.replace('_', ' ').toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {log.ip_origem}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {log.detalhes || '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {abaSelecionada === 'estatisticas' && estatisticas && (
         <div className="space-y-6">
