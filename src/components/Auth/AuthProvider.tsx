@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
-import { connectionService } from "../../services/connectionService";
-import { sessaoService } from "../../services/sessaoService";
 
 interface AuthContextType {
   user: User | null;
@@ -16,34 +14,28 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    // Inicia monitoramento de conexão
-    connectionService.startMonitoring();
+    if (initialized) return;
+    setInitialized(true);
     
-    // Busca sessão inicial e define loading como false
     const initializeAuth = async () => {
       try {
+        console.log('🔄 Inicializando autenticação...');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.warn('Erro ao buscar sessão:', error);
+          console.warn('⚠️ Erro ao buscar sessão:', error);
         }
         
+        console.log('👤 Sessão encontrada:', session?.user?.email || 'Nenhuma');
         setUser(session?.user ?? null);
-        
-        // Se há sessão ativa, cria sessão no sistema apenas uma vez
-        if (session?.user) {
-          try {
-            await sessaoService.criarSessao(session.user.id);
-          } catch (error) {
-            console.warn('Erro ao criar sessão inicial:', error);
-          }
-        }
       } catch (error) {
-        console.error('Erro na inicialização:', error);
+        console.error('❌ Erro na inicialização:', error);
         setUser(null);
       } finally {
+        console.log('✅ Inicialização concluída');
         setLoading(false);
       }
     };
@@ -53,42 +45,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listener para mudanças de estado
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('🔄 Auth state change:', event, session?.user?.email || 'Nenhum usuário');
         setUser(session?.user ?? null);
-        
-        // Cria sessão apenas no login bem-sucedido
-        if (event === 'SIGNED_IN' && session?.user) {
-          try {
-            await sessaoService.criarSessao(session.user.id);
-          } catch (error) {
-            console.warn('Erro ao criar sessão no login:', error);
-          }
-        }
-        
-        // Encerra sessão no logout
-        if (event === 'SIGNED_OUT') {
-          try {
-            await sessaoService.encerrarSessao();
-          } catch (error) {
-            console.warn('Erro ao encerrar sessão:', error);
-          }
-        }
       }
     );
     
     return () => {
       subscription.unsubscribe();
-      connectionService.stopMonitoring();
     };
-  }, []);
+  }, [initialized]);
 
   const signOut = async () => {
     try {
-      // Para monitoramento de conexão
-      connectionService.stopMonitoring();
+      console.log('🚪 Fazendo logout...');
       
-      await sessaoService.encerrarSessao();
+      // Limpa sessionStorage
+      if (user?.id) {
+        sessionStorage.removeItem(`active_session_${user.id}`);
+      }
+      localStorage.removeItem('session_token');
     } catch (error) {
-      console.warn('Erro ao encerrar sessão:', error);
+      console.warn('⚠️ Erro ao limpar sessão:', error);
     }
     
     await supabase.auth.signOut();
@@ -96,6 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshUser = () => {
+    console.log('🔄 Refreshing user...');
     window.location.reload();
   };
 

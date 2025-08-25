@@ -23,14 +23,15 @@ export function useUserProfile(userId?: string) {
 
   const loadProfile = async () => {
     if (!userId) {
+      console.log('⚠️ Nenhum userId fornecido para loadProfile');
       setLoading(false);
       return;
     }
     
     try {
-      setIsLoadingProfile(true);
-      setLoading(true);
+      console.log('🔍 Carregando perfil para userId:', userId);
       setError(null);
+      setIsLoadingProfile(true);
 
       const { data, error: profileError } = await supabase
         .from('usuarios_sistema')
@@ -39,11 +40,15 @@ export function useUserProfile(userId?: string) {
         .maybeSingle();
 
       if (profileError) {
+        console.warn('⚠️ Erro ao carregar perfil:', profileError);
         setProfile(null);
+        setError(profileError.message);
       } else {
+        console.log('✅ Perfil carregado:', data?.nome_completo || 'Sem nome');
         setProfile(data);
       }
     } catch (err) {
+      console.error('❌ Erro inesperado ao carregar perfil:', err);
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setLoading(false);
@@ -161,6 +166,7 @@ export function useUserProfile(userId?: string) {
   };
 
   useEffect(() => {
+    console.log('🔄 useUserProfile effect triggered, userId:', userId);
     loadProfile();
   }, [userId]);
 

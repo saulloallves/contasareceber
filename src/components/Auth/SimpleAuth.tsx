@@ -2,7 +2,6 @@
 import React, { useState } from "react";
 import { LogIn, UserPlus, X } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
-import { sessaoService } from "../../services/sessaoService";
 import logo from "../../assets/logo-principal.png";
 
 interface SimpleAuthProps {
@@ -61,7 +60,17 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
         // Garantir que existe um perfil na tabela usuarios_sistema
         await ensureUserProfile(data.user);
         
-        // Remove criação de sessão duplicada - será criada pelo AuthProvider
+        // Cria sessão simples no sessionStorage
+        if (data.user?.id) {
+          const sessionKey = `active_session_${data.user.id}`;
+          const sessionData = {
+            userId: data.user.id,
+            email: data.user.email,
+            loginTime: new Date().toISOString()
+          };
+          sessionStorage.setItem(sessionKey, JSON.stringify(sessionData));
+          console.log('✅ Sessão salva no sessionStorage');
+        }
         
         onAuthSuccess();
       }
@@ -143,13 +152,14 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
 
       console.log('✅ Login automático bem-sucedido');
       
-      // Cria sessão no sistema
-      try {
-        await sessaoService.criarSessao(authData.user.id);
-        console.log('✅ Sessão criada no sistema');
-      } catch (sessionError) {
-        console.warn('⚠️ Erro ao criar sessão:', sessionError);
-      }
+      // Cria sessão simples no sessionStorage
+      const sessionKey = `active_session_${authData.user.id}`;
+      const sessionData = {
+        userId: authData.user.id,
+        email: signUpData.email,
+        loginTime: new Date().toISOString()
+      };
+      sessionStorage.setItem(sessionKey, JSON.stringify(sessionData));
       
       setShowSignUpModal(false);
       onAuthSuccess();
