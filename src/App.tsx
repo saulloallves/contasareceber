@@ -40,7 +40,23 @@ function AppContent() {
   }, []);
 
   // Simula dados do usuário logado
-  const userPermissions = ["admin"];
+  // Mapeia o nível de permissão do usuário para as permissões do sistema
+  const getUserPermissions = (nivelPermissao: string): string[] => {
+    const permissionsMap: Record<string, string[]> = {
+      'admin_master': ['admin', 'financeiro', 'cobranca', 'juridico', 'leitura'],
+      'gestor_juridico': ['juridico', 'leitura'],
+      'cobranca': ['financeiro', 'cobranca', 'leitura'],
+      'analista_financeiro': ['financeiro', 'leitura'],
+      'franqueado': ['leitura'],
+      'observador': ['leitura']
+    };
+    
+    return permissionsMap[nivelPermissao] || ['leitura'];
+  };
+
+  const userPermissions = profile?.nivel_permissao 
+    ? getUserPermissions(profile.nivel_permissao)
+    : ['leitura']; // Fallback para apenas leitura se não conseguir determinar o nível
 
   // Mapeia o usuário do Supabase para o formato esperado pelo Header/Layout
   const mappedUser = user
