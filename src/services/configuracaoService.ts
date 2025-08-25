@@ -325,6 +325,7 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
         throw new Error(`Erro ao buscar usuários: ${error.message}`);
       }
 
+      console.log('🔍 Usuários encontrados:', data?.length || 0, data);
       return data || [];
     } catch (error) {
       console.error('Erro ao buscar usuários:', error);
@@ -340,6 +341,8 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
       const { data: usuarios } = await supabase
         .from('usuarios_sistema')
         .select('nivel_permissao, ativo, ultimo_acesso');
+
+      console.log('📊 Dados para estatísticas:', usuarios?.length || 0, usuarios);
 
       // Logs de segurança serão implementados quando a tabela for criada
       const logsSeguranca: any[] = [];
@@ -358,6 +361,7 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
         stats.por_nivel[u.nivel_permissao] = (stats.por_nivel[u.nivel_permissao] || 0) + 1;
       });
 
+      console.log('📈 Estatísticas calculadas:', stats);
       return stats;
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);

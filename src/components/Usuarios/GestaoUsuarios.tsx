@@ -24,10 +24,15 @@ export function GestaoUsuarios() {
   const carregarDados = useCallback(async () => {
     setCarregando(true);
     try {
+      console.log('🔄 Carregando dados com filtros:', filtros);
+      
       const [usuariosData, statsData] = await Promise.all([
         configuracaoService.buscarUsuarios(filtros),
         configuracaoService.buscarEstatisticasUsuarios()
       ]);
+      
+      console.log('👥 Usuários carregados:', usuariosData.length, usuariosData);
+      console.log('📊 Estatísticas carregadas:', statsData);
       
       setUsuarios(usuariosData);
       setEstatisticas(statsData);
