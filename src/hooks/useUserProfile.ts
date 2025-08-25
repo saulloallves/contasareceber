@@ -22,11 +22,13 @@ export function useUserProfile(userId?: string) {
 
   const loadProfile = async () => {
     if (!userId) {
+      console.log('⚠️ useUserProfile: userId não fornecido');
       setLoading(false);
       return;
     }
 
     try {
+      console.log('🔍 Carregando perfil para userId:', userId);
       setLoading(true);
       setError(null);
 
@@ -37,14 +39,13 @@ export function useUserProfile(userId?: string) {
         .maybeSingle();
 
       if (profileError) {
-        console.warn('Perfil não encontrado para userId:', userId, profileError);
+        console.warn('⚠️ Perfil não encontrado para userId:', userId, profileError);
         // Não falha se não encontrar perfil
         setProfile(null);
-        setLoading(false);
-        return;
+      } else {
+        console.log('✅ Perfil carregado:', data?.nome_completo, data?.email);
+        setProfile(data);
       }
-
-      setProfile(data);
     } catch (err) {
       console.error('Erro ao carregar perfil do usuário:', err);
       setError(err instanceof Error ? err.message : 'Erro desconhecido');

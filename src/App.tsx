@@ -50,13 +50,13 @@ function AppContent() {
 
   // Debug logs
   useEffect(() => {
-    // console.log("🔍 App State:", {
-    //   hasUser: !!user,
-    //   hasProfile: !!profile,
-    //   loading,
-    //   userEmail: user?.email,
-    //   profileName: profile?.nome_completo,
-    // });
+    console.log("🔍 App State:", {
+      hasUser: !!user,
+      hasProfile: !!profile,
+      loading,
+      userEmail: user?.email,
+      profileName: profile?.nome_completo,
+    });
   }, [user, profile, loading]);
 
   // Se ainda está carregando, mostra loading

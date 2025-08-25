@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
-import { sessaoService } from "../../services/sessaoService";
 
 interface AuthContextType {
   user: User | null;
@@ -22,59 +21,74 @@ function saveSessionToStorage(session: Session | null) {
   }
 }
 
-// getSessionFromStorage não é utilizado; mantemos apenas a persistência via saveSessionToStorage
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionProcessed, setSessionProcessed] = useState(false);
 
-  // Carrega usuário autenticado
-  const loadUser = async () => {
-    setLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session && session.user) {
-        setUser(session.user);
-        saveSessionToStorage(session);
-        
-        // NÃO cria sessão aqui - apenas no evento SIGNED_IN
-        console.log('👤 Usuário já autenticado, não criando nova sessão');
-      } else {
-        setUser(null);
-      }
-  } catch {
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Inicialização
+  // Inicialização - carrega sessão uma única vez
   useEffect(() => {
-    loadUser();
-    // Listener de mudanças de sessão
+    let mounted = true;
+    
+    const initializeAuth = async () => {
+      try {
+        console.log('🔄 Inicializando autenticação...');
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+        
+        if (session?.user) {
+          console.log('✅ Sessão encontrada para:', session.user.email);
+          setUser(session.user);
+          saveSessionToStorage(session);
+        } else {
+          console.log('❌ Nenhuma sessão encontrada');
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('❌ Erro ao inicializar auth:', error);
+        if (mounted) setUser(null);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+          setSessionProcessed(true);
+        }
+      }
+    };
+
+    initializeAuth();
+    
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Listener de mudanças de sessão - apenas após inicialização
+  useEffect(() => {
+    if (!sessionProcessed) return;
+    
+    console.log('🎧 Configurando listener de auth state...');
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔄 Auth state change:', event, session?.user?.id);
+        console.log('🔄 Auth state change:', event, session?.user?.email);
         
         saveSessionToStorage(session);
+        
         if (session?.user) {
           setUser(session.user);
           
-          // Cria sessão no sistema para novos logins
+          // Cria sessão no sistema APENAS para novos logins
           if (event === 'SIGNED_IN') {
-            console.log('✅ Usuário logado, criando sessão...');
+            console.log('✅ Novo login detectado, criando sessão...');
             try {
+              // Importação dinâmica para evitar dependência circular
+              const { sessaoService } = await import('../../services/sessaoService');
               await sessaoService.criarSessao(session.user.id);
               console.log('✅ Sessão criada com sucesso');
             } catch (error) {
               console.warn('⚠️ Erro ao criar sessão do usuário:', error);
             }
-          }
-          
-          // Para outros eventos (TOKEN_REFRESHED, etc), não cria nova sessão
-          if (event !== 'SIGNED_IN') {
-            console.log('ℹ️ Evento', event, '- não criando nova sessão');
           }
         } else {
           setUser(null);
@@ -83,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (event === 'SIGNED_OUT') {
             console.log('🚪 Usuário saiu, encerrando sessão...');
             try {
+              const { sessaoService } = await import('../../services/sessaoService');
               await sessaoService.encerrarSessao();
               console.log('✅ Sessão encerrada com sucesso');
             } catch (error) {
@@ -90,17 +105,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         }
-        setLoading(false);
       }
     );
+    
     return () => {
+      console.log('🧹 Removendo listener de auth state');
       subscription.unsubscribe();
     };
-  }, []);
+  }, [sessionProcessed]);
 
   const signOut = async () => {
-    // Encerra sessão no sistema antes do logout
+    console.log('🚪 Iniciando logout...');
     try {
+      const { sessaoService } = await import('./sessaoService');
       await sessaoService.encerrarSessao();
     } catch (error) {
       console.warn('Erro ao encerrar sessão:', error);
@@ -112,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshUser = () => {
-    // Força recarregamento completo para garantir sincronização
+    console.log('🔄 Forçando refresh do usuário...');
     window.location.reload();
   };
 
