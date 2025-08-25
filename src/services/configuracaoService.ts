@@ -302,34 +302,79 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
     busca?: string;
   } = {}): Promise<Usuario[]> {
     try {
-      let query = supabase
+      // Tenta primeiro com service_role para admin_master
+      const { data: currentUser } = await supabase.auth.getUser();
+      
+      // Busca o perfil do usuário atual para verificar se é admin_master
+      const { data: userProfile } = await supabase
         .from('usuarios_sistema')
-        .select('*')
-        .order('nome_completo');
+        .select('nivel_permissao')
+        .eq('id', currentUser.user?.id)
+        .single();
 
-      if (filtros.nivel) {
-        query = query.eq('nivel_permissao', filtros.nivel);
+      // Se não é admin_master, retorna apenas o próprio usuário
+      if (!userProfile || userProfile.nivel_permissao !== 'admin_master') {
+        console.log('🔒 Usuário não é admin_master, retornando apenas próprio perfil');
+        const { data: ownProfile, error } = await supabase
+          .from('usuarios_sistema')
+          .select('*')
+          .eq('id', currentUser.user?.id)
+          .single();
+        
+        if (error) {
+          console.error('❌ Erro ao buscar próprio perfil:', error);
+          return [];
+        }
+        
+        return ownProfile ? [ownProfile] : [];
       }
 
-      if (filtros.ativo !== undefined) {
-        query = query.eq('ativo', filtros.ativo);
-      }
-
-      if (filtros.busca) {
-        query = query.or(`nome_completo.ilike.%${filtros.busca}%,email.ilike.%${filtros.busca}%,cargo.ilike.%${filtros.busca}%`);
-      }
-
-      const { data, error } = await query;
+      // Para admin_master, usa RPC function que bypassa RLS
+      console.log('👑 Usuário é admin_master, buscando todos os usuários via RPC');
+      
+      const { data, error } = await supabase.rpc('get_all_users_admin', {
+        p_nivel_filtro: filtros.nivel || null,
+        p_ativo_filtro: filtros.ativo,
+        p_busca_filtro: filtros.busca || null
+      });
 
       if (error) {
-        throw new Error(`Erro ao buscar usuários: ${error.message}`);
+        console.error('❌ Erro na RPC function, tentando query direta:', error);
+        
+        // Fallback: tenta query direta (pode falhar devido ao RLS)
+        let query = supabase
+          .from('usuarios_sistema')
+          .select('*')
+          .order('nome_completo');
+
+        if (filtros.nivel) {
+          query = query.eq('nivel_permissao', filtros.nivel);
+        }
+
+        if (filtros.ativo !== undefined) {
+          query = query.eq('ativo', filtros.ativo);
+        }
+
+        if (filtros.busca) {
+          query = query.or(`nome_completo.ilike.%${filtros.busca}%,email.ilike.%${filtros.busca}%,cargo.ilike.%${filtros.busca}%`);
+        }
+
+        const { data: fallbackData, error: fallbackError } = await query;
+        
+        if (fallbackError) {
+          console.error('❌ Erro no fallback também:', fallbackError);
+          return [];
+        }
+        
+        console.log('✅ Usuários encontrados via fallback:', fallbackData?.length || 0);
+        return fallbackData || [];
       }
 
-      console.log('🔍 Usuários encontrados:', data?.length || 0, data);
+      console.log('✅ Usuários encontrados via RPC:', data?.length || 0);
       return data || [];
     } catch (error) {
       console.error('Erro ao buscar usuários:', error);
-      throw error;
+      return [];
     }
   }
 
@@ -338,9 +383,35 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
    */
   async buscarEstatisticasUsuarios(): Promise<EstatisticasUsuarios> {
     try {
-      const { data: usuarios } = await supabase
+      // Tenta usar RPC function para admin_master
+      const { data: currentUser } = await supabase.auth.getUser();
+      
+      const { data: userProfile } = await supabase
         .from('usuarios_sistema')
-        .select('nivel_permissao, ativo, ultimo_acesso');
+        .select('nivel_permissao')
+        .eq('id', currentUser.user?.id)
+        .single();
+
+      let usuarios: any[] = [];
+
+      if (userProfile?.nivel_permissao === 'admin_master') {
+        // Admin master pode ver estatísticas de todos
+        const { data: allUsers, error } = await supabase.rpc('get_all_users_admin');
+        
+        if (error) {
+          console.warn('⚠️ Erro na RPC para estatísticas, usando fallback');
+          // Fallback para query direta
+          const { data: fallbackUsers } = await supabase
+            .from('usuarios_sistema')
+            .select('nivel_permissao, ativo, ultimo_acesso');
+          usuarios = fallbackUsers || [];
+        } else {
+          usuarios = allUsers || [];
+        }
+      } else {
+        // Outros usuários veem apenas estatísticas básicas
+        usuarios = userProfile ? [userProfile] : [];
+      }
 
       console.log('📊 Dados para estatísticas:', usuarios?.length || 0, usuarios);
 
@@ -365,7 +436,14 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
       return stats;
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
-      throw error;
+      return {
+        total_usuarios: 0,
+        usuarios_ativos: 0,
+        usuarios_inativos: 0,
+        por_nivel: {},
+        logins_mes_atual: 0,
+        tentativas_bloqueadas: 0
+      };
     }
   }
 
