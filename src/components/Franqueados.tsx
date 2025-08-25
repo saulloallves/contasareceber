@@ -58,10 +58,10 @@ export function Franqueados() {
   const carregarFranqueados = async () => {
     setCarregando(true);
     try {
-      const { data, error } = await connectionService.query(() => supabase
+      const { data, error } = await supabase
         .from("franqueados")
         .select("*")
-        .order("nome_completo"));
+        .order("nome_completo");
       
       if (error) {
         console.error('Erro ao carregar franqueados:', error);
@@ -115,19 +115,19 @@ export function Franqueados() {
     try {
       let franqueadoId = formData.id;
       if (!franqueadoSelecionado) {
-        const { data, error } = await connectionService.query(() => supabase
+        const { data, error } = await supabase
           .from("franqueados")
           .insert(formData)
           .select()
-          .single());
+          .single();
         if (error) throw error;
         franqueadoId = data.id;
       } else {
         const { id, ...dadosParaAtualizar } = formData;
-        const { error } = await connectionService.query(() => supabase
+        const { error } = await supabase
           .from("franqueados")
           .update(dadosParaAtualizar)
-          .eq("id", franqueadoSelecionado.id));
+          .eq("id", franqueadoSelecionado.id);
         if (error) throw error;
         franqueadoId = franqueadoSelecionado.id;
       }

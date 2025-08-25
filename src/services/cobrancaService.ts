@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "../lib/supabaseClient";
-import { connectionService } from "./connectionService";
 import {
   CobrancaFranqueado,
   QuitacaoCobranca,
@@ -96,7 +95,6 @@ export class CobrancaService {
   ): Promise<CobrancaFranqueado[]> {
   // Observação: joins embutidos removidos para evitar ambiguidade de relacionamentos no PostgREST
   // Caso precise de dados de unidade/franqueado, a UI resolve via serviços dedicados após o fetch.
-    const queryFn = () => {
       let query = supabase.from("cobrancas_franqueados").select("*");
 
       // Filtros básicos
@@ -175,9 +173,8 @@ export class CobrancaService {
       const direcaoOrdenacao = filtros.direcaoOrdenacao as string || "desc";
       
       return query.order(colunaOrdenacao, { ascending: direcaoOrdenacao === "asc" });
-    };
 
-    const { data, error } = await connectionService.query(queryFn);
+    const { data, error } = await query;
 
     if (error) {
       throw new Error(`Erro ao buscar cobranças: ${error.message}`);
@@ -219,11 +216,11 @@ export class CobrancaService {
       usuario,
     } = dados;
 
-    const { data: cobranca, error: cobrancaError } = await connectionService.query(() => supabase
+    const { data: cobranca, error: cobrancaError } = await supabase
       .from("cobrancas_franqueados")
       .select("*")
       .eq("id", cobrancaId)
-      .single());
+      .single();
 
     if (cobrancaError || !cobranca) {
       throw new Error(`Erro ao buscar cobrança: ${cobrancaError?.message}`);
@@ -237,7 +234,7 @@ export class CobrancaService {
     const novaObservacao = `\n[${new Date().toLocaleString("pt-BR")}] Pagamento registrado: ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valorPago)} via ${formaPagamento}${observacoes ? ` - ${observacoes}` : ""}. Usuário: ${usuario}`;
     observacoesConsolidadas += novaObservacao;
 
-    const { error: updateError } = await connectionService.query(() => supabase
+    const { error: updateError } = await supabase
       .from("cobrancas_franqueados")
       .update({
         valor_recebido: (cobranca.valor_recebido || 0) + valorPago,
@@ -245,7 +242,7 @@ export class CobrancaService {
         data_ultima_atualizacao: new Date().toISOString(),
         observacoes: observacoesConsolidadas,
       })
-      .eq("id", cobrancaId));
+      .eq("id", cobrancaId);
 
     if (updateError) {
       throw new Error(`Erro ao atualizar cobrança: ${updateError.message}`);
@@ -263,19 +260,17 @@ export class CobrancaService {
   }
 
   async registrarTratativa(tratativa: TrativativaCobranca): Promise<void> {
-    const { error } = await connectionService.query(() => 
-      supabase.from("tratativas").insert(tratativa)
-    );
+    const { error } = await supabase.from("tratativas_cobranca").insert(tratativa);
 
     if (error) {
       throw new Error(`Erro ao registrar tratativa: ${error.message}`);
     }
 
     if (tratativa.status_cobranca_resultante) {
-      const { error: updateError } = await connectionService.query(() => supabase
+      const { error: updateError } = await supabase
         .from("cobrancas_franqueados")
         .update({ status: tratativa.status_cobranca_resultante })
-        .eq("id", tratativa.titulo_id));
+        .eq("id", tratativa.titulo_id);
 
       if (updateError) {
         throw new Error(
@@ -286,9 +281,9 @@ export class CobrancaService {
   }
 
   async enviarMensagemCobranca(mensagem: EnvioMensagem): Promise<void> {
-    const { error } = await connectionService.query(() => supabase
-      .from("mensagens_enviadas")
-      .insert(mensagem));
+    const { error } = await supabase
+      .from("envios_mensagem")
+      .insert(mensagem);
 
     if (error) {
       throw new Error(`Erro ao registrar mensagem enviada: ${error.message}`);
@@ -308,11 +303,11 @@ export class CobrancaService {
 
     for (const cobrancaId of cobrancas) {
       try {
-        const { data: cobranca, error } = await connectionService.query(() => supabase
+        const { data: cobranca, error } = await supabase
           .from("cobrancas_franqueados")
           .select("*")
           .eq("id", cobrancaId)
-          .single());
+          .single();
 
         if (error || !cobranca) {
           throw new Error(`Erro ao buscar cobrança: ${error?.message}`);
@@ -356,10 +351,10 @@ export class CobrancaService {
     dados: Partial<CobrancaFranqueado>
   ): Promise<void> {
     const payload = this.sanitizeUpdatePayload(dados);
-    const { error } = await connectionService.query(() => supabase
+    const { error } = await supabase
       .from("cobrancas_franqueados")
       .update({ ...payload, data_ultima_atualizacao: new Date().toISOString() })
-      .eq("id", id));
+      .eq("id", id);
 
     if (error) {
       throw new Error(`Erro ao atualizar cobrança: ${error.message}`);
@@ -375,11 +370,11 @@ export class CobrancaService {
 
     // 1) Logs de WhatsApp via n8n em 'logs_envio_whatsapp'
     try {
-      const { data, error } = await connectionService.query(() => supabase
+      const { data, error } = await supabase
         .from("logs_envio_whatsapp")
         .select("id, destinatario, mensagem_enviada, instancia_evolution, sucesso, evolution_message_id, erro_detalhes, data_envio, created_at, cobranca_id")
         .eq("cobranca_id", cobrancaId)
-        .order("data_envio", { ascending: false }));
+        .order("data_envio", { ascending: false });
 
       if (!error && data) {
         historico.push(
@@ -405,11 +400,11 @@ export class CobrancaService {
 
     // 2) Logs de e-mail via n8n em 'logs_envio_email'
     try {
-      const { data, error } = await connectionService.query(() => supabase
+      const { data, error } = await supabase
         .from("logs_envio_email")
         .select("id, destinatario, mensagem, sucesso, message_id, erro_detalhes, data_envio, created_at, cobranca_id")
         .eq("cobranca_id", cobrancaId)
-        .order("data_envio", { ascending: false }));
+        .order("data_envio", { ascending: false });
 
       if (!error && data) {
         historico.push(
