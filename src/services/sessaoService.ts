@@ -52,11 +52,6 @@
       throw error;
     }
   }
-    } catch (error) {
-      console.error('Erro ao criar sessão:', error);
-      throw error;
-    }
-  }
 
   /**
    * Atualiza último acesso da sessão (heartbeat)
