@@ -34,7 +34,6 @@ export interface Usuario {
   email: string;
   telefone?: string;
   cargo: string;
-  codigo_unidade_vinculada?: string;
   vinculo_multifranqueado?: string;
   nivel_permissao: 'admin_master' | 'gestor_juridico' | 'cobranca' | 'analista_financeiro' | 'franqueado' | 'observador';
   ativo: boolean;

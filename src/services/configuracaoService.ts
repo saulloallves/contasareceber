@@ -35,7 +35,6 @@ export class ConfiguracaoService {
           cargo: payload.cargo,
           nivel_permissao: payload.nivel_permissao,
           ativo: payload.ativo ?? true,
-          codigo_unidade_vinculada: payload.codigo_unidade_vinculada,
         }
       });
 
