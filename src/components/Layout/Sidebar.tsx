@@ -250,7 +250,7 @@ export function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-hidden">
+      <nav className="flex-1 p-3 space-y-1 overflow-hidden">
         {/* Seção Principal */}
         {!collapsed && (
           <div className="px-3 py-2">
@@ -712,7 +712,7 @@ export function Sidebar({
       {/* Desktop Sidebar */}
       <div
         className={`hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:z-50 transition-all duration-300 ${
-          collapsed ? "lg:w-16" : "lg:w-72"
+          collapsed ? "lg:w-24" : "lg:w-72"
         }`}
       >
         <SidebarContent />

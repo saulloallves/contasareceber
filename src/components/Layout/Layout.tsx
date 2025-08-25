@@ -36,7 +36,7 @@ export function Layout({
 
       <div
         className={`flex-1 flex flex-col transition-all duration-300 ${
-          collapsed ? "lg:ml-20" : "lg:ml-72"
+          collapsed ? "lg:ml-24" : "lg:ml-72"
         }`}
       >
         <main className="flex-1 p-4 lg:p-6">{children}</main>
