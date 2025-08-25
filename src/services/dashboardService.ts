@@ -103,14 +103,23 @@ export class DashboardService {
 
       const pctChange = (curr: number, prev: number) => {
         if (!prev && !curr) return 0;
-        if (!prev) return 100; // crescimento a partir de zero
-        return ((curr - prev) / prev) * 100;
+        if (!prev && curr > 0) return 100; // crescimento a partir de zero
+        if (prev === 0 && curr > 0) return 100; // crescimento a partir de zero
+        if (prev > 0) return ((curr - prev) / prev) * 100;
+        return 0;
       };
 
       const variacaoEmAberto = pctChange(currEmAberto, prevEmAberto);
       const variacaoQuitado = pctChange(currQuitadoVal, prevQuitadoVal);
       const variacaoNegociando = pctChange(currNegociando, prevNegociando);
       const variacaoUnidades = pctChange(currUnidades, prevUnidades);
+
+      console.log('Debug variação negociando:', {
+        currNegociando,
+        prevNegociando,
+        variacaoNegociando,
+        totalNegociando
+      });
 
       return {
         total_em_aberto_mes: totalEmAberto,
