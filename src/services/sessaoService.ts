@@ -30,54 +30,70 @@ export class SessaoService {
    * Cria nova sessão quando usuário faz login
    */
   async criarSessao(usuarioId: string): Promise<string> {
+    // Verifica se já existe uma operação de criação de sessão em andamento
+    const lockKey = `creating_session_${usuarioId}`;
+    if (localStorage.getItem(lockKey)) {
+      console.log('⏳ Criação de sessão já em andamento, aguardando...');
+      return;
+    }
+    
+    // Define lock temporário
+    localStorage.setItem(lockKey, 'true');
+    
     try {
       console.log('🔄 Criando sessão para usuário:', usuarioId);
       
-      // Primeiro, desativa todas as sessões anteriores do usuário
-      console.log('🔄 Desativando sessões anteriores...');
-      await supabase
-        .from('sessoes_usuario')
-        .update({ ativa: false })
-        .eq('usuario_id', usuarioId)
-        .eq('ativa', true);
-      
-      // Gera token único para a sessão
-      const tokenSessao = this.gerarTokenSessao();
-      
-      // Obtém informações do navegador
-      const ipOrigem = await this.obterIP();
-      const userAgent = navigator.userAgent;
+      try {
+        // Primeiro, desativa todas as sessões anteriores do usuário
+        console.log('🔄 Desativando sessões anteriores...');
+        await supabase
+          .from('sessoes_usuario')
+          .update({ ativa: false })
+          .eq('usuario_id', usuarioId)
+          .eq('ativa', true);
+        
+        // Gera token único para a sessão
+        const tokenSessao = this.gerarTokenSessao();
+        
+        // Obtém informações do navegador
+        const ipOrigem = await this.obterIP();
+        const userAgent = navigator.userAgent;
 
-      // Cria nova sessão
-      console.log('🆕 Criando nova sessão...');
-      const { data, error } = await supabase
-        .from('sessoes_usuario')
-        .insert({
-          usuario_id: usuarioId,
-          token_sessao: tokenSessao,
-          ip_origem: ipOrigem,
-          user_agent: userAgent,
-          data_inicio: new Date().toISOString(),
-          data_ultimo_acesso: new Date().toISOString(),
-          ativa: true
-        })
-        .select()
-        .single();
+        // Cria nova sessão
+        console.log('🆕 Criando nova sessão...');
+        const { data, error } = await supabase
+          .from('sessoes_usuario')
+          .insert({
+            usuario_id: usuarioId,
+            token_sessao: tokenSessao,
+            ip_origem: ipOrigem,
+            user_agent: userAgent,
+            data_inicio: new Date().toISOString(),
+            data_ultimo_acesso: new Date().toISOString(),
+            ativa: true
+          })
+          .select()
+          .single();
 
-      if (error) {
-        throw new Error(`Erro ao criar sessão: ${error.message}`);
+        if (error) {
+          throw new Error(`Erro ao criar sessão: ${error.message}`);
+        }
+
+        console.log('✅ Sessão criada com sucesso:', data.id);
+        
+        // Salva token no localStorage para manter sessão
+        localStorage.setItem('session_token', tokenSessao);
+
+        // Inicia heartbeat para manter sessão ativa
+        this.iniciarHeartbeat(tokenSessao);
+
+        return tokenSessao;
+      } finally {
+        // Remove lock
+        localStorage.removeItem(lockKey);
       }
-
-      console.log('✅ Sessão criada com sucesso:', data.id);
-      
-      // Salva token no localStorage para manter sessão
-      localStorage.setItem('session_token', tokenSessao);
-
-      // Inicia heartbeat para manter sessão ativa
-      this.iniciarHeartbeat(tokenSessao);
-
-      return tokenSessao;
     } catch (error) {
+      localStorage.removeItem(lockKey);
       console.error('Erro ao criar sessão:', error);
       throw error;
     }
