@@ -18,8 +18,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log('🎧 Configurando listener de auth state...');
     
+    // Flag para evitar múltiplas execuções simultâneas
+    let isInitializing = false;
+    
     // Busca sessão inicial e define loading como false
     const initializeAuth = async () => {
+      if (isInitializing) {
+        console.log('⚠️ Inicialização já em andamento, ignorando...');
+        return;
+      }
+      
+      isInitializing = true;
+      
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         console.log('🔍 Sessão inicial:', session?.user?.email || 'Nenhuma');
@@ -35,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } finally {
         // SEMPRE define loading como false, independente do resultado
         setLoading(false);
+        isInitializing = false;
       }
     };
     
@@ -45,12 +56,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         console.log('🔄 Auth state change:', event, session?.user?.email);
         
+        // Evita processamento duplicado de eventos
+        if (isInitializing) {
+          console.log('⚠️ Inicialização em andamento, ignorando auth state change');
+          return;
+        }
+        
         setUser(session?.user ?? null);
         
         // Cria sessão apenas no login bem-sucedido
         if (event === 'SIGNED_IN' && session?.user) {
           console.log('✅ Login detectado, criando sessão...');
           try {
+            // Aguarda um pouco para evitar condições de corrida
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
             const { sessaoService } = await import('../../services/sessaoService');
             await sessaoService.criarSessao(session.user.id);
             console.log('✅ Sessão criada com sucesso');

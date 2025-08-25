@@ -32,78 +32,110 @@ export class SessaoService {
     try {
       console.log('🔄 Criando sessão para usuário:', usuarioId);
       
-      // Desativa TODAS as sessões anteriores primeiro
-      console.log('🔄 Desativando todas as sessões anteriores...');
-      const { error: errorDesativar } = await supabase
-        .from('sessoes_usuario')
-        .update({ ativa: false })
-        .eq('usuario_id', usuarioId);
-
-      if (errorDesativar) {
-        console.warn('⚠️ Erro ao desativar sessões anteriores:', errorDesativar);
-      } else {
-        console.log('✅ Sessões anteriores desativadas');
+      // Implementa controle de concorrência com lock otimista
+      const lockKey = `session_lock_${usuarioId}`;
+      const lockValue = Date.now().toString();
+      
+      // Tenta adquirir lock usando localStorage como semáforo simples
+      const existingLock = localStorage.getItem(lockKey);
+      if (existingLock && (Date.now() - parseInt(existingLock)) < 5000) {
+        console.log('🔒 Criação de sessão já em andamento, aguardando...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Verifica se sessão foi criada por outro processo
+        const tokenExistente = localStorage.getItem('session_token');
+        if (tokenExistente) {
+          console.log('✅ Sessão já criada por outro processo');
+          return tokenExistente;
+        }
       }
-
-      // Verifica se ainda existe sessão ativa (não deveria existir após desativação)
-      const { data: sessaoExistente, error: errorVerificacao } = await supabase
-        .from('sessoes_usuario')
-        .select('id, token_sessao, ativa')
-        .eq('usuario_id', usuarioId)
-        .eq('ativa', true)
-        .maybeSingle();
-
-      if (errorVerificacao) {
-        console.warn('⚠️ Erro ao verificar sessão existente:', errorVerificacao);
-      }
-
-      // Se ainda existe sessão ativa após desativação, algo está errado
-      if (sessaoExistente) {
-        console.warn('⚠️ Sessão ativa ainda existe após desativação, forçando desativação:', sessaoExistente.id);
-        await supabase
+      
+      // Adquire lock
+      localStorage.setItem(lockKey, lockValue);
+      
+      try {
+        // Desativa TODAS as sessões anteriores de forma atômica
+        console.log('🔄 Desativando todas as sessões anteriores...');
+        const { error: errorDesativar } = await supabase
           .from('sessoes_usuario')
           .update({ ativa: false })
-          .eq('id', sessaoExistente.id);
+          .eq('usuario_id', usuarioId)
+          .eq('ativa', true);
+
+        if (errorDesativar) {
+          console.warn('⚠️ Erro ao desativar sessões anteriores:', errorDesativar);
+        } else {
+          console.log('✅ Sessões anteriores desativadas');
+        }
+
+        // Aguarda um pouco para garantir que a operação foi processada
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Verifica novamente se existe sessão ativa
+        const { data: sessaoExistente, error: errorVerificacao } = await supabase
+          .from('sessoes_usuario')
+          .select('id, token_sessao, ativa')
+          .eq('usuario_id', usuarioId)
+          .eq('ativa', true)
+          .maybeSingle();
+
+        if (errorVerificacao) {
+          console.warn('⚠️ Erro ao verificar sessão existente:', errorVerificacao);
+        }
+
+        // Se ainda existe sessão ativa, força desativação
+        if (sessaoExistente) {
+          console.warn('⚠️ Sessão ativa ainda existe, forçando desativação:', sessaoExistente.id);
+          await supabase
+            .from('sessoes_usuario')
+            .update({ ativa: false })
+            .eq('id', sessaoExistente.id);
+        }
+
+        // Gera token único para a sessão
+        const tokenSessao = this.gerarTokenSessao();
+        
+        // Obtém informações do navegador
+        const ipOrigem = await this.obterIP();
+        const userAgent = navigator.userAgent;
+
+        // Cria nova sessão
+        console.log('🆕 Criando nova sessão...');
+        const { data, error } = await supabase
+          .from('sessoes_usuario')
+          .insert({
+            usuario_id: usuarioId,
+            token_sessao: tokenSessao,
+            ip_origem: ipOrigem,
+            user_agent: userAgent,
+            data_inicio: new Date().toISOString(),
+            data_ultimo_acesso: new Date().toISOString(),
+            ativa: true
+          })
+          .select()
+          .single();
+
+        if (error) {
+          throw new Error(`Erro ao criar sessão: ${error.message}`);
+        }
+
+        console.log('✅ Sessão criada com sucesso:', data.id);
+        
+        // Salva token no localStorage para manter sessão
+        localStorage.setItem('session_token', tokenSessao);
+
+        // Inicia heartbeat para manter sessão ativa
+        this.iniciarHeartbeat(tokenSessao);
+
+        return tokenSessao;
+      } finally {
+        // Remove lock
+        localStorage.removeItem(lockKey);
       }
-
-      // Gera token único para a sessão
-      const tokenSessao = this.gerarTokenSessao();
-      
-      // Obtém informações do navegador
-      const ipOrigem = await this.obterIP();
-      const userAgent = navigator.userAgent;
-
-      // Cria nova sessão
-      console.log('🆕 Criando nova sessão...');
-      const { data, error } = await supabase
-        .from('sessoes_usuario')
-        .insert({
-          usuario_id: usuarioId,
-          token_sessao: tokenSessao,
-          ip_origem: ipOrigem,
-          user_agent: userAgent,
-          data_inicio: new Date().toISOString(),
-          data_ultimo_acesso: new Date().toISOString(),
-          ativa: true
-        })
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(`Erro ao criar sessão: ${error.message}`);
-      }
-
-      console.log('✅ Sessão criada com sucesso:', data.id);
-      
-      // Salva token no localStorage para manter sessão
-      localStorage.setItem('session_token', tokenSessao);
-
-      // Inicia heartbeat para manter sessão ativa
-      this.iniciarHeartbeat(tokenSessao);
-
-      return tokenSessao;
     } catch (error) {
       console.error('Erro ao criar sessão:', error);
+      // Remove lock em caso de erro
+      localStorage.removeItem(`session_lock_${usuarioId}`);
       throw error;
     }
   }

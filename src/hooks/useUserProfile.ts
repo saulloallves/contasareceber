@@ -19,6 +19,7 @@ export function useUserProfile(userId?: string) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
   const loadProfile = async () => {
     if (!userId) {
@@ -26,9 +27,16 @@ export function useUserProfile(userId?: string) {
       setLoading(false);
       return;
     }
+    
+    // Evita múltiplas chamadas simultâneas
+    if (isLoadingProfile) {
+      console.log('⚠️ Perfil já sendo carregado, ignorando...');
+      return;
+    }
 
     try {
       console.log('🔍 Carregando perfil para userId:', userId);
+      setIsLoadingProfile(true);
       setLoading(true);
       setError(null);
 
@@ -51,6 +59,7 @@ export function useUserProfile(userId?: string) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setLoading(false);
+      setIsLoadingProfile(false);
     }
   };
 

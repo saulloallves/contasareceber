@@ -23,6 +23,7 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showSignUpModal, setShowSignUpModal] = useState(false);
+  const [isProcessingLogin, setIsProcessingLogin] = useState(false);
   const [signUpData, setSignUpData] = useState<SignUpData>({
     email: "",
     password: "",
@@ -33,6 +34,14 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Evita múltiplos cliques no botão de login
+    if (isProcessingLogin) {
+      console.log('⚠️ Login já em processamento, ignorando...');
+      return;
+    }
+    
+    setIsProcessingLogin(true);
     setLoading(true);
     setError("");
 
@@ -52,14 +61,8 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
         // Garantir que existe um perfil na tabela usuarios_sistema
         await ensureUserProfile(data.user);
         
-        // Cria sessão no sistema
-        try {
-          await sessaoService.criarSessao(data.user.id);
-          console.log('✅ Sessão criada no sistema');
-        } catch (sessionError) {
-          console.warn('⚠️ Erro ao criar sessão:', sessionError);
-          // Não bloqueia o login por erro de sessão
-        }
+        // Aguarda um pouco antes de chamar onAuthSuccess para dar tempo do AuthProvider processar
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         onAuthSuccess();
       }
@@ -68,6 +71,7 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
       setError("Erro ao fazer login");
     } finally {
       setLoading(false);
+      setIsProcessingLogin(false);
     }
   };
 

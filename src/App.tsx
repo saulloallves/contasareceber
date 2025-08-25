@@ -25,6 +25,7 @@ function AppContent() {
   const { user, loading } = useAuth();
   const { profile } = useUserProfile(user?.id);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Simula dados do usuário logado
   const userPermissions = ["admin"];
@@ -54,18 +55,35 @@ function AppContent() {
       hasUser: !!user,
       hasProfile: !!profile,
       loading,
+      isInitialized,
       userEmail: user?.email,
       profileName: profile?.nome_completo,
     });
-  }, [user, profile, loading]);
+  }, [user, profile, loading, isInitialized]);
 
-  // Se ainda está carregando, mostra loading
-  if (loading) {
+  // Controla inicialização para evitar loops
+  useEffect(() => {
+    if (!loading && user) {
+      // Aguarda um pouco para garantir que o perfil seja carregado
+      const timer = setTimeout(() => {
+        setIsInitialized(true);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    } else if (!loading && !user) {
+      setIsInitialized(true);
+    }
+  }, [loading, user]);
+
+  // Se ainda está carregando ou não foi inicializado, mostra loading
+  if (loading || !isInitialized) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando sistema...</p>
+          <p className="text-gray-600">
+            {loading ? 'Carregando sistema...' : 'Inicializando aplicação...'}
+          </p>
           {user && (
             <p className="text-xs text-gray-400 mt-2">
               Carregando perfil de {user.email}...
