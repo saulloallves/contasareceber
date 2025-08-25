@@ -61,14 +61,7 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
         // Garantir que existe um perfil na tabela usuarios_sistema
         await ensureUserProfile(data.user);
         
-        // Cria sessão explicitamente aqui também para garantir
-        try {
-          console.log('🔄 Criando sessão no SimpleAuth...');
-          await sessaoService.criarSessao(data.user.id);
-          console.log('✅ Sessão criada no SimpleAuth');
-        } catch (sessionError) {
-          console.warn('⚠️ Erro ao criar sessão no SimpleAuth:', sessionError);
-        }
+        // Remove criação de sessão duplicada - será criada pelo AuthProvider
         
         onAuthSuccess();
       }
@@ -271,6 +264,7 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
         )}
 
         <form onSubmit={handleLogin} className="space-y-4">
+          <div data-auth-form></div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Email

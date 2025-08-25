@@ -23,16 +23,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Inicia monitoramento de conexão
     connectionService.startMonitoring();
     
-    // Flag para evitar múltiplas execuções simultâneas
-    let isInitializing = false;
+    // Flag global para evitar múltiplas inicializações
+    const initKey = 'auth_initializing';
     
     // Busca sessão inicial e define loading como false
     const initializeAuth = async () => {
-      if (isInitializing) {
+      // Verifica se já está inicializando
+      if (sessionStorage.getItem(initKey)) {
+        console.log('🔒 Auth já inicializando, aguardando...');
         return;
       }
       
-      isInitializing = true;
+      sessionStorage.setItem(initKey, 'true');
       
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -43,10 +45,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         setUser(session?.user ?? null);
         
-        // Se há sessão ativa mas não há sessão no sistema, cria uma
+        // Se há sessão ativa, cria sessão no sistema apenas uma vez
         if (session?.user) {
           try {
+            console.log('🔄 Criando sessão inicial para usuário logado...');
             await sessaoService.criarSessao(session.user.id);
+            console.log('✅ Sessão inicial criada');
           } catch (error) {
             console.warn('⚠️ Erro ao criar sessão inicial:', error);
           }
@@ -57,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } finally {
         // SEMPRE define loading como false, independente do resultado
         setLoading(false);
-        isInitializing = false;
+        sessionStorage.removeItem(initKey);
       }
     };
     
@@ -68,21 +72,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         console.log('🔄 Auth state change:', event, session?.user?.email || 'Nenhum usuário');
         
-        // Evita processamento duplicado de eventos
-        if (isInitializing) {
-          return;
-        }
-        
         setUser(session?.user ?? null);
         
-        // Cria sessão apenas no login bem-sucedido
+        // Cria sessão apenas no login bem-sucedido e se não foi criada na inicialização
         if (event === 'SIGNED_IN' && session?.user) {
-          console.log('✅ Login detectado, criando sessão...');
-          try {
-            await sessaoService.criarSessao(session.user.id);
-            console.log('✅ Sessão criada com sucesso');
-          } catch (error) {
-            console.error('❌ Erro ao criar sessão no login:', error);
+          // Só cria sessão se não foi criada na inicialização
+          if (!sessionStorage.getItem(initKey)) {
+            console.log('✅ Login detectado, criando sessão...');
+            try {
+              await sessaoService.criarSessao(session.user.id);
+              console.log('✅ Sessão criada com sucesso');
+            } catch (error) {
+              console.warn('⚠️ Erro ao criar sessão no login:', error);
+            }
           }
         }
         
@@ -91,6 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             await sessaoService.encerrarSessao();
           } catch (error) {
+            console.warn('⚠️ Erro ao encerrar sessão:', error);
           }
         }
       }
@@ -99,6 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
       connectionService.stopMonitoring();
+      sessionStorage.removeItem(initKey);
     };
   }, []);
 

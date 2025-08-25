@@ -95,14 +95,20 @@ export class ConnectionService {
       } else {
         console.warn('⚠️ Falha na conexão com Supabase:', error);
         this.updateConnectionStatus(false);
-        this.attemptReconnect();
+        // Só tenta reconectar se não estiver na tela de login
+        if (window.location.pathname !== '/' && document.querySelector('[data-auth-form]') === null) {
+          this.attemptReconnect();
+        }
       }
       
       return isConnected;
     } catch (error) {
       console.error('❌ Erro ao verificar conexão:', error);
       this.updateConnectionStatus(false);
-      this.attemptReconnect();
+      // Só tenta reconectar se não estiver na tela de login
+      if (window.location.pathname !== '/' && document.querySelector('[data-auth-form]') === null) {
+        this.attemptReconnect();
+      }
       return false;
     }
   }
