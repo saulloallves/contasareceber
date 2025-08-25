@@ -87,6 +87,7 @@ export function Sidebar({
       removeConnectionListener();
       supabase.removeChannel(alertasChannel);
     };
+  }, []);
 
   const handleLogout = async () => {
     setLoggingOut(true);
