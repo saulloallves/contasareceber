@@ -488,7 +488,7 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
         .from('usuarios_sistema')
         .select('*')
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       const { data, error } = await supabase
         .from('usuarios_sistema')
@@ -507,7 +507,7 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
         acao: 'atualizar_usuario',
         tabela_afetada: 'usuarios_sistema',
         registro_id: id,
-        dados_anteriores: usuarioAtual,
+        dados_anteriores: usuarioAtual || {},
         dados_novos: dadosAtualizacao
       });
 
