@@ -18,12 +18,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log('🎧 Configurando listener de auth state...');
     
-    // Busca sessão inicial
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('🔍 Sessão inicial:', session?.user?.email || 'Nenhuma');
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    // Busca sessão inicial e define loading como false
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('🔍 Sessão inicial:', session?.user?.email || 'Nenhuma');
+        
+        if (error) {
+          console.error('❌ Erro ao buscar sessão:', error);
+        }
+        
+        setUser(session?.user ?? null);
+      } catch (error) {
+        console.error('❌ Erro na inicialização:', error);
+        setUser(null);
+      } finally {
+        // SEMPRE define loading como false, independente do resultado
+        setLoading(false);
+      }
+    };
+    
+    initializeAuth();
 
     // Listener para mudanças de estado
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -36,7 +51,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (event === 'SIGNED_IN' && session?.user) {
           console.log('✅ Login detectado, criando sessão...');
           try {
-            // Importação dinâmica para evitar dependência circular
             const { sessaoService } = await import('../../services/sessaoService');
             await sessaoService.criarSessao(session.user.id);
             console.log('✅ Sessão criada com sucesso');
@@ -56,8 +70,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.warn('⚠️ Erro ao encerrar sessão:', error);
           }
         }
-        
-        setLoading(false);
       }
     );
     
