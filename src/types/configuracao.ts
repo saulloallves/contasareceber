@@ -41,7 +41,6 @@ export interface Usuario {
   ultimo_acesso?: string;
   tentativas_login?: number;
   bloqueado_ate?: string;
-  area_atuacao?: 'global' | 'regional' | 'unidade_especifica';
   regioes_permitidas?: string[];
   unidades_permitidas?: string[];
   permissoes_customizadas?: PermissoesCustomizadas;
@@ -136,7 +135,6 @@ export interface PermissaoUsuario {
 export interface FiltrosUsuarios {
   nivel_permissao?: string;
   ativo?: boolean;
-  area_atuacao?: string;
   cargo?: string;
   busca?: string;
   data_inicio?: string;
@@ -148,7 +146,6 @@ export interface EstatisticasUsuarios {
   usuarios_ativos: number;
   usuarios_inativos: number;
   por_nivel: Record<string, number>;
-  por_area: Record<string, number>;
   logins_mes_atual: number;
   tentativas_bloqueadas: number;
 }

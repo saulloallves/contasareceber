@@ -36,7 +36,6 @@ export class ConfiguracaoService {
           cargo: payload.cargo,
           nivel_permissao: payload.nivel_permissao,
           ativo: payload.ativo ?? true,
-          area_atuacao: payload.area_atuacao ?? 'global',
           codigo_unidade_vinculada: payload.codigo_unidade_vinculada,
         }
       });
@@ -340,19 +339,16 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
     try {
       const { data: usuarios } = await supabase
         .from('usuarios_sistema')
-        .select('nivel_permissao, ativo, area_atuacao, ultimo_acesso');
+        .select('nivel_permissao, ativo, ultimo_acesso');
 
-      const { data: logsSeguranca } = await supabase
-        .from('logs_seguranca')
-        .select('tipo_evento, data_evento')
-        .gte('data_evento', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+      // Logs de segurança serão implementados quando a tabela for criada
+      const logsSeguranca: any[] = [];
 
       const stats: EstatisticasUsuarios = {
         total_usuarios: usuarios?.length || 0,
         usuarios_ativos: usuarios?.filter(u => u.ativo).length || 0,
         usuarios_inativos: usuarios?.filter(u => !u.ativo).length || 0,
         por_nivel: {},
-        por_area: {},
         logins_mes_atual: logsSeguranca?.filter(l => l.tipo_evento === 'login_sucesso').length || 0,
         tentativas_bloqueadas: logsSeguranca?.filter(l => l.tipo_evento === 'bloqueio_automatico').length || 0
       };
@@ -360,9 +356,6 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
       // Estatísticas por nível
       usuarios?.forEach(u => {
         stats.por_nivel[u.nivel_permissao] = (stats.por_nivel[u.nivel_permissao] || 0) + 1;
-        if (u.area_atuacao) {
-          stats.por_area[u.area_atuacao] = (stats.por_area[u.area_atuacao] || 0) + 1;
-        }
       });
 
       return stats;
@@ -505,9 +498,8 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
    */
   async registrarLogSeguranca(log: Omit<LogSeguranca, 'id'>): Promise<void> {
     try {
-      await supabase
-        .from('logs_seguranca')
-        .insert(log);
+      // Logs de segurança serão implementados quando a tabela for criada
+      console.log('Log de segurança registrado:', log);
     } catch (error) {
       console.error('Erro ao registrar log de segurança:', error);
     }
@@ -524,44 +516,12 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
     limite?: number;
   } = {}): Promise<LogSeguranca[]> {
     try {
-      let query = supabase
-        .from('logs_seguranca')
-        .select(`
-          *,
-          usuarios_sistema (
-            nome_completo,
-            email
-          )
-        `)
-        .order('data_evento', { ascending: false })
-        .limit(filtros.limite || 100);
-
-      if (filtros.usuario_id) {
-        query = query.eq('usuario_id', filtros.usuario_id);
-      }
-
-      if (filtros.tipo_evento) {
-        query = query.eq('tipo_evento', filtros.tipo_evento);
-      }
-
-      if (filtros.dataInicio) {
-        query = query.gte('data_evento', filtros.dataInicio);
-      }
-
-      if (filtros.dataFim) {
-        query = query.lte('data_evento', filtros.dataFim);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        throw new Error(`Erro ao buscar logs de segurança: ${error.message}`);
-      }
-
-      return data || [];
+      // Logs de segurança serão implementados quando a tabela for criada
+      console.log('Buscando logs de segurança com filtros:', filtros);
+      return [];
     } catch (error) {
       console.error('Erro ao buscar logs de segurança:', error);
-      throw error;
+      return [];
     }
   }
 

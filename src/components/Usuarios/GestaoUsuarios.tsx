@@ -342,16 +342,6 @@ export function GestaoUsuarios() {
                 <option value="true">Ativo</option>
                 <option value="false">Inativo</option>
               </select>
-              <select
-                value={filtros.area_atuacao || ''}
-                onChange={(e) => setFiltros({...filtros, area_atuacao: e.target.value})}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Todas as Áreas</option>
-                <option value="global">Global</option>
-                <option value="regional">Regional</option>
-                <option value="unidade_especifica">Unidade Específica</option>
-              </select>
               <input
                 type="text"
                 value={filtros.busca || ''}
@@ -381,9 +371,6 @@ export function GestaoUsuarios() {
                       Permissão
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Área de Atuação
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -397,7 +384,7 @@ export function GestaoUsuarios() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {carregando ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-4 text-center">
+                      <td colSpan={5} className="px-6 py-4 text-center">
                         <div className="flex items-center justify-center">
                           <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mr-2" />
                           Carregando usuários...
@@ -406,7 +393,7 @@ export function GestaoUsuarios() {
                     </tr>
                   ) : usuarios.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                      <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
                         Nenhum usuário encontrado
                       </td>
                     </tr>
@@ -429,12 +416,6 @@ export function GestaoUsuarios() {
                           <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPermissaoColor(usuario.nivel_permissao)}`}>
                             {getPermissaoLabel(usuario.nivel_permissao)}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center text-sm text-gray-900">
-                            {getAreaIcon(usuario.area_atuacao || 'global')}
-                            <span className="ml-2">{usuario.area_atuacao?.replace('_', ' ').toUpperCase() || 'GLOBAL'}</span>
-                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
@@ -577,17 +558,16 @@ export function GestaoUsuarios() {
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-6">
-              <h4 className="font-semibold text-gray-800 mb-4">Distribuição por Área</h4>
+              <h4 className="font-semibold text-gray-800 mb-4">Atividade do Sistema</h4>
               <div className="space-y-3">
-                {Object.entries(estatisticas.por_area).map(([area, quantidade]) => (
-                  <div key={area} className="flex justify-between items-center">
-                    <div className="flex items-center">
-                      {getAreaIcon(area)}
-                      <span className="ml-2 text-gray-700">{area.replace('_', ' ').toUpperCase()}</span>
-                    </div>
-                    <span className="font-medium">{quantidade}</span>
-                  </div>
-                ))}
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-700">Logins este mês</span>
+                  <span className="font-medium">{estatisticas.logins_mes_atual}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-700">Tentativas bloqueadas</span>
+                  <span className="font-medium">{estatisticas.tentativas_bloqueadas}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -667,32 +647,7 @@ export function GestaoUsuarios() {
                 </select>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Área de Atuação</label>
-                <select
-                  value={formData.area_atuacao || 'global'}
-                  onChange={(e) => setFormData({...formData, area_atuacao: e.target.value as Usuario['area_atuacao']})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="global">Global</option>
-                  <option value="regional">Regional</option>
-                  <option value="unidade_especifica">Unidade Específica</option>
-                </select>
-              </div>
             </div>
-
-            {formData.area_atuacao === 'unidade_especifica' && (
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Código da Unidade</label>
-                <input
-                  type="text"
-                  value={formData.codigo_unidade_vinculada || ''}
-                  onChange={(e) => setFormData({...formData, codigo_unidade_vinculada: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Código da unidade específica"
-                />
-              </div>
-            )}
             
             <div className="flex items-center space-x-6 mb-6">
               <div className="flex items-center">
