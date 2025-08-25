@@ -69,7 +69,7 @@ export class SessaoService {
             .maybeSingle()
         );
         
-        if (sessaoExistente.data) {
+        if (sessaoExistente && sessaoExistente.data) {
           console.log('✅ Sessão ativa já existe, reutilizando:', sessaoExistente.data.token_sessao);
           localStorage.setItem('session_token', sessaoExistente.data.token_sessao);
           this.iniciarHeartbeat(sessaoExistente.data.token_sessao);
