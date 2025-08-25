@@ -172,7 +172,7 @@ export class CobrancaService {
       const colunaOrdenacao = filtros.colunaOrdenacao as string || "data_vencimento";
       const direcaoOrdenacao = filtros.direcaoOrdenacao as string || "desc";
       
-      return query.order(colunaOrdenacao, { ascending: direcaoOrdenacao === "asc" });
+      query = query.order(colunaOrdenacao, { ascending: direcaoOrdenacao === "asc" });
 
     const { data, error } = await query;
 
