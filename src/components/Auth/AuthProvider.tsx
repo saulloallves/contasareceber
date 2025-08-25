@@ -15,40 +15,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Inicialização
   useEffect(() => {
     console.log('🎧 Configurando listener de auth state...');
     
+    // Busca sessão inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('🔍 Sessão inicial:', session?.user?.email || 'Nenhuma');
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    // Listener para mudanças de estado
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔄 Auth state change:', event, session?.user?.email);
         
-        if (session?.user) {
-          setUser(session.user);
-          
-          // Cria sessão no sistema para logins
-          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            console.log('✅ Novo login detectado, criando sessão...');
-            try {
-              const { sessaoService } = await import('../../services/sessaoService');
-              await sessaoService.criarSessao(session.user.id);
-              console.log('✅ Sessão criada com sucesso');
-            } catch (error) {
-              console.warn('⚠️ Erro ao criar sessão do usuário:', error);
-            }
+        setUser(session?.user ?? null);
+        
+        // Cria sessão apenas no login bem-sucedido
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log('✅ Login detectado, criando sessão...');
+          try {
+            // Importação dinâmica para evitar dependência circular
+            const { sessaoService } = await import('../../services/sessaoService');
+            await sessaoService.criarSessao(session.user.id);
+            console.log('✅ Sessão criada com sucesso');
+          } catch (error) {
+            console.warn('⚠️ Erro ao criar sessão:', error);
           }
-        } else {
-          setUser(null);
-          
-          if (event === 'SIGNED_OUT') {
-            console.log('🚪 Usuário saiu, encerrando sessão...');
-            try {
-              const { sessaoService } = await import('../../services/sessaoService');
-              await sessaoService.encerrarSessao();
-              console.log('✅ Sessão encerrada com sucesso');
-            } catch (error) {
-              console.warn('⚠️ Erro ao encerrar sessão do usuário:', error);
-            }
+        }
+        
+        // Encerra sessão no logout
+        if (event === 'SIGNED_OUT') {
+          console.log('🚪 Logout detectado, encerrando sessão...');
+          try {
+            const { sessaoService } = await import('../../services/sessaoService');
+            await sessaoService.encerrarSessao();
+            console.log('✅ Sessão encerrada');
+          } catch (error) {
+            console.warn('⚠️ Erro ao encerrar sessão:', error);
           }
         }
         
