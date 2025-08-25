@@ -2,8 +2,8 @@ import { useState } from "react";
 import { 
   Home, Building2, 
   Settings, ChevronLeft, ChevronRight,
-  Menu, X, Shield, Receipt, CircleDollarSign, Calculator, Users,
-  Bell, MoreHorizontal, LogOut, User, CheckCircle
+  Menu, X, Receipt, CircleDollarSign, Calculator, Users,
+  Bell, MoreHorizontal, LogOut, CheckCircle
 } from "lucide-react";
 import { useAuth } from "../Auth/AuthProvider";
 import { useUserProfile } from "../../hooks/useUserProfile";
@@ -213,12 +213,12 @@ export function Sidebar({
       <div className="flex items-center justify-between p-4 border-b border-gray-100">
         {!collapsed && (
           <div className="flex items-center">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center mr-3">
+            <div className="w-10 h-auto rounded-lg flex items-center justify-center mr-3">
               <img src={icon} alt="Icone Girafa" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h1 className="text-sm font-semibold text-gray-900">Cresci e Perdi</h1>
-              <p className="text-xs text-gray-500">Sistema Financeiro</p>
+              <h1 className="text-md font-bold text-gray-900">Gestor Financeiro CP</h1>
+              <p className="text-xs text-gray-500">Sistema de Cobranças</p>
             </div>
           </div>
         )}
@@ -234,13 +234,6 @@ export function Sidebar({
             <ChevronLeft className="w-4 h-4 text-gray-500" />
           )}
         </button>
-        
-        {/* Collapsed header */}
-        {collapsed && (
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center">
-            <img src={icon} alt="Icone Girafa" className="w-full h-full object-contain" />
-          </div>
-        )}
       </div>
 
       {/* Navigation */}
@@ -261,7 +254,7 @@ export function Sidebar({
                 onClick={() => { onTabChange(item.id); setMobileOpen(false); }}
                 className={`w-full flex items-center px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
                   isActive
-                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                    ? "bg-[#fe97210c] text-[#fe9821] border border-[#fe9821]"
                     : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                 }`}
                 title={collapsed ? item.label : undefined}
@@ -282,15 +275,15 @@ export function Sidebar({
                   </div>
                 )}
                 {isActive && (
-                  <div className="absolute right-2 w-1.5 h-1.5 bg-blue-600 rounded-full"></div>
+                  <div className="absolute right-2 w-1.5 h-1.5 bg-[#fe9821] rounded-full"></div>
                 )}
               </button>
 
               {/* Tooltip for collapsed state */}
               {collapsed && (
-                <div className="absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-900 text-white px-3 py-2 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+                <div className="absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-[#fe9821] text-white px-3 py-2 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
                   <div className="font-medium text-sm">{item.label}</div>
-                  <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-900"></div>
+                  <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-[#fe9821]"></div>
                 </div>
               )}
             </div>
@@ -313,7 +306,7 @@ export function Sidebar({
                 onClick={() => { onTabChange(item.id); setMobileOpen(false); }}
                 className={`w-full flex items-center px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
                   isActive
-                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                    ? "bg-[#fe97210c] text-[#fe9821] border border-[#fe9821]"
                     : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                 }`}
                 title={collapsed ? item.label : undefined}
@@ -334,15 +327,15 @@ export function Sidebar({
                   </div>
                 )}
                 {isActive && (
-                  <div className="absolute right-2 w-1.5 h-1.5 bg-blue-600 rounded-full"></div>
+                  <div className="absolute right-2 w-1.5 h-1.5 bg-[#fe9821] rounded-full"></div>
                 )}
               </button>
 
               {/* Tooltip for collapsed state */}
               {collapsed && (
-                <div className="absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-900 text-white px-3 py-2 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+                <div className="absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-[#fe9821] text-white px-3 py-2 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
                   <div className="font-medium text-sm">{item.label}</div>
-                  <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-900"></div>
+                  <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-[#fe9821]"></div>
                 </div>
               )}
             </div>
@@ -439,7 +432,7 @@ export function Sidebar({
       </nav>
 
       {/* Footer com perfil do usuário */}
-      <div className="p-4 border-t border-gray-100">
+      <div className="p-3 border-t border-gray-100">
         {!collapsed ? (
           <div className="relative">
             <button
@@ -451,10 +444,10 @@ export function Sidebar({
                   <img
                     src={user.avatar_url}
                     alt={user.name}
-                    className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 mr-3"
+                    className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 mr-3"
                   />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mr-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mr-3">
                     <span className="text-white text-sm font-semibold">
                       {user ? getInitials(user.name) : "CP"}
                     </span>
