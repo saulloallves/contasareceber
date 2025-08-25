@@ -82,10 +82,6 @@ export function GestaoUsuarios() {
     setModalAberto('permissoes');
   };
 
-  const abrirModalLogs = (usuario: Usuario) => {
-    setUsuarioSelecionado(usuario);
-    setModalAberto('logs');
-  };
 
   const fecharModal = () => {
     setModalAberto(null);
@@ -556,13 +552,6 @@ export function GestaoUsuarios() {
                                 title="Configurar permissões"
                               >
                                 <Settings className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => abrirModalLogs(usuario)}
-                                className="text-gray-600 hover:text-gray-900"
-                                title="Ver logs"
-                              >
-                                <Eye className="w-4 h-4" />
                               </button>
                               {isOnline && (
                                 <button
