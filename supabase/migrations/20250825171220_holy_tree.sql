@@ -11,19 +11,6 @@
     - Corrige lógica de sessões online
 */
 
--- Limpa todas as sessões inativas para começar limpo
-DELETE FROM sessoes_usuario WHERE ativa = false;
-
--- Limpa sessões muito antigas (mais de 24 horas)
-DELETE FROM sessoes_usuario 
-WHERE data_ultimo_acesso < NOW() - INTERVAL '24 hours';
-
--- Desativa sessões que não tiveram heartbeat nos últimos 10 minutos
-UPDATE sessoes_usuario 
-SET ativa = false 
-WHERE ativa = true 
-  AND data_ultimo_acesso < NOW() - INTERVAL '10 minutes';
-
 -- Adiciona índice para melhorar performance das consultas de usuários online
 CREATE INDEX IF NOT EXISTS idx_sessoes_usuario_online 
 ON sessoes_usuario (ativa, data_ultimo_acesso DESC) 
