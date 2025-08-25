@@ -26,7 +26,6 @@ function AppContent() {
   const { user, loading } = useAuth();
   const { profile } = useUserProfile(user?.id);
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [isInitialized, setIsInitialized] = useState(false);
 
   // Monitora status de conexão
   useEffect(() => {
@@ -39,7 +38,6 @@ function AppContent() {
     return removeListener;
   }, []);
 
-  // Simula dados do usuário logado
   // Mapeia o nível de permissão do usuário para as permissões do sistema
   const getUserPermissions = (nivelPermissao: string): string[] => {
     const permissionsMap: Record<string, string[]> = {
@@ -75,57 +73,18 @@ function AppContent() {
       }
     : undefined;
 
-  // Debug logs
-  useEffect(() => {
-    console.log("🔍 App State:", {
-      hasUser: !!user,
-      hasProfile: !!profile,
-      loading,
-      isInitialized,
-      userEmail: user?.email,
-      profileName: profile?.nome_completo,
-    });
-  }, [user, profile, loading, isInitialized]);
-
-  // Controla inicialização para evitar loops
-  useEffect(() => {
-    if (!loading) {
-      // Se tem usuário, inicializa imediatamente (não aguarda perfil)
-      if (user) {
-        console.log('✅ Usuário logado, inicializando sistema...');
-        setIsInitialized(true);
-      } else {
-        // Se não tem usuário, também inicializa (vai mostrar tela de login)
-        console.log('❌ Usuário não logado, inicializando tela de login...');
-        setIsInitialized(true);
-      }
-    }
-  }, [loading, user]);
-
-  // Timer de segurança mais curto para evitar loops
-  useEffect(() => {
-    const forceInitTimer = setTimeout(() => {
-      if (!isInitialized) {
-        console.warn('⚠️ Forçando inicialização após 3 segundos');
-        setIsInitialized(true);
-      }
-    }, 3000); // Reduzido de 10s para 3s
-      
-    return () => clearTimeout(forceInitTimer);
-  }, [isInitialized]);
-
-  // Se ainda está carregando ou não foi inicializado, mostra loading
-  if (loading || !isInitialized) {
+  // Se ainda está carregando, mostra loading
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">
-            {loading ? 'Carregando sistema...' : 'Inicializando aplicação...'}
+            Carregando sistema...
           </p>
           {user && (
             <p className="text-xs text-gray-400 mt-2">
-              Carregando perfil de {user.email}...
+              Usuário: {user.email}
             </p>
           )}
         </div>

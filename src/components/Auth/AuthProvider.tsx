@@ -18,29 +18,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('🎧 Configurando listener de auth state...');
-    
     // Inicia monitoramento de conexão
     connectionService.startMonitoring();
     
-    // Flag global para evitar múltiplas inicializações
-    const initKey = 'auth_initializing';
-    
     // Busca sessão inicial e define loading como false
     const initializeAuth = async () => {
-      // Verifica se já está inicializando
-      if (sessionStorage.getItem(initKey)) {
-        console.log('🔒 Auth já inicializando, aguardando...');
-        return;
-      }
-      
-      sessionStorage.setItem(initKey, 'true');
-      
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('❌ Erro ao buscar sessão:', error);
+          console.warn('Erro ao buscar sessão:', error);
         }
         
         setUser(session?.user ?? null);
@@ -48,20 +35,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Se há sessão ativa, cria sessão no sistema apenas uma vez
         if (session?.user) {
           try {
-            console.log('🔄 Criando sessão inicial para usuário logado...');
             await sessaoService.criarSessao(session.user.id);
-            console.log('✅ Sessão inicial criada');
           } catch (error) {
-            console.warn('⚠️ Erro ao criar sessão inicial:', error);
+            console.warn('Erro ao criar sessão inicial:', error);
           }
         }
       } catch (error) {
-        console.error('❌ Erro na inicialização:', error);
+        console.error('Erro na inicialização:', error);
         setUser(null);
       } finally {
-        // SEMPRE define loading como false, independente do resultado
         setLoading(false);
-        sessionStorage.removeItem(initKey);
       }
     };
     
@@ -70,18 +53,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listener para mudanças de estado
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔄 Auth state change:', event, session?.user?.email || 'Nenhum usuário');
-        
         setUser(session?.user ?? null);
         
-        // Cria sessão apenas no login bem-sucedido e se não foi criada na inicialização
+        // Cria sessão apenas no login bem-sucedido
         if (event === 'SIGNED_IN' && session?.user) {
-          console.log('✅ Login detectado, criando sessão...');
           try {
             await sessaoService.criarSessao(session.user.id);
-            console.log('✅ Sessão criada com sucesso');
           } catch (error) {
-            console.warn('⚠️ Erro ao criar sessão no login:', error);
+            console.warn('Erro ao criar sessão no login:', error);
           }
         }
         
@@ -90,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             await sessaoService.encerrarSessao();
           } catch (error) {
-            console.warn('⚠️ Erro ao encerrar sessão:', error);
+            console.warn('Erro ao encerrar sessão:', error);
           }
         }
       }
@@ -99,12 +78,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
       connectionService.stopMonitoring();
-      sessionStorage.removeItem(initKey);
     };
   }, []);
 
   const signOut = async () => {
-    console.log('🚪 Iniciando logout...');
     try {
       // Para monitoramento de conexão
       connectionService.stopMonitoring();
@@ -119,7 +96,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshUser = () => {
-    console.log('🔄 Forçando refresh do usuário...');
     window.location.reload();
   };
 
