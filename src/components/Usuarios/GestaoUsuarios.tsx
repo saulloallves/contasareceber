@@ -228,7 +228,8 @@ export function GestaoUsuarios() {
       fecharModal();
       carregarDados();
     } catch (e) {
-      alert(`Erro ao salvar usuário: ${e}`);
+     const errorMessage = e instanceof Error ? e.message : String(e);
+     alert(`Erro ao salvar usuário: ${errorMessage}`);
     }
   };
 
