@@ -116,6 +116,71 @@ export interface ConfiguracaoSistema {
   updated_at?: string;
 }
 
+export interface ConfiguracaoSeguranca {
+  id: string;
+  // Políticas de Senha
+  senha_comprimento_minimo: number;
+  senha_requer_maiuscula: boolean;
+  senha_requer_minuscula: boolean;
+  senha_requer_numero: boolean;
+  senha_requer_especial: boolean;
+  senha_expiracao_dias: number;
+  senha_historico_bloqueio: number;
+  
+  // Bloqueio por Tentativas
+  max_tentativas_login: number;
+  duracao_bloqueio_minutos: number;
+  reset_tentativas_apos_minutos: number;
+  
+  // Controle de IP
+  ip_whitelist_ativo: boolean;
+  ips_permitidos: string[];
+  ip_blacklist_ativo: boolean;
+  ips_bloqueados: string[];
+  
+  // Configurações Gerais
+  timeout_sessao_minutos: number;
+  log_tentativas_falhas: boolean;
+  notificar_admin_tentativas: boolean;
+  email_notificacao_admin: string;
+  
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TentativaLogin {
+  id?: string;
+  email_tentativa: string;
+  ip_origem: string;
+  user_agent?: string;
+  sucesso: boolean;
+  motivo_falha?: string;
+  data_tentativa: string;
+  bloqueado_automaticamente?: boolean;
+}
+
+export interface IPBloqueado {
+  id?: string;
+  endereco_ip: string;
+  motivo_bloqueio: string;
+  bloqueado_por: string;
+  data_bloqueio: string;
+  data_expiracao?: string;
+  ativo: boolean;
+}
+
+export interface AlertaSeguranca {
+  id?: string;
+  tipo: 'tentativa_brute_force' | 'ip_suspeito' | 'login_fora_horario' | 'multiplas_sessoes';
+  titulo: string;
+  descricao: string;
+  ip_origem?: string;
+  usuario_afetado?: string;
+  data_deteccao: string;
+  resolvido: boolean;
+  acao_tomada?: string;
+}
+
 export interface PermissaoUsuario {
   nivel: string;
   descricao: string;

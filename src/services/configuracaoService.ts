@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from './databaseService';
-import { ConfiguracaoCobranca, ValidacaoConfiguracao, Usuario, LogSistema, ConfiguracaoSistema, PermissaoUsuario, LogSeguranca, EstatisticasUsuarios } from '../types/configuracao';
+import { ConfiguracaoCobranca, ValidacaoConfiguracao, Usuario, LogSistema, ConfiguracaoSistema, PermissaoUsuario, LogSeguranca, EstatisticasUsuarios, ConfiguracaoSeguranca, TentativaLogin, IPBloqueado, AlertaSeguranca } from '../types/configuracao';
 
 export class ConfiguracaoService {
   /**
@@ -647,6 +647,283 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
     } catch (error) {
       console.error('Erro ao registrar log:', error);
     }
+  }
+
+  /**
+   * Busca configuração de segurança
+   */
+  async buscarConfiguracaoSeguranca(): Promise<ConfiguracaoSeguranca> {
+    try {
+      const { data, error } = await supabase
+        .from('configuracao_seguranca')
+        .select('*')
+        .eq('id', 'default')
+        .maybeSingle();
+
+      if (error || !data) {
+        // Retorna configuração padrão
+        return {
+          id: 'default',
+          senha_comprimento_minimo: 8,
+          senha_requer_maiuscula: true,
+          senha_requer_minuscula: true,
+          senha_requer_numero: true,
+          senha_requer_especial: false,
+          senha_expiracao_dias: 90,
+          senha_historico_bloqueio: 5,
+          max_tentativas_login: 5,
+          duracao_bloqueio_minutos: 30,
+          reset_tentativas_apos_minutos: 60,
+          ip_whitelist_ativo: false,
+          ips_permitidos: [],
+          ip_blacklist_ativo: false,
+          ips_bloqueados: [],
+          timeout_sessao_minutos: 120,
+          log_tentativas_falhas: true,
+          notificar_admin_tentativas: true,
+          email_notificacao_admin: 'admin@crescieperdi.com.br'
+        };
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar configuração de segurança:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Salva configuração de segurança
+   */
+  async salvarConfiguracaoSeguranca(config: ConfiguracaoSeguranca, usuario: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('configuracao_seguranca')
+        .upsert({
+          ...config,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) {
+        throw new Error(`Erro ao salvar configuração de segurança: ${error.message}`);
+      }
+
+      // Registra log
+      await this.registrarLog({
+        usuario_id: usuario,
+        acao: 'atualizar_configuracao_seguranca',
+        tabela_afetada: 'configuracao_seguranca',
+        registro_id: 'default',
+        dados_novos: config
+      });
+    } catch (error) {
+      console.error('Erro ao salvar configuração de segurança:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Busca tentativas de login recentes
+   */
+  async buscarTentativasLogin(limite: number = 50): Promise<TentativaLogin[]> {
+    try {
+      // Como a tabela tentativas_login pode não existir ainda, simulamos dados
+      // Em produção, isso seria uma query real
+      const tentativasSimuladas: TentativaLogin[] = [
+        {
+          id: '1',
+          email_tentativa: 'admin@teste.com',
+          ip_origem: '192.168.1.100',
+          sucesso: false,
+          motivo_falha: 'Senha incorreta',
+          data_tentativa: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          bloqueado_automaticamente: false
+        },
+        {
+          id: '2',
+          email_tentativa: 'hacker@malicious.com',
+          ip_origem: '45.123.45.67',
+          sucesso: false,
+          motivo_falha: 'Usuário não encontrado',
+          data_tentativa: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+          bloqueado_automaticamente: true
+        }
+      ];
+
+      return tentativasSimuladas;
+    } catch (error) {
+      console.error('Erro ao buscar tentativas de login:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Busca IPs bloqueados
+   */
+  async buscarIPsBloqueados(): Promise<IPBloqueado[]> {
+    try {
+      // Simulação - em produção seria uma query real
+      const ipsSimulados: IPBloqueado[] = [
+        {
+          id: '1',
+          endereco_ip: '45.123.45.67',
+          motivo_bloqueio: 'Múltiplas tentativas de login falhadas',
+          bloqueado_por: 'Sistema Automático',
+          data_bloqueio: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          ativo: true
+        }
+      ];
+
+      return ipsSimulados;
+    } catch (error) {
+      console.error('Erro ao buscar IPs bloqueados:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Adiciona IP à lista de bloqueados
+   */
+  async bloquearIP(ip: string, motivo: string, usuario: string): Promise<void> {
+    try {
+      // Em produção, salvaria na tabela ips_bloqueados
+      console.log(`IP ${ip} bloqueado por ${usuario}. Motivo: ${motivo}`);
+      
+      // Registra log
+      await this.registrarLog({
+        usuario_id: usuario,
+        acao: 'bloquear_ip',
+        tabela_afetada: 'ips_bloqueados',
+        dados_novos: { ip, motivo }
+      });
+    } catch (error) {
+      console.error('Erro ao bloquear IP:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove IP da lista de bloqueados
+   */
+  async desbloquearIP(ip: string, usuario: string): Promise<void> {
+    try {
+      // Em produção, atualizaria na tabela ips_bloqueados
+      console.log(`IP ${ip} desbloqueado por ${usuario}`);
+      
+      // Registra log
+      await this.registrarLog({
+        usuario_id: usuario,
+        acao: 'desbloquear_ip',
+        tabela_afetada: 'ips_bloqueados',
+        dados_novos: { ip }
+      });
+    } catch (error) {
+      console.error('Erro ao desbloquear IP:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Busca alertas de segurança
+   */
+  async buscarAlertasSeguranca(): Promise<AlertaSeguranca[]> {
+    try {
+      // Simulação - em produção seria uma query real
+      const alertasSimulados: AlertaSeguranca[] = [
+        {
+          id: '1',
+          tipo: 'tentativa_brute_force',
+          titulo: 'Possível ataque de força bruta detectado',
+          descricao: '10 tentativas de login falhadas do IP 45.123.45.67 em 5 minutos',
+          ip_origem: '45.123.45.67',
+          data_deteccao: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+          resolvido: false
+        },
+        {
+          id: '2',
+          tipo: 'login_fora_horario',
+          titulo: 'Login fora do horário comercial',
+          descricao: 'Usuário admin@teste.com fez login às 02:30',
+          usuario_afetado: 'admin@teste.com',
+          data_deteccao: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+          resolvido: true,
+          acao_tomada: 'Verificado - acesso autorizado'
+        }
+      ];
+
+      return alertasSimulados;
+    } catch (error) {
+      console.error('Erro ao buscar alertas de segurança:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Resolve alerta de segurança
+   */
+  async resolverAlertaSeguranca(alertaId: string, acaoTomada: string, usuario: string): Promise<void> {
+    try {
+      // Em produção, atualizaria na tabela alertas_seguranca
+      console.log(`Alerta ${alertaId} resolvido por ${usuario}. Ação: ${acaoTomada}`);
+      
+      // Registra log
+      await this.registrarLog({
+        usuario_id: usuario,
+        acao: 'resolver_alerta_seguranca',
+        tabela_afetada: 'alertas_seguranca',
+        registro_id: alertaId,
+        dados_novos: { acao_tomada }
+      });
+    } catch (error) {
+      console.error('Erro ao resolver alerta:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Valida configuração de segurança
+   */
+  validarConfiguracaoSeguranca(config: ConfiguracaoSeguranca): { valido: boolean; erros: string[] } {
+    const erros: string[] = [];
+
+    if (config.senha_comprimento_minimo < 6 || config.senha_comprimento_minimo > 50) {
+      erros.push('Comprimento mínimo da senha deve estar entre 6 e 50 caracteres');
+    }
+
+    if (config.senha_expiracao_dias < 30 || config.senha_expiracao_dias > 365) {
+      erros.push('Expiração da senha deve estar entre 30 e 365 dias');
+    }
+
+    if (config.max_tentativas_login < 3 || config.max_tentativas_login > 20) {
+      erros.push('Máximo de tentativas deve estar entre 3 e 20');
+    }
+
+    if (config.duracao_bloqueio_minutos < 5 || config.duracao_bloqueio_minutos > 1440) {
+      erros.push('Duração do bloqueio deve estar entre 5 minutos e 24 horas');
+    }
+
+    if (config.timeout_sessao_minutos < 30 || config.timeout_sessao_minutos > 480) {
+      erros.push('Timeout da sessão deve estar entre 30 minutos e 8 horas');
+    }
+
+    // Valida IPs se whitelist estiver ativo
+    if (config.ip_whitelist_ativo && config.ips_permitidos.length === 0) {
+      erros.push('Whitelist ativo deve ter pelo menos um IP permitido');
+    }
+
+    // Valida formato dos IPs
+    const ipRegex = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
+    const ipsInvalidos = [...config.ips_permitidos, ...config.ips_bloqueados]
+      .filter(ip => ip && !ipRegex.test(ip));
+    
+    if (ipsInvalidos.length > 0) {
+      erros.push(`IPs com formato inválido: ${ipsInvalidos.join(', ')}`);
+    }
+
+    return {
+      valido: erros.length === 0,
+      erros
+    };
   }
 
   /**

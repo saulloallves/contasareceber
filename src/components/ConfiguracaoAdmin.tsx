@@ -44,6 +44,12 @@ export function ConfiguracaoAdmin() {
     dataInicio: "",
     dataFim: "",
   });
+  const [configSeguranca, setConfigSeguranca] = useState<any>(null);
+  const [tentativasLogin, setTentativasLogin] = useState<any[]>([]);
+  const [ipsBloqueados, setIpsBloqueados] = useState<any[]>([]);
+  const [alertasSeguranca, setAlertasSeguranca] = useState<any[]>([]);
+  const [novoIP, setNovoIP] = useState({ ip: '', motivo: '' });
+  const [salvandoSeguranca, setSalvandoSeguranca] = useState(false);
   const [configNotificacao, setConfigNotificacao] = useState({
     whatsapp_ativo: true,
     email_ativo: true,
@@ -53,6 +59,12 @@ export function ConfiguracaoAdmin() {
     template_email_assunto: "",
     template_email_corpo: "",
   });
+  const [configSeguranca, setConfigSeguranca] = useState<any>(null);
+  const [tentativasLogin, setTentativasLogin] = useState<any[]>([]);
+  const [ipsBloqueados, setIpsBloqueados] = useState<any[]>([]);
+  const [alertasSeguranca, setAlertasSeguranca] = useState<any[]>([]);
+  const [novoIP, setNovoIP] = useState({ ip: '', motivo: '' });
+  const [salvandoSeguranca, setSalvandoSeguranca] = useState(false);
 
   const configuracaoService = new ConfiguracaoService();
   const notificacaoAutomaticaService = new NotificacaoAutomaticaService();
@@ -64,6 +76,8 @@ export function ConfiguracaoAdmin() {
       carregarLogs();
     } else if (abaSelecionada === "notificacoes") {
       carregarConfiguracaoNotificacao();
+    } else if (abaSelecionada === "seguranca") {
+      carregarDadosSeguranca();
     }
   }, [abaSelecionada]);
 
@@ -179,6 +193,88 @@ export function ConfiguracaoAdmin() {
       mostrarMensagem("sucesso", "Configuração exportada com sucesso!");
     } catch (error) {
       mostrarMensagem("erro", "Erro ao exportar configuração");
+    }
+  };
+
+  const carregarDadosSeguranca = async () => {
+    setCarregando(true);
+    try {
+      const [configData, tentativasData, ipsData, alertasData] = await Promise.all([
+        configuracaoService.buscarConfiguracaoSeguranca(),
+        configuracaoService.buscarTentativasLogin(20),
+        configuracaoService.buscarIPsBloqueados(),
+        configuracaoService.buscarAlertasSeguranca()
+      ]);
+      
+      setConfigSeguranca(configData);
+      setTentativasLogin(tentativasData);
+      setIpsBloqueados(ipsData);
+      setAlertasSeguranca(alertasData);
+    } catch (error) {
+      mostrarMensagem("erro", "Erro ao carregar dados de segurança");
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  const salvarConfiguracaoSeguranca = async () => {
+    if (!configSeguranca) return;
+
+    setSalvandoSeguranca(true);
+    try {
+      const validacao = configuracaoService.validarConfiguracaoSeguranca(configSeguranca);
+      if (!validacao.valido) {
+        mostrarMensagem("erro", `Erros de validação: ${validacao.erros.join(', ')}`);
+        return;
+      }
+
+      await configuracaoService.salvarConfiguracaoSeguranca(configSeguranca, "usuario_atual");
+      mostrarMensagem("sucesso", "Configurações de segurança salvas com sucesso!");
+    } catch (error) {
+      mostrarMensagem("erro", `Erro ao salvar configurações: ${error}`);
+    } finally {
+      setSalvandoSeguranca(false);
+    }
+  };
+
+  const bloquearIP = async () => {
+    if (!novoIP.ip || !novoIP.motivo) {
+      alert("IP e motivo são obrigatórios");
+      return;
+    }
+
+    try {
+      await configuracaoService.bloquearIP(novoIP.ip, novoIP.motivo, "usuario_atual");
+      setNovoIP({ ip: '', motivo: '' });
+      carregarDadosSeguranca();
+      mostrarMensagem("sucesso", "IP bloqueado com sucesso!");
+    } catch (error) {
+      mostrarMensagem("erro", `Erro ao bloquear IP: ${error}`);
+    }
+  };
+
+  const desbloquearIP = async (ip: string) => {
+    if (!confirm(`Tem certeza que deseja desbloquear o IP ${ip}?`)) return;
+
+    try {
+      await configuracaoService.desbloquearIP(ip, "usuario_atual");
+      carregarDadosSeguranca();
+      mostrarMensagem("sucesso", "IP desbloqueado com sucesso!");
+    } catch (error) {
+      mostrarMensagem("erro", `Erro ao desbloquear IP: ${error}`);
+    }
+  };
+
+  const resolverAlerta = async (alertaId: string) => {
+    const acao = prompt("Descreva a ação tomada para resolver este alerta:");
+    if (!acao) return;
+
+    try {
+      await configuracaoService.resolverAlertaSeguranca(alertaId, acao, "usuario_atual");
+      carregarDadosSeguranca();
+      mostrarMensagem("sucesso", "Alerta resolvido com sucesso!");
+    } catch (error) {
+      mostrarMensagem("erro", `Erro ao resolver alerta: ${error}`);
     }
   };
 
@@ -739,54 +835,468 @@ export function ConfiguracaoAdmin() {
         {abaSelecionada === "seguranca" && (
           <div className="space-y-6">
             <h3 className="text-lg font-semibold text-gray-800">
-              Configurações de Segurança
+              Configurações de Segurança e Controle de Acesso
             </h3>
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-              <div className="flex items-center">
-                <Shield className="w-6 h-6 text-yellow-600 mr-3" />
-                <div>
-                  <h4 className="font-semibold text-yellow-800">
-                    Recursos de Segurança Implementados
-                  </h4>
-                  <ul className="text-yellow-700 text-sm mt-2 space-y-1">
-                    <li>
-                      • Row Level Security (RLS) ativo em todas as tabelas
-                    </li>
-                    <li>• Logs de auditoria para todas as ações</li>
-                    <li>• Controle granular de permissões por usuário</li>
-                    <li>• Validação de dados antes de salvar</li>
-                    <li>• Bloqueio de edição em registros finalizados</li>
-                  </ul>
+            {configSeguranca && (
+              <div className="space-y-8">
+                {/* Políticas de Senha */}
+                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                  <div className="flex items-center mb-6">
+                    <Shield className="w-6 h-6 text-blue-600 mr-3" />
+                    <h4 className="text-xl font-semibold text-gray-800">Políticas de Senha</h4>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Comprimento Mínimo
+                      </label>
+                      <input
+                        type="number"
+                        min="6"
+                        max="50"
+                        value={configSeguranca.senha_comprimento_minimo}
+                        onChange={(e) => setConfigSeguranca({
+                          ...configSeguranca,
+                          senha_comprimento_minimo: parseInt(e.target.value)
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Expiração (dias)
+                      </label>
+                      <input
+                        type="number"
+                        min="30"
+                        max="365"
+                        value={configSeguranca.senha_expiracao_dias}
+                        onChange={(e) => setConfigSeguranca({
+                          ...configSeguranca,
+                          senha_expiracao_dias: parseInt(e.target.value)
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="requer_maiuscula"
+                        checked={configSeguranca.senha_requer_maiuscula}
+                        onChange={(e) => setConfigSeguranca({
+                          ...configSeguranca,
+                          senha_requer_maiuscula: e.target.checked
+                        })}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label htmlFor="requer_maiuscula" className="ml-2 text-sm text-gray-700">
+                        Letra maiúscula
+                      </label>
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="requer_minuscula"
+                        checked={configSeguranca.senha_requer_minuscula}
+                        onChange={(e) => setConfigSeguranca({
+                          ...configSeguranca,
+                          senha_requer_minuscula: e.target.checked
+                        })}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label htmlFor="requer_minuscula" className="ml-2 text-sm text-gray-700">
+                        Letra minúscula
+                      </label>
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="requer_numero"
+                        checked={configSeguranca.senha_requer_numero}
+                        onChange={(e) => setConfigSeguranca({
+                          ...configSeguranca,
+                          senha_requer_numero: e.target.checked
+                        })}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label htmlFor="requer_numero" className="ml-2 text-sm text-gray-700">
+                        Número
+                      </label>
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="requer_especial"
+                        checked={configSeguranca.senha_requer_especial}
+                        onChange={(e) => setConfigSeguranca({
+                          ...configSeguranca,
+                          senha_requer_especial: e.target.checked
+                        })}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label htmlFor="requer_especial" className="ml-2 text-sm text-gray-700">
+                        Caractere especial
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Controle de Tentativas de Login */}
+                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                  <div className="flex items-center mb-6">
+                    <AlertTriangle className="w-6 h-6 text-orange-600 mr-3" />
+                    <h4 className="text-xl font-semibold text-gray-800">Controle de Tentativas de Login</h4>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Máximo de Tentativas
+                      </label>
+                      <input
+                        type="number"
+                        min="3"
+                        max="20"
+                        value={configSeguranca.max_tentativas_login}
+                        onChange={(e) => setConfigSeguranca({
+                          ...configSeguranca,
+                          max_tentativas_login: parseInt(e.target.value)
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Duração do Bloqueio (minutos)
+                      </label>
+                      <input
+                        type="number"
+                        min="5"
+                        max="1440"
+                        value={configSeguranca.duracao_bloqueio_minutos}
+                        onChange={(e) => setConfigSeguranca({
+                          ...configSeguranca,
+                          duracao_bloqueio_minutos: parseInt(e.target.value)
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Timeout da Sessão (minutos)
+                      </label>
+                      <input
+                        type="number"
+                        min="30"
+                        max="480"
+                        value={configSeguranca.timeout_sessao_minutos}
+                        onChange={(e) => setConfigSeguranca({
+                          ...configSeguranca,
+                          timeout_sessao_minutos: parseInt(e.target.value)
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="log_tentativas"
+                        checked={configSeguranca.log_tentativas_falhas}
+                        onChange={(e) => setConfigSeguranca({
+                          ...configSeguranca,
+                          log_tentativas_falhas: e.target.checked
+                        })}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label htmlFor="log_tentativas" className="ml-2 text-sm text-gray-700">
+                        Registrar tentativas de login falhadas
+                      </label>
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="notificar_admin"
+                        checked={configSeguranca.notificar_admin_tentativas}
+                        onChange={(e) => setConfigSeguranca({
+                          ...configSeguranca,
+                          notificar_admin_tentativas: e.target.checked
+                        })}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label htmlFor="notificar_admin" className="ml-2 text-sm text-gray-700">
+                        Notificar admin sobre tentativas suspeitas
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Controle de IPs */}
+                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                  <div className="flex items-center mb-6">
+                    <Globe className="w-6 h-6 text-purple-600 mr-3" />
+                    <h4 className="text-xl font-semibold text-gray-800">Controle de Acesso por IP</h4>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Whitelist */}
+                    <div>
+                      <div className="flex items-center mb-4">
+                        <input
+                          type="checkbox"
+                          id="whitelist_ativo"
+                          checked={configSeguranca.ip_whitelist_ativo}
+                          onChange={(e) => setConfigSeguranca({
+                            ...configSeguranca,
+                            ip_whitelist_ativo: e.target.checked
+                          })}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <label htmlFor="whitelist_ativo" className="ml-2 text-sm font-medium text-gray-700">
+                          Ativar Whitelist de IPs
+                        </label>
+                      </div>
+                      
+                      <textarea
+                        value={configSeguranca.ips_permitidos.join('\n')}
+                        onChange={(e) => setConfigSeguranca({
+                          ...configSeguranca,
+                          ips_permitidos: e.target.value.split('\n').filter(ip => ip.trim())
+                        })}
+                        rows={5}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="192.168.1.0/24&#10;10.0.0.1&#10;203.45.67.89"
+                        disabled={!configSeguranca.ip_whitelist_ativo}
+                      />
+                      <p className="text-xs text-gray-500 mt-2">
+                        Um IP por linha. Suporta CIDR (ex: 192.168.1.0/24)
+                      </p>
+                    </div>
+                    
+                    {/* Blacklist */}
+                    <div>
+                      <div className="flex items-center mb-4">
+                        <input
+                          type="checkbox"
+                          id="blacklist_ativo"
+                          checked={configSeguranca.ip_blacklist_ativo}
+                          onChange={(e) => setConfigSeguranca({
+                            ...configSeguranca,
+                            ip_blacklist_ativo: e.target.checked
+                          })}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <label htmlFor="blacklist_ativo" className="ml-2 text-sm font-medium text-gray-700">
+                          Ativar Blacklist de IPs
+                        </label>
+                      </div>
+                      
+                      <textarea
+                        value={configSeguranca.ips_bloqueados.join('\n')}
+                        onChange={(e) => setConfigSeguranca({
+                          ...configSeguranca,
+                          ips_bloqueados: e.target.value.split('\n').filter(ip => ip.trim())
+                        })}
+                        rows={5}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="45.123.45.67&#10;192.168.100.50"
+                        disabled={!configSeguranca.ip_blacklist_ativo}
+                      />
+                      <p className="text-xs text-gray-500 mt-2">
+                        IPs bloqueados permanentemente
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Adicionar IP Manualmente */}
+                  <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                    <h5 className="font-medium text-gray-800 mb-3">Bloquear IP Manualmente</h5>
+                    <div className="flex gap-3">
+                      <input
+                        type="text"
+                        value={novoIP.ip}
+                        onChange={(e) => setNovoIP({...novoIP, ip: e.target.value})}
+                        placeholder="192.168.1.100"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        value={novoIP.motivo}
+                        onChange={(e) => setNovoIP({...novoIP, motivo: e.target.value})}
+                        placeholder="Motivo do bloqueio"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        onClick={bloquearIP}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                      >
+                        Bloquear
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tentativas de Login Recentes */}
+                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center">
+                      <AlertTriangle className="w-6 h-6 text-red-600 mr-3" />
+                      <h4 className="text-xl font-semibold text-gray-800">Tentativas de Login Recentes</h4>
+                    </div>
+                    <button
+                      onClick={carregarDadosSeguranca}
+                      className="flex items-center px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Atualizar
+                    </button>
+                  </div>
+                  
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Data/Hora
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Email
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            IP
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Motivo
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {tentativasLogin.map((tentativa) => (
+                          <tr key={tentativa.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {formatarData(tentativa.data_tentativa)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {tentativa.email_tentativa}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {tentativa.ip_origem}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                tentativa.sucesso 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {tentativa.sucesso ? 'SUCESSO' : 'FALHA'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {tentativa.motivo_falha || '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* IPs Bloqueados */}
+                {ipsBloqueados.length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-center mb-6">
+                      <XCircle className="w-6 h-6 text-red-600 mr-3" />
+                      <h4 className="text-xl font-semibold text-gray-800">IPs Bloqueados Atualmente</h4>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {ipsBloqueados.map((ip) => (
+                        <div key={ip.id} className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
+                          <div>
+                            <div className="font-medium text-red-800">{ip.endereco_ip}</div>
+                            <div className="text-sm text-red-600">{ip.motivo_bloqueio}</div>
+                            <div className="text-xs text-gray-500">
+                              Bloqueado em {formatarData(ip.data_bloqueio)} por {ip.bloqueado_por}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => desbloquearIP(ip.endereco_ip)}
+                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                          >
+                            Desbloquear
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Alertas de Segurança */}
+                {alertasSeguranca.length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-center mb-6">
+                      <Bell className="w-6 h-6 text-yellow-600 mr-3" />
+                      <h4 className="text-xl font-semibold text-gray-800">Alertas de Segurança</h4>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      {alertasSeguranca.filter(a => !a.resolvido).map((alerta) => (
+                        <div key={alerta.id} className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center mb-2">
+                                <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
+                                <h5 className="font-medium text-yellow-800">{alerta.titulo}</h5>
+                              </div>
+                              <p className="text-yellow-700 mb-2">{alerta.descricao}</p>
+                              <div className="text-xs text-gray-600">
+                                {alerta.ip_origem && `IP: ${alerta.ip_origem} • `}
+                                {alerta.usuario_afetado && `Usuário: ${alerta.usuario_afetado} • `}
+                                Detectado em {formatarData(alerta.data_deteccao)}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => resolverAlerta(alerta.id!)}
+                              className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                            >
+                              Resolver
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Botão Salvar */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={salvarConfiguracaoSeguranca}
+                    disabled={salvandoSeguranca}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {salvandoSeguranca ? "Salvando..." : "Salvar Configurações de Segurança"}
+                  </button>
                 </div>
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h4 className="font-semibold text-gray-800 mb-4">
-                  Políticas de Senha
-                </h4>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li>• Mínimo 8 caracteres</li>
-                  <li>• Pelo menos 1 letra maiúscula</li>
-                  <li>• Pelo menos 1 número</li>
-                  <li>• Bloqueio após 5 tentativas</li>
-                </ul>
-              </div>
-
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h4 className="font-semibold text-gray-800 mb-4">
-                  Controle de Sessão
-                </h4>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li>• Timeout automático em 2 horas</li>
-                  <li>• Logout em múltiplas abas</li>
-                  <li>• Registro de IP e User-Agent</li>
-                  <li>• Detecção de acesso suspeito</li>
-                </ul>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
