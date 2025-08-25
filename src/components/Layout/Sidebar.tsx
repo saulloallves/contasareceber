@@ -71,28 +71,22 @@ export function Sidebar({
       setConnectionStatus(status);
     });
 
-    // Escuta em tempo real para novos alertas (apenas se conectado)
-    let channel: any = null;
-    if (connectionStatus.isConnected) {
-      channel = supabase
-        .channel("alertas_sistema_sidebar")
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "alertas_sistema" },
-          () => {
-            fetchAlertas();
-          }
-        )
-        .subscribe();
-    }
+    // Escuta em tempo real para novos alertas
+    const alertasChannel = supabase
+      .channel("alertas_sistema_sidebar")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "alertas_sistema" },
+        () => {
+          fetchAlertas();
+        }
+      )
+      .subscribe();
 
     return () => {
       removeConnectionListener();
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
+      supabase.removeChannel(alertasChannel);
     };
-  }, [connectionStatus.isConnected]);
 
   const handleLogout = async () => {
     setLoggingOut(true);

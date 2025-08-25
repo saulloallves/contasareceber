@@ -52,7 +52,7 @@ export class SessaoService {
         console.log('✅ Sessão existente válida, reutilizando...');
         // Atualiza último acesso da sessão existente
         await this.atualizarUltimoAcesso(existingToken);
-        this.iniciarHeartbeat(existingToken);
+        this.iniciarMonitoramentoAtividade(existingToken);
         return existingToken;
       } else {
         console.log('⚠️ Sessão no sessionStorage inválida, removendo...');
@@ -103,8 +103,8 @@ export class SessaoService {
       sessionStorage.setItem(sessionKey, tokenSessao);
       localStorage.setItem('session_token', tokenSessao);
 
-      // Inicia heartbeat para manter sessão ativa
-      this.iniciarHeartbeat(tokenSessao);
+      // Inicia monitoramento de atividade para manter sessão ativa
+      this.iniciarMonitoramentoAtividade(tokenSessao);
 
       return tokenSessao;
     } catch (error) {
@@ -121,7 +121,7 @@ export class SessaoService {
       const token = tokenSessao || localStorage.getItem('session_token');
       if (!token) return;
 
-      // console.log('💓 Atualizando heartbeat para token:', token.substring(0, 20) + '...');
+      console.log('💓 Atualizando último acesso para token:', token.substring(0, 20) + '...');
       
       const { error } = await supabase
         .from('sessoes_usuario')
@@ -134,7 +134,7 @@ export class SessaoService {
       if (error) {
         console.warn('⚠️ Erro ao atualizar último acesso:', error);
       } else {
-        // console.log('✅ Heartbeat atualizado com sucesso');
+        console.log('✅ Último acesso atualizado com sucesso');
       }
     } catch (error) {
       console.warn('⚠️ Erro ao atualizar último acesso:', error);
@@ -174,8 +174,8 @@ export class SessaoService {
       }
       localStorage.removeItem('session_token');
 
-      // Para heartbeat
-      this.pararHeartbeat();
+      // Para monitoramento de atividade
+      this.pararMonitoramentoAtividade();
     } catch (error) {
       console.warn('⚠️ Erro ao encerrar sessão:', error);
     }
@@ -387,21 +387,53 @@ export class SessaoService {
 
   private heartbeatInterval: number | null = null;
 
-  private iniciarHeartbeat(tokenSessao: string): void {
-    // Para heartbeat anterior se existir
-    this.pararHeartbeat();
+  private activityListeners: (() => void)[] = [];
+  private lastActivityUpdate = 0;
+  private readonly ACTIVITY_DEBOUNCE_MS = 30000; // 30 segundos
 
-    console.log('💓 Iniciando heartbeat para token:', tokenSessao.substring(0, 20) + '...');
+  private iniciarMonitoramentoAtividade(tokenSessao: string): void {
+    console.log('👁️ Iniciando monitoramento de atividade para token:', tokenSessao.substring(0, 20) + '...');
     
-    // Atualiza último acesso a cada 60 segundos (sessão expira em 120s)
-    this.heartbeatInterval = window.setInterval(() => {
+    // Remove listeners anteriores
+    this.pararMonitoramentoAtividade();
+    
+    // Função debounced para atualizar último acesso
+    const atualizarComDebounce = () => {
+      const agora = Date.now();
+      if (agora - this.lastActivityUpdate >= this.ACTIVITY_DEBOUNCE_MS) {
+        this.lastActivityUpdate = agora;
+        console.log('🔄 Atividade detectada, atualizando sessão...');
+        this.atualizarUltimoAcesso(tokenSessao);
+      }
+    };
+    
+    // Eventos de atividade do usuário
+    const eventos = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    eventos.forEach(evento => {
+      const listener = () => atualizarComDebounce();
+      document.addEventListener(evento, listener, { passive: true });
+      this.activityListeners.push(() => document.removeEventListener(evento, listener));
+    });
+    
+    // Listener para quando a aba volta ao foco
+    const focusListener = () => {
+      console.log('👁️ Aba voltou ao foco, atualizando sessão...');
       this.atualizarUltimoAcesso(tokenSessao);
-    }, 60 * 1000); // 60 segundos
+    };
+    window.addEventListener('focus', focusListener);
+    this.activityListeners.push(() => window.removeEventListener('focus', focusListener));
     
     // Primeira atualização imediata
     setTimeout(() => {
       this.atualizarUltimoAcesso(tokenSessao);
-    }, 5000); // 5 segundos após login
+    }, 2000); // 2 segundos após login
+  }
+
+  private pararMonitoramentoAtividade(): void {
+    console.log('🛑 Parando monitoramento de atividade');
+    this.activityListeners.forEach(removeListener => removeListener());
+    this.activityListeners = [];
   }
 
   private pararHeartbeat(): void {

@@ -49,20 +49,32 @@ export function GestaoUsuarios() {
     } finally {
       setCarregando(false);
     }
-  }, [abaSelecionada, configuracaoService, filtros]);
+  }, [configuracaoService, filtros]);
 
   useEffect(() => {
     carregarDados();
     
-    // Atualiza dados a cada 15 segundos para manter status online atualizado
-    const interval = setInterval(() => {
-      if (abaSelecionada === 'sessoes' || abaSelecionada === 'usuarios') {
-        carregarDados();
-      }
-    }, 15000); // 15 segundos
+    // Escuta mudanças em tempo real nas sessões
+    const sessoesChannel = supabase
+      .channel('sessoes_usuario_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sessoes_usuario' },
+        (payload) => {
+          console.log('🔄 Mudança detectada em sessões:', payload);
+          // Só recarrega usuários online se estiver na aba de sessões
+          if (abaSelecionada === 'sessoes') {
+            sessaoService.buscarUsuariosOnline().then(setUsuariosOnline);
+            sessaoService.buscarEstatisticasSessoes().then(setEstatisticasSessoes);
+          }
+        }
+      )
+      .subscribe();
 
-    return () => clearInterval(interval);
-  }, [carregarDados]);
+    return () => {
+      supabase.removeChannel(sessoesChannel);
+    };
+  }, [carregarDados, abaSelecionada]);
 
   // removido: usamos a versão memoizada acima
 
