@@ -288,78 +288,27 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
     busca?: string;
   } = {}): Promise<Usuario[]> {
     try {
-      console.log('🔍 Buscando usuários com filtros:', filtros);
+      console.log('🔍 Admin master buscando todos os usuários...');
       
-      // Para admin_master, usa service_role para ver todos os usuários
-      const { data: currentUser } = await supabase.auth.getUser();
-      if (!currentUser.user) {
-        console.warn('⚠️ Usuário não autenticado');
+      // Como esta tela só é acessível por admin_master, usa Edge Function diretamente
+      const { data: edgeData, error: edgeError } = await (supabase as any).functions.invoke('admin-get-users', {
+        body: { filtros }
+      });
+
+      if (edgeError) {
+        console.error('❌ Erro na Edge Function:', edgeError);
+        throw new Error(`Erro ao buscar usuários: ${edgeError.message}`);
+      }
+
+      if (!edgeData?.users) {
+        console.warn('⚠️ Edge Function não retornou usuários');
         return [];
       }
 
-      // Verifica se é admin_master
-      const { data: profile } = await supabase
-        .from('usuarios_sistema')
-        .select('nivel_permissao')
-        .eq('id', currentUser.user.id)
-        .maybeSingle();
-
-      const isAdminMaster = profile?.nivel_permissao === 'admin_master';
-      console.log('👤 Usuário atual é admin_master:', isAdminMaster);
-
-      // Query principal
-      let query = supabase
-        .from('usuarios_sistema')
-        .select('*')
-        .order('nome_completo');
-
-      if (filtros.nivel) {
-        query = query.eq('nivel_permissao', filtros.nivel);
-      }
-
-      if (filtros.ativo !== undefined) {
-        query = query.eq('ativo', filtros.ativo);
-      }
-
-      if (filtros.busca) {
-        query = query.or(`nome_completo.ilike.%${filtros.busca}%,email.ilike.%${filtros.busca}%,cargo.ilike.%${filtros.busca}%`);
-      }
-
-      const { data: directData, error: directError } = await query;
-      
-      if (!directError && directData && directData.length > 0) {
-        console.log('✅ Usuários encontrados via query direta:', directData.length);
-        return directData;
-      }
-      
-      console.warn('⚠️ Query direta falhou ou retornou vazio:', directError?.message);
-      
-      // Se for admin_master e query direta falhou, tenta Edge Function
-      if (isAdminMaster) {
-        console.log('🔄 Admin master detectado, tentando Edge Function...');
-        try {
-          const { data: edgeData, error: edgeError } = await (supabase as any).functions.invoke('admin-get-users', {
-            body: {
-              filtros: filtros
-            }
-          });
-
-          if (!edgeError && edgeData?.users) {
-            console.log('✅ Usuários encontrados via Edge Function:', edgeData.users.length);
-            return edgeData.users;
-          }
-          
-          console.warn('⚠️ Edge Function falhou:', edgeError?.message);
-        } catch (edgeErr) {
-          console.warn('⚠️ Erro na Edge Function:', edgeErr);
-        }
-      }
-      
-      // Se chegou até aqui, algo está errado com as políticas RLS
-      console.error('❌ Não foi possível buscar usuários. Verifique as políticas RLS da tabela usuarios_sistema');
-      throw new Error('Erro ao buscar usuários: verifique as permissões da tabela usuarios_sistema');
+      console.log('✅ Usuários encontrados:', edgeData.users.length);
+      return edgeData.users;
     } catch (error) {
-      console.error('Erro geral ao buscar usuários:', error);
+      console.error('❌ Erro ao buscar usuários:', error);
       throw error;
     }
   }
@@ -369,22 +318,32 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
    */
   async buscarEstatisticasUsuarios(): Promise<EstatisticasUsuarios> {
     try {
-      // Para estatísticas, vamos usar os dados que conseguimos buscar
-      const usuarios = await this.buscarUsuarios();
+      console.log('📊 Buscando estatísticas de usuários...');
       
-      console.log('📊 Calculando estatísticas para:', usuarios?.length || 0, 'usuários');
+      // Usa Edge Function para buscar todos os usuários
+      const { data: edgeData, error: edgeError } = await (supabase as any).functions.invoke('admin-get-users', {
+        body: { filtros: {} }
+      });
+
+      if (edgeError) {
+        console.warn('⚠️ Erro ao buscar usuários para estatísticas:', edgeError);
+        return this.getEstatisticasVazias();
+      }
+
+      const usuarios = edgeData?.users || [];
+      console.log('📊 Calculando estatísticas para:', usuarios.length, 'usuários');
 
       const stats: EstatisticasUsuarios = {
-        total_usuarios: usuarios?.length || 0,
-        usuarios_ativos: usuarios?.filter(u => u.ativo).length || 0,
-        usuarios_inativos: usuarios?.filter(u => !u.ativo).length || 0,
+        total_usuarios: usuarios.length,
+        usuarios_ativos: usuarios.filter((u: any) => u.ativo !== false).length,
+        usuarios_inativos: usuarios.filter((u: any) => u.ativo === false).length,
         por_nivel: {},
         logins_mes_atual: 0, // Será implementado quando logs_seguranca existir
         tentativas_bloqueadas: 0 // Será implementado quando logs_seguranca existir
       };
 
       // Estatísticas por nível
-      usuarios?.forEach(u => {
+      usuarios.forEach((u: any) => {
         stats.por_nivel[u.nivel_permissao] = (stats.por_nivel[u.nivel_permissao] || 0) + 1;
       });
 
@@ -392,14 +351,7 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
       return stats;
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
-      return {
-        total_usuarios: 0,
-        usuarios_ativos: 0,
-        usuarios_inativos: 0,
-        por_nivel: {},
-        logins_mes_atual: 0,
-        tentativas_bloqueadas: 0
-      };
+      return this.getEstatisticasVazias();
     }
   }
 
