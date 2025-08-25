@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { LogIn, UserPlus, X } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
+import { sessaoService } from "../../services/sessaoService";
 import logo from "../../assets/logo-principal.png";
 
 interface SimpleAuthProps {
@@ -49,6 +50,16 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
         console.log('✅ Login bem-sucedido:', data.user?.id);
         // Garantir que existe um perfil na tabela usuarios_sistema
         await ensureUserProfile(data.user);
+        
+        // Cria sessão no sistema
+        try {
+          await sessaoService.criarSessao(data.user.id);
+          console.log('✅ Sessão criada no sistema');
+        } catch (sessionError) {
+          console.warn('⚠️ Erro ao criar sessão:', sessionError);
+          // Não bloqueia o login por erro de sessão
+        }
+        
         onAuthSuccess();
       }
     } catch (err) {
@@ -127,6 +138,15 @@ export function SimpleAuth({ onAuthSuccess }: SimpleAuthProps) {
       }
 
       console.log('✅ Login automático bem-sucedido');
+      
+      // Cria sessão no sistema
+      try {
+        await sessaoService.criarSessao(authData.user.id);
+        console.log('✅ Sessão criada no sistema');
+      } catch (sessionError) {
+        console.warn('⚠️ Erro ao criar sessão:', sessionError);
+      }
+      
       setShowSignUpModal(false);
       onAuthSuccess();
     } catch (err) {

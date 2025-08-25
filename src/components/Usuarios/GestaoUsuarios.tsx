@@ -3,13 +3,16 @@ import {
   Users, Plus, Edit, Eye, Shield,
   CheckCircle, XCircle, Filter,
   RefreshCw, Lock, Unlock, AlertTriangle, Settings,
-  Globe, MapPin, Building2, BarChart3, Download
+  Globe, MapPin, Building2, BarChart3, Download, Wifi, WifiOff, Clock
 } from 'lucide-react';
 import { ConfiguracaoService } from '../../services/configuracaoService';
+import { sessaoService, UsuarioOnline } from '../../services/sessaoService';
 import { Usuario, EstatisticasUsuarios, FiltrosUsuarios, LogSeguranca } from '../../types/configuracao';
 
 export function GestaoUsuarios() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [usuariosOnline, setUsuariosOnline] = useState<UsuarioOnline[]>([]);
+  const [estatisticasSessoes, setEstatisticasSessoes] = useState<any>(null);
   const [estatisticas, setEstatisticas] = useState<EstatisticasUsuarios | null>(null);
   const [logsSeguranca, setLogsSeguranca] = useState<LogSeguranca[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -17,7 +20,7 @@ export function GestaoUsuarios() {
   const [usuarioSelecionado, setUsuarioSelecionado] = useState<Usuario | null>(null);
   const [formData, setFormData] = useState<Partial<Usuario>>({});
   const [filtros, setFiltros] = useState<FiltrosUsuarios>({});
-  const [abaSelecionada, setAbaSelecionada] = useState<'usuarios' | 'logs' | 'estatisticas'>('usuarios');
+  const [abaSelecionada, setAbaSelecionada] = useState<'usuarios' | 'sessoes' | 'logs' | 'estatisticas'>('usuarios');
 
   const configuracaoService = useMemo(() => new ConfiguracaoService(), []);
 
@@ -26,15 +29,20 @@ export function GestaoUsuarios() {
     try {
       console.log('🔄 Carregando dados com filtros:', filtros);
       
-      const [usuariosData, statsData] = await Promise.all([
+      const [usuariosData, statsData, usuariosOnlineData, statsSessoesData] = await Promise.all([
         configuracaoService.buscarUsuarios(filtros),
-        configuracaoService.buscarEstatisticasUsuarios()
+        configuracaoService.buscarEstatisticasUsuarios(),
+        sessaoService.buscarUsuariosOnline(),
+        sessaoService.buscarEstatisticasSessoes()
       ]);
       
       console.log('👥 Usuários carregados:', usuariosData.length, usuariosData);
       console.log('📊 Estatísticas carregadas:', statsData);
+      console.log('🟢 Usuários online:', usuariosOnlineData.length, usuariosOnlineData);
       
       setUsuarios(usuariosData);
+      setUsuariosOnline(usuariosOnlineData);
+      setEstatisticasSessoes(statsSessoesData);
       setEstatisticas(statsData);
 
       if (abaSelecionada === 'logs') {
@@ -54,6 +62,15 @@ export function GestaoUsuarios() {
 
   useEffect(() => {
     carregarDados();
+    
+    // Atualiza dados a cada 30 segundos para manter status online atualizado
+    const interval = setInterval(() => {
+      if (abaSelecionada === 'sessoes' || abaSelecionada === 'usuarios') {
+        carregarDados();
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [carregarDados]);
 
   // removido: usamos a versão memoizada acima
@@ -65,7 +82,6 @@ export function GestaoUsuarios() {
       telefone: '',
       cargo: '',
       nivel_permissao: 'observador',
-      area_atuacao: 'global',
       ativo: true,
       verificacao_ip_ativa: false
     });
@@ -93,6 +109,38 @@ export function GestaoUsuarios() {
     setModalAberto(null);
     setUsuarioSelecionado(null);
     setFormData({});
+  };
+
+  const forcarLogout = async (usuarioId: string, nomeUsuario: string) => {
+    if (!confirm(`Tem certeza que deseja forçar o logout de ${nomeUsuario}?`)) {
+      return;
+    }
+
+    try {
+      await sessaoService.forcarLogoutUsuario(usuarioId);
+      alert('Logout forçado com sucesso!');
+      carregarDados();
+    } catch (error) {
+      alert(`Erro ao forçar logout: ${error}`);
+    }
+  };
+
+  const limparSessoesExpiradas = async () => {
+    try {
+      const sessoesLimpas = await sessaoService.limparSessoesExpiradas();
+      alert(`${sessoesLimpas} sessões expiradas foram limpas`);
+      carregarDados();
+    } catch (error) {
+      alert(`Erro ao limpar sessões: ${error}`);
+    }
+  };
+
+  const verificarStatusOnline = (usuarioId: string): boolean => {
+    return usuariosOnline.some(u => u.usuario_id === usuarioId);
+  };
+
+  const obterDadosSessao = (usuarioId: string): UsuarioOnline | null => {
+    return usuariosOnline.find(u => u.usuario_id === usuarioId) || null;
   };
 
   const salvarUsuario = async () => {
@@ -166,14 +214,14 @@ export function GestaoUsuarios() {
         email: u.email,
         cargo: u.cargo,
         nivel: u.nivel_permissao,
-        area: u.area_atuacao,
         status: u.ativo ? 'Ativo' : 'Inativo',
+        online: verificarStatusOnline(u.id!) ? 'Online' : 'Offline',
         ultimo_acesso: u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleDateString('pt-BR') : 'Nunca'
       }));
 
       const csv = [
-        'Nome,Email,Cargo,Nível,Área,Status,Último Acesso',
-        ...dados.map(d => `${d.nome},${d.email},${d.cargo},${d.nivel},${d.area},${d.status},${d.ultimo_acesso}`)
+        'Nome,Email,Cargo,Nível,Status,Online,Último Acesso',
+        ...dados.map(d => `${d.nome},${d.email},${d.cargo},${d.nivel},${d.status},${d.online},${d.ultimo_acesso}`)
       ].join('\n');
 
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -209,15 +257,6 @@ export function GestaoUsuarios() {
     return colors[nivel] || 'bg-gray-100 text-gray-800';
   };
 
-  const getAreaIcon = (area: string) => {
-    switch (area) {
-      case 'global': return <Globe className="w-4 h-4" />;
-      case 'regional': return <MapPin className="w-4 h-4" />;
-      case 'unidade_especifica': return <Building2 className="w-4 h-4" />;
-      default: return <Globe className="w-4 h-4" />;
-    }
-  };
-
   const getTipoEventoColor = (tipo: string) => {
     switch (tipo) {
       case 'login_sucesso': return 'bg-green-100 text-green-800';
@@ -227,6 +266,15 @@ export function GestaoUsuarios() {
       case 'bloqueio_automatico': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const formatarTempoSessao = (minutos: number) => {
+    if (minutos < 60) {
+      return `${minutos}min`;
+    }
+    const horas = Math.floor(minutos / 60);
+    const minutosRestantes = minutos % 60;
+    return `${horas}h ${minutosRestantes}min`;
   };
 
   const formatarData = (data: string) => {
@@ -242,6 +290,15 @@ export function GestaoUsuarios() {
           <p className="text-gray-600">Controle completo de usuários, permissões e segurança</p>
         </div>
         <div className="flex space-x-3">
+          {abaSelecionada === 'sessoes' && (
+            <button
+              onClick={limparSessoesExpiradas}
+              className="flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              Limpar Expiradas
+            </button>
+          )}
           <button
             onClick={exportarDados}
             className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
@@ -264,6 +321,7 @@ export function GestaoUsuarios() {
         <nav className="-mb-px flex space-x-8">
           {[
             { id: 'usuarios', label: 'Usuários', icon: Users },
+            { id: 'sessoes', label: 'Sessões Online', icon: Wifi },
             { id: 'logs', label: 'Logs de Segurança', icon: Shield },
             { id: 'estatisticas', label: 'Estatísticas', icon: BarChart3 }
           ].map((aba) => {
@@ -271,7 +329,7 @@ export function GestaoUsuarios() {
             return (
               <button
                 key={aba.id}
-                onClick={() => setAbaSelecionada(aba.id as 'usuarios' | 'logs' | 'estatisticas')}
+                onClick={() => setAbaSelecionada(aba.id as 'usuarios' | 'sessoes' | 'logs' | 'estatisticas')}
                 className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
                   abaSelecionada === aba.id
                     ? 'border-blue-500 text-blue-600'
@@ -280,6 +338,11 @@ export function GestaoUsuarios() {
               >
                 <Icon className="w-4 h-4 mr-2" />
                 {aba.label}
+                {aba.id === 'sessoes' && usuariosOnline.length > 0 && (
+                  <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-500 text-white rounded-full">
+                    {usuariosOnline.length}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -288,7 +351,7 @@ export function GestaoUsuarios() {
 
       {/* Estatísticas */}
       {estatisticas && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
           <div className="bg-blue-50 rounded-lg p-4">
             <div className="text-2xl font-bold text-blue-600">{estatisticas.total_usuarios}</div>
             <div className="text-sm text-blue-800">Total de Usuários</div>
@@ -296,6 +359,10 @@ export function GestaoUsuarios() {
           <div className="bg-green-50 rounded-lg p-4">
             <div className="text-2xl font-bold text-green-600">{estatisticas.usuarios_ativos}</div>
             <div className="text-sm text-green-800">Usuários Ativos</div>
+          </div>
+          <div className="bg-emerald-50 rounded-lg p-4">
+            <div className="text-2xl font-bold text-emerald-600">{usuariosOnline.length}</div>
+            <div className="text-sm text-emerald-800">Online Agora</div>
           </div>
           <div className="bg-red-50 rounded-lg p-4">
             <div className="text-2xl font-bold text-red-600">{estatisticas.usuarios_inativos}</div>
@@ -379,6 +446,9 @@ export function GestaoUsuarios() {
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Online
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Último Acesso
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -389,7 +459,7 @@ export function GestaoUsuarios() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {carregando ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-4 text-center">
+                      <td colSpan={6} className="px-6 py-4 text-center">
                         <div className="flex items-center justify-center">
                           <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mr-2" />
                           Carregando usuários...
@@ -398,97 +468,260 @@ export function GestaoUsuarios() {
                     </tr>
                   ) : usuarios.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                      <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
                         Nenhum usuário encontrado
                       </td>
                     </tr>
                   ) : (
-                    usuarios.map((usuario) => (
-                      <tr key={usuario.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center shadow-md">
-                              <Users className="w-6 h-6 text-white" />
+                    usuarios.map((usuario) => {
+                      const isOnline = verificarStatusOnline(usuario.id!);
+                      const dadosSessao = obterDadosSessao(usuario.id!);
+                      
+                      return (
+                        <tr key={usuario.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="relative">
+                                {usuario.avatar_url ? (
+                                  <img
+                                    src={usuario.avatar_url}
+                                    alt={usuario.nome_completo}
+                                    className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center shadow-md">
+                                    <Users className="w-6 h-6 text-white" />
+                                  </div>
+                                )}
+                                {/* Indicador de status online */}
+                                <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 border-2 border-white rounded-full ${
+                                  isOnline ? 'bg-green-400' : 'bg-gray-400'
+                                }`}></div>
+                              </div>
+                              <div className="ml-4">
+                                <div className="text-sm font-semibold text-gray-900">{usuario.nome_completo}</div>
+                                <div className="text-sm text-gray-600">{usuario.email}</div>
+                                <div className="text-xs text-gray-500">{usuario.cargo}</div>
+                              </div>
                             </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-semibold text-gray-900">{usuario.nome_completo}</div>
-                              <div className="text-sm text-gray-600">{usuario.email}</div>
-                              <div className="text-xs text-gray-500">{usuario.cargo}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPermissaoColor(usuario.nivel_permissao)}`}>
-                            {getPermissaoLabel(usuario.nivel_permissao)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            {usuario.ativo ? (
-                              <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
-                            ) : (
-                              <XCircle className="w-5 h-5 text-red-600 mr-2" />
-                            )}
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                              usuario.ativo 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {usuario.ativo ? 'ATIVO' : 'INATIVO'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPermissaoColor(usuario.nivel_permissao)}`}>
+                              {getPermissaoLabel(usuario.nivel_permissao)}
                             </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {usuario.ultimo_acesso ? formatarData(usuario.ultimo_acesso) : 'Nunca'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => abrirModalEditar(usuario)}
-                              className="text-blue-600 hover:text-blue-900"
-                              title="Editar usuário"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => abrirModalPermissoes(usuario)}
-                              className="text-purple-600 hover:text-purple-900"
-                              title="Configurar permissões"
-                            >
-                              <Settings className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => abrirModalLogs(usuario)}
-                              className="text-gray-600 hover:text-gray-900"
-                              title="Ver logs"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => alterarStatus(usuario.id!, !usuario.ativo)}
-                              className={`${usuario.ativo ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}
-                              title={usuario.ativo ? 'Desativar' : 'Ativar'}
-                            >
-                              {usuario.ativo ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                            </button>
-                            {usuario.ativo && (
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              {usuario.ativo ? (
+                                <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+                              ) : (
+                                <XCircle className="w-5 h-5 text-red-600 mr-2" />
+                              )}
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                usuario.ativo 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {usuario.ativo ? 'ATIVO' : 'INATIVO'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              {isOnline ? (
+                                <Wifi className="w-5 h-5 text-green-600 mr-2" />
+                              ) : (
+                                <WifiOff className="w-5 h-5 text-gray-400 mr-2" />
+                              )}
+                              <div>
+                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                  isOnline 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {isOnline ? 'ONLINE' : 'OFFLINE'}
+                                </span>
+                                {dadosSessao && (
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {formatarTempoSessao(dadosSessao.tempo_sessao_minutos)}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {usuario.ultimo_acesso ? formatarData(usuario.ultimo_acesso) : 'Nunca'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
                               <button
-                                onClick={() => bloquearUsuario(usuario.id!)}
-                                className="text-orange-600 hover:text-orange-900"
-                                title="Bloquear temporariamente"
+                                onClick={() => abrirModalEditar(usuario)}
+                                className="text-blue-600 hover:text-blue-900"
+                                title="Editar usuário"
                               >
-                                <AlertTriangle className="w-4 h-4" />
+                                <Edit className="w-4 h-4" />
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                              <button
+                                onClick={() => abrirModalPermissoes(usuario)}
+                                className="text-purple-600 hover:text-purple-900"
+                                title="Configurar permissões"
+                              >
+                                <Settings className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => abrirModalLogs(usuario)}
+                                className="text-gray-600 hover:text-gray-900"
+                                title="Ver logs"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              {isOnline && (
+                                <button
+                                  onClick={() => forcarLogout(usuario.id!, usuario.nome_completo)}
+                                  className="text-orange-600 hover:text-orange-900"
+                                  title="Forçar logout"
+                                >
+                                  <WifiOff className="w-4 h-4" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => alterarStatus(usuario.id!, !usuario.ativo)}
+                                className={`${usuario.ativo ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}
+                                title={usuario.ativo ? 'Desativar' : 'Ativar'}
+                              >
+                                {usuario.ativo ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                              </button>
+                              {usuario.ativo && (
+                                <button
+                                  onClick={() => bloquearUsuario(usuario.id!)}
+                                  className="text-orange-600 hover:text-orange-900"
+                                  title="Bloquear temporariamente"
+                                >
+                                  <AlertTriangle className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {abaSelecionada === 'sessoes' && (
+        <div className="space-y-6">
+          {/* Estatísticas de Sessões */}
+          {estatisticasSessoes && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="text-2xl font-bold text-green-600">{estatisticasSessoes.usuarios_online}</div>
+                <div className="text-sm text-green-800">Usuários Online</div>
+              </div>
+              <div className="bg-blue-50 rounded-lg p-4">
+                <div className="text-2xl font-bold text-blue-600">{estatisticasSessoes.sessoes_ativas}</div>
+                <div className="text-sm text-blue-800">Sessões Ativas</div>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-4">
+                <div className="text-2xl font-bold text-purple-600">{estatisticasSessoes.tempo_medio_sessao}min</div>
+                <div className="text-sm text-purple-800">Tempo Médio</div>
+              </div>
+              <div className="bg-yellow-50 rounded-lg p-4">
+                <div className="text-2xl font-bold text-yellow-600">{estatisticasSessoes.picos_acesso_hoje}</div>
+                <div className="text-sm text-yellow-800">Acessos Hoje</div>
+              </div>
+            </div>
+          )}
+
+          <h3 className="text-lg font-semibold text-gray-800">Usuários Online</h3>
+          
+          {usuariosOnline.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-lg p-8 text-center border border-gray-100">
+              <WifiOff className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">Nenhum usuário online no momento</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Usuário
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Tempo de Sessão
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Último Acesso
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        IP
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ações
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {usuariosOnline.map((usuarioOnline) => (
+                      <tr key={usuarioOnline.usuario_id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="relative">
+                              {usuarioOnline.avatar_url ? (
+                                <img
+                                  src={usuarioOnline.avatar_url}
+                                  alt={usuarioOnline.nome_completo}
+                                  className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-md">
+                                  <Users className="w-5 h-5 text-white" />
+                                </div>
+                              )}
+                              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 border-2 border-white rounded-full"></div>
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-semibold text-gray-900">{usuarioOnline.nome_completo}</div>
+                              <div className="text-sm text-gray-600">{usuarioOnline.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <Clock className="w-4 h-4 text-green-600 mr-2" />
+                            <span className="text-sm font-medium text-green-600">
+                              {formatarTempoSessao(usuarioOnline.tempo_sessao_minutos)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatarData(usuarioOnline.data_ultimo_acesso)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {usuarioOnline.ip_origem}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button
+                            onClick={() => forcarLogout(usuarioOnline.usuario_id, usuarioOnline.nome_completo)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Forçar logout"
+                          >
+                            <WifiOff className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -573,6 +806,16 @@ export function GestaoUsuarios() {
                   <span className="text-gray-700">Tentativas bloqueadas</span>
                   <span className="font-medium">{estatisticas.tentativas_bloqueadas}</span>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-700">Usuários online agora</span>
+                  <span className="font-medium text-green-600">{usuariosOnline.length}</span>
+                </div>
+                {estatisticasSessoes && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-700">Tempo médio de sessão</span>
+                    <span className="font-medium">{estatisticasSessoes.tempo_medio_sessao} min</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
