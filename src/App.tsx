@@ -107,7 +107,8 @@ function AppContent() {
     const forceInitTimer = setTimeout(() => {
       if (!isInitialized) {
         console.warn('⚠️ Forçando inicialização após 3 segundos');
-      setIsInitialized(true);
+        setIsInitialized(true);
+      }
     }, 3000); // Reduzido de 10s para 3s
       
     return () => clearTimeout(forceInitTimer);
@@ -138,7 +139,7 @@ function AppContent() {
   }
 
   const renderContent = () => {
-  switch (activeTab) {
+    switch (activeTab) {
       case "dashboard":
         return <DashboardGeral onNavigate={setActiveTab} />;
       case "cobrancas":
