@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
+import { sessaoService } from "../../services/sessaoService";
 
 interface AuthContextType {
   user: User | null;
@@ -35,6 +36,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session && session.user) {
         setUser(session.user);
         saveSessionToStorage(session);
+        
+        // Cria sessão no sistema quando usuário está autenticado
+        try {
+          await sessaoService.criarSessao(session.user.id);
+        } catch (error) {
+          console.warn('Erro ao criar sessão do usuário:', error);
+        }
       } else {
         setUser(null);
       }
@@ -54,8 +62,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         saveSessionToStorage(session);
         if (session?.user) {
           setUser(session.user);
+          
+          // Cria sessão no sistema para novos logins
+          if (event === 'SIGNED_IN') {
+            try {
+              await sessaoService.criarSessao(session.user.id);
+            } catch (error) {
+              console.warn('Erro ao criar sessão do usuário:', error);
+            }
+          }
         } else {
           setUser(null);
+          
+          // Encerra sessão no sistema quando usuário faz logout
+          if (event === 'SIGNED_OUT') {
+            try {
+              await sessaoService.encerrarSessao();
+            } catch (error) {
+              console.warn('Erro ao encerrar sessão do usuário:', error);
+            }
+          }
         }
         setLoading(false);
       }
@@ -66,6 +92,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    // Encerra sessão no sistema antes do logout
+    try {
+      await sessaoService.encerrarSessao();
+    } catch (error) {
+      console.warn('Erro ao encerrar sessão:', error);
+    }
+    
     await supabase.auth.signOut();
     saveSessionToStorage(null);
     setUser(null);
