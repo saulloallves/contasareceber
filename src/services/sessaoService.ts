@@ -31,49 +31,7 @@ export class SessaoService {
     try {
       console.log('🔄 Criando sessão para usuário:', usuarioId);
       
-      // PRIMEIRO: Verifica se já existe sessão ativa para este usuário
-      const { data: sessaoExistente, error: errorVerificacao } = await supabase
-        .from('sessoes_usuario')
-        .select('id, token_sessao, ativa')
-        .eq('usuario_id', usuarioId)
-        .eq('ativa', true)
-        .maybeSingle();
-
-      if (errorVerificacao) {
-        console.warn('⚠️ Erro ao verificar sessão existente:', errorVerificacao);
-      }
-
-      // Se já existe sessão ativa, retorna o token existente
-      if (sessaoExistente) {
-        console.log('✅ Sessão ativa já existe, reutilizando token:', sessaoExistente.token_sessao.substring(0, 20) + '...');
-        
-        // Atualiza último acesso da sessão existente
-        await supabase
-          .from('sessoes_usuario')
-          .update({
-            data_ultimo_acesso: new Date().toISOString(),
-            ip_origem: await this.obterIP(),
-            user_agent: navigator.userAgent
-          })
-          .eq('id', sessaoExistente.id);
-
-        // Salva token no localStorage
-        localStorage.setItem('session_token', sessaoExistente.token_sessao);
-        
-        // Inicia heartbeat
-        this.iniciarHeartbeat(sessaoExistente.token_sessao);
-        
-        return sessaoExistente.token_sessao;
-      }
-
-      // Gera token único para a sessão
-      const tokenSessao = this.gerarTokenSessao();
-      
-      // Obtém informações do navegador
-      const ipOrigem = await this.obterIP();
-      const userAgent = navigator.userAgent;
-
-      // SEGUNDO: Desativa TODAS as sessões anteriores do mesmo usuário
+      // Desativa TODAS as sessões anteriores primeiro
       console.log('🔄 Desativando todas as sessões anteriores...');
       const { error: errorDesativar } = await supabase
         .from('sessoes_usuario')
@@ -86,8 +44,36 @@ export class SessaoService {
         console.log('✅ Sessões anteriores desativadas');
       }
 
-      // TERCEIRO: Cria nova sessão única
-      console.log('🆕 Criando nova sessão única...');
+      // Verifica se ainda existe sessão ativa (não deveria existir após desativação)
+      const { data: sessaoExistente, error: errorVerificacao } = await supabase
+        .from('sessoes_usuario')
+        .select('id, token_sessao, ativa')
+        .eq('usuario_id', usuarioId)
+        .eq('ativa', true)
+        .maybeSingle();
+
+      if (errorVerificacao) {
+        console.warn('⚠️ Erro ao verificar sessão existente:', errorVerificacao);
+      }
+
+      // Se ainda existe sessão ativa após desativação, algo está errado
+      if (sessaoExistente) {
+        console.warn('⚠️ Sessão ativa ainda existe após desativação, forçando desativação:', sessaoExistente.id);
+        await supabase
+          .from('sessoes_usuario')
+          .update({ ativa: false })
+          .eq('id', sessaoExistente.id);
+      }
+
+      // Gera token único para a sessão
+      const tokenSessao = this.gerarTokenSessao();
+      
+      // Obtém informações do navegador
+      const ipOrigem = await this.obterIP();
+      const userAgent = navigator.userAgent;
+
+      // Cria nova sessão
+      console.log('🆕 Criando nova sessão...');
       const { data, error } = await supabase
         .from('sessoes_usuario')
         .insert({
