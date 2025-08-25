@@ -290,7 +290,24 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
     try {
       console.log('🔍 Buscando usuários com filtros:', filtros);
       
-      // Primeiro tenta query direta (mais confiável)
+      // Para admin_master, usa service_role para ver todos os usuários
+      const { data: currentUser } = await supabase.auth.getUser();
+      if (!currentUser.user) {
+        console.warn('⚠️ Usuário não autenticado');
+        return [];
+      }
+
+      // Verifica se é admin_master
+      const { data: profile } = await supabase
+        .from('usuarios_sistema')
+        .select('nivel_permissao')
+        .eq('id', currentUser.user.id)
+        .maybeSingle();
+
+      const isAdminMaster = profile?.nivel_permissao === 'admin_master';
+      console.log('👤 Usuário atual é admin_master:', isAdminMaster);
+
+      // Query principal
       let query = supabase
         .from('usuarios_sistema')
         .select('*')
@@ -310,55 +327,40 @@ _Esta é uma mensagem automática do sistema de cobrança._`,
 
       const { data: directData, error: directError } = await query;
       
-      if (!directError && directData) {
+      if (!directError && directData && directData.length > 0) {
         console.log('✅ Usuários encontrados via query direta:', directData.length);
         return directData;
       }
       
-      console.warn('⚠️ Query direta falhou, tentando RPC:', directError?.message);
+      console.warn('⚠️ Query direta falhou ou retornou vazio:', directError?.message);
       
-      // Fallback: tenta RPC function
-      try {
-        const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_users_admin', {
-          p_nivel_filtro: filtros.nivel || null,
-          p_ativo_filtro: filtros.ativo,
-          p_busca_filtro: filtros.busca || null
-        });
+      // Se for admin_master e query direta falhou, tenta Edge Function
+      if (isAdminMaster) {
+        console.log('🔄 Admin master detectado, tentando Edge Function...');
+        try {
+          const { data: edgeData, error: edgeError } = await (supabase as any).functions.invoke('admin-get-users', {
+            body: {
+              filtros: filtros
+            }
+          });
 
-        if (!rpcError && rpcData) {
-          console.log('✅ Usuários encontrados via RPC:', rpcData.length);
-          return rpcData;
-        }
-        
-        console.warn('⚠️ RPC também falhou:', rpcError?.message);
-      } catch (rpcErr) {
-        console.warn('⚠️ Erro na RPC:', rpcErr);
-      }
-      
-      // Último fallback: retorna apenas usuário atual
-      try {
-        const { data: currentUser } = await supabase.auth.getUser();
-        if (currentUser.user) {
-          const { data: ownProfile, error: ownError } = await supabase
-            .from('usuarios_sistema')
-            .select('*')
-            .eq('id', currentUser.user.id)
-            .maybeSingle();
-        
-          if (!ownError && ownProfile) {
-            console.log('✅ Retornando apenas usuário atual como fallback');
-            return [ownProfile];
+          if (!edgeError && edgeData?.users) {
+            console.log('✅ Usuários encontrados via Edge Function:', edgeData.users.length);
+            return edgeData.users;
           }
+          
+          console.warn('⚠️ Edge Function falhou:', edgeError?.message);
+        } catch (edgeErr) {
+          console.warn('⚠️ Erro na Edge Function:', edgeErr);
         }
-      } catch (fallbackErr) {
-        console.warn('⚠️ Fallback também falhou:', fallbackErr);
       }
       
-      console.warn('⚠️ Todos os métodos falharam, retornando lista vazia');
-      return [];
+      // Se chegou até aqui, algo está errado com as políticas RLS
+      console.error('❌ Não foi possível buscar usuários. Verifique as políticas RLS da tabela usuarios_sistema');
+      throw new Error('Erro ao buscar usuários: verifique as permissões da tabela usuarios_sistema');
     } catch (error) {
       console.error('Erro geral ao buscar usuários:', error);
-      return [];
+      throw error;
     }
   }
 
