@@ -40,7 +40,19 @@ export class ConfiguracaoService {
       });
 
       if (error) {
-        throw new Error(error.message || 'Erro ao criar usuário');
+        // Trata erros específicos do Supabase Auth
+        if (error.message?.includes('A user with this email address has already been registered')) {
+          throw new Error('Um usuário com este e-mail já está registrado no sistema.');
+        }
+        if (error.message?.includes('email address has already been registered')) {
+          throw new Error('Um usuário com este e-mail já está registrado no sistema.');
+        }
+        if (error.message?.includes('already been registered')) {
+          throw new Error('Um usuário com este e-mail já está registrado no sistema.');
+        }
+        
+        // Outros erros genéricos
+        throw new Error(error.message || 'Erro ao criar usuário no sistema');
       }
 
       return { id: data.id, invited: Boolean(data.invited) };
