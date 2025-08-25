@@ -415,7 +415,7 @@ export function Sidebar({
 
           {/* Dropdown de Notificações */}
           {showNotifications && !collapsed && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-80 overflow-y-auto">
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-80 overflow-y-hidden">
               <div className="p-3 border-b border-gray-100">
                 <h4 className="font-semibold text-gray-800 text-sm">Notificações</h4>
               </div>
