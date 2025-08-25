@@ -126,7 +126,7 @@ export class DashboardService {
         comparativo_mes_anterior: {
           variacao_em_aberto: variacaoEmAberto,
           variacao_pago: variacaoQuitado,
-          variacao_inadimplencia: variacaoNegociando
+          variacao_negociando: variacaoNegociando
         }
       };
     } catch (error) {

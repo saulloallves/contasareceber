@@ -88,7 +88,7 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
       variacaoNegociando: pickNum(
         data?.variacaoNegociando,
         data?.variacao_negociando,
-        data?.comparativo_mes_anterior?.variacao_inadimplencia
+        data?.comparativo_mes_anterior?.variacao_negociando
       ),
       variacaoUnidades: pickNum(
         data?.variacaoUnidades,
