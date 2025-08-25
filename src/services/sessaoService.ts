@@ -31,6 +31,41 @@ export class SessaoService {
     try {
       console.log('🔄 Criando sessão para usuário:', usuarioId);
       
+      // PRIMEIRO: Verifica se já existe sessão ativa para este usuário
+      const { data: sessaoExistente, error: errorVerificacao } = await supabase
+        .from('sessoes_usuario')
+        .select('id, token_sessao, ativa')
+        .eq('usuario_id', usuarioId)
+        .eq('ativa', true)
+        .maybeSingle();
+
+      if (errorVerificacao) {
+        console.warn('⚠️ Erro ao verificar sessão existente:', errorVerificacao);
+      }
+
+      // Se já existe sessão ativa, retorna o token existente
+      if (sessaoExistente) {
+        console.log('✅ Sessão ativa já existe, reutilizando token:', sessaoExistente.token_sessao.substring(0, 20) + '...');
+        
+        // Atualiza último acesso da sessão existente
+        await supabase
+          .from('sessoes_usuario')
+          .update({
+            data_ultimo_acesso: new Date().toISOString(),
+            ip_origem: await this.obterIP(),
+            user_agent: navigator.userAgent
+          })
+          .eq('id', sessaoExistente.id);
+
+        // Salva token no localStorage
+        localStorage.setItem('session_token', sessaoExistente.token_sessao);
+        
+        // Inicia heartbeat
+        this.iniciarHeartbeat(sessaoExistente.token_sessao);
+        
+        return sessaoExistente.token_sessao;
+      }
+
       // Gera token único para a sessão
       const tokenSessao = this.gerarTokenSessao();
       
@@ -38,10 +73,21 @@ export class SessaoService {
       const ipOrigem = await this.obterIP();
       const userAgent = navigator.userAgent;
 
-      // Desativa sessões anteriores do mesmo usuário (evita múltiplas sessões ativas)
-      await this.desativarSessoesAnteriores(usuarioId);
+      // SEGUNDO: Desativa TODAS as sessões anteriores do mesmo usuário
+      console.log('🔄 Desativando todas as sessões anteriores...');
+      const { error: errorDesativar } = await supabase
+        .from('sessoes_usuario')
+        .update({ ativa: false })
+        .eq('usuario_id', usuarioId);
 
-      // Cria nova sessão
+      if (errorDesativar) {
+        console.warn('⚠️ Erro ao desativar sessões anteriores:', errorDesativar);
+      } else {
+        console.log('✅ Sessões anteriores desativadas');
+      }
+
+      // TERCEIRO: Cria nova sessão única
+      console.log('🆕 Criando nova sessão única...');
       const { data, error } = await supabase
         .from('sessoes_usuario')
         .insert({
@@ -144,9 +190,9 @@ export class SessaoService {
    */
   async buscarUsuariosOnline(): Promise<UsuarioOnline[]> {
     try {
-      // Considera online se último acesso foi há menos de 10 minutos (mais tolerante)
+      // Considera online se último acesso foi há menos de 5 minutos E sessão está ativa
       const limiteOnline = new Date();
-      limiteOnline.setMinutes(limiteOnline.getMinutes() - 10);
+      limiteOnline.setMinutes(limiteOnline.getMinutes() - 5);
       
       console.log('🔍 Buscando usuários online desde:', limiteOnline.toISOString());
 
@@ -205,7 +251,7 @@ export class SessaoService {
   async verificarUsuarioOnline(usuarioId: string): Promise<boolean> {
     try {
       const limiteOnline = new Date();
-      limiteOnline.setMinutes(limiteOnline.getMinutes() - 10);
+      limiteOnline.setMinutes(limiteOnline.getMinutes() - 5);
 
       const { data, error } = await supabase
         .from('sessoes_usuario')
@@ -232,9 +278,9 @@ export class SessaoService {
    */
   async limparSessoesExpiradas(): Promise<number> {
     try {
-      // Considera expirada se último acesso foi há mais de 4 horas
+      // Considera expirada se último acesso foi há mais de 2 horas
       const limiteExpiracao = new Date();
-      limiteExpiracao.setHours(limiteExpiracao.getHours() - 4);
+      limiteExpiracao.setHours(limiteExpiracao.getHours() - 2);
       
       console.log('🧹 Limpando sessões expiradas antes de:', limiteExpiracao.toISOString());
 
@@ -279,15 +325,21 @@ export class SessaoService {
     try {
       console.log('🔄 Desativando sessões anteriores para usuário:', usuarioId);
       
-      await supabase
+      const { error } = await supabase
         .from('sessoes_usuario')
         .update({ ativa: false })
         .eq('usuario_id', usuarioId)
         .eq('ativa', true);
         
+      if (error) {
+        console.error('❌ Erro ao desativar sessões anteriores:', error);
+        throw error;
+      }
+        
       console.log('✅ Sessões anteriores desativadas');
     } catch (error) {
-      console.warn('⚠️ Erro ao desativar sessões anteriores:', error);
+      console.error('❌ Erro ao desativar sessões anteriores:', error);
+      throw error;
     }
   }
 

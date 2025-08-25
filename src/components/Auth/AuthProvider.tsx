@@ -37,12 +37,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session.user);
         saveSessionToStorage(session);
         
-        // Cria sessão no sistema quando usuário está autenticado
-        try {
-          await sessaoService.criarSessao(session.user.id);
-        } catch (error) {
-          console.warn('Erro ao criar sessão do usuário:', error);
-        }
+        // NÃO cria sessão aqui - apenas no evento SIGNED_IN
+        console.log('👤 Usuário já autenticado, não criando nova sessão');
       } else {
         setUser(null);
       }
@@ -58,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadUser();
     // Listener de mudanças de sessão
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         console.log('🔄 Auth state change:', event, session?.user?.id);
         
         saveSessionToStorage(session);
@@ -74,6 +70,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } catch (error) {
               console.warn('⚠️ Erro ao criar sessão do usuário:', error);
             }
+          }
+          
+          // Para outros eventos (TOKEN_REFRESHED, etc), não cria nova sessão
+          if (event !== 'SIGNED_IN') {
+            console.log('ℹ️ Evento', event, '- não criando nova sessão');
           }
         } else {
           setUser(null);
