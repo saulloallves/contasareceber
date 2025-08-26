@@ -97,6 +97,13 @@ export class CobrancaService {
   // Caso precise de dados de unidade/franqueado, a UI resolve via serviços dedicados após o fetch.
       let query = supabase.from("cobrancas_franqueados").select("*");
 
+      // Filtro para incluir/excluir parcelas
+      if (filtros.incluirParcelas === false) {
+        query = query.eq("is_parcela", false);
+      } else if (filtros.apenasParcelas) {
+        query = query.eq("is_parcela", true);
+      }
+
       // Filtros básicos
       if (filtros.status) {
         query = query.eq("status", filtros.status);
@@ -165,7 +172,7 @@ export class CobrancaService {
 
       // Filtro apenas inadimplentes
       if (filtros.apenasInadimplentes) {
-        query = query.neq("status", "quitado");
+        query = query.not("status", "in", "(quitado,parcelado)");
       }
 
       // Ordenação
@@ -386,50 +393,4 @@ export class CobrancaService {
             mensagem_enviada: row.mensagem_enviada || "Mensagem não capturada",
             status_envio: row.sucesso ? "sucesso" : "falha",
             erro_detalhes: row.erro_detalhes,
-            data_envio: row.data_envio || row.created_at,
-            metadados: {
-              evolution_message_id: row.evolution_message_id,
-              instancia_evolution: row.instancia_evolution,
-            },
-          }))
-        );
-      }
-    } catch (e) {
-      console.warn("Falha ao buscar logs_envio_whatsapp:", e);
-    }
-
-    // 2) Logs de e-mail via n8n em 'logs_envio_email'
-    try {
-      const { data, error } = await supabase
-        .from("logs_envio_email")
-        .select("id, destinatario, mensagem, sucesso, message_id, erro_detalhes, data_envio, created_at, cobranca_id")
-        .eq("cobranca_id", cobrancaId)
-        .order("data_envio", { ascending: false });
-
-      if (!error && data) {
-        historico.push(
-          ...data.map((row: any): HistoricoEnvio => ({
-            id: row.id,
-            canal: "email",
-            tipo: "email_n8n",
-            destinatario: row.destinatario,
-            mensagem: row.mensagem || "Conteúdo do email não capturado",
-            status_envio: row.sucesso ? "sucesso" : "falha",
-            erro_detalhes: row.erro_detalhes,
-            data_envio: row.data_envio || row.created_at,
-            metadados: {
-              message_id: row.message_id,
-            },
-          }))
-        );
-      }
-    } catch (e) {
-      console.warn("Falha ao buscar logs_envio_email:", e);
-    }
-    // Ordena por data desc como fallback
-    historico.sort((a, b) => new Date(b.data_envio || 0).getTime() - new Date(a.data_envio || 0).getTime());
-    return historico;
-  }
-}
-
-export const cobrancaService = new CobrancaService();
+            data_envio: row

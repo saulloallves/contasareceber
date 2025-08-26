@@ -258,39 +258,54 @@ export class TrativativasService {
    * Registra criação de acordo
    */
   async registrarCriacaoAcordo(
-    tituloId: string,
+    parcelamentoMasterId: string,
     valorTotal: number,
     quantidadeParcelas: number,
     valorEntrada: number
   ): Promise<void> {
-    const tratativa: Omit<TrativativaCobranca, 'id' | 'created_at'> = {
-      titulo_id: tituloId,
-      tipo_interacao: 'acordo_fechado',
-      canal: 'interno',
-      usuario_sistema: 'sistema_acordos',
-      descricao: `Acordo de parcelamento criado: ${quantidadeParcelas}x + entrada R$ ${valorEntrada.toFixed(2)}. Total: R$ ${valorTotal.toFixed(2)}`,
-      status_cobranca_resultante: 'negociando'
-    };
+    try {
+      // Busca cobranças originais do parcelamento master
+      const { data: cobrancasOriginais } = await supabase
+        .from('cobrancas_franqueados')
+        .select('id')
+        .eq('parcelamento_master_id', parcelamentoMasterId)
+        .eq('is_parcela', false);
 
-    await this.registrarTratativa(tratativa);
+      // Registra tratativa para todas as cobranças originais
+      for (const cobranca of cobrancasOriginais || []) {
+        const tratativa: Omit<TrativativaCobranca, 'id' | 'created_at'> = {
+          titulo_id: cobranca.id,
+          tipo_interacao: 'acordo_fechado',
+          canal: 'interno',
+          usuario_sistema: 'sistema_acordos',
+          descricao: `Acordo de parcelamento criado: ${quantidadeParcelas}x + entrada R$ ${valorEntrada.toFixed(2)}. Total: R$ ${valorTotal.toFixed(2)}`,
+          status_cobranca_resultante: 'negociando'
+        };
+
+        await this.registrarTratativa(tratativa);
+      }
+    } catch (error) {
+      console.error('Erro ao registrar criação de acordo:', error);
+      throw error;
+    }
   }
 
   /**
    * Registra pagamento de parcela
    */
   async registrarPagamentoParcela(
-    tituloId: string,
+    cobrancaParcelaId: string,
     numeroParcela: number,
     valorPago: number,
     dataPagamento: string
   ): Promise<void> {
     const tratativa: Omit<TrativativaCobranca, 'id' | 'created_at'> = {
-      titulo_id: tituloId,
+      titulo_id: cobrancaParcelaId,
       tipo_interacao: 'pagamento_parcial',
       canal: 'interno',
       usuario_sistema: 'sistema_acordos',
       descricao: `Parcela ${numeroParcela} paga: R$ ${valorPago.toFixed(2)} em ${new Date(dataPagamento).toLocaleDateString('pt-BR')}`,
-      status_cobranca_resultante: undefined
+      status_cobranca_resultante: 'quitado'
     };
 
     await this.registrarTratativa(tratativa);
@@ -300,20 +315,35 @@ export class TrativativasService {
    * Registra quebra de acordo
    */
   async registrarQuebraAcordo(
-    tituloId: string,
+    parcelamentoMasterId: string,
     motivo: string,
     parcelaAtrasada: number
   ): Promise<void> {
-    const tratativa: Omit<TrativativaCobranca, 'id' | 'created_at'> = {
-      titulo_id: tituloId,
-      tipo_interacao: 'quebra_acordo',
-      canal: 'interno',
-      usuario_sistema: 'sistema_acordos',
-      descricao: `Acordo quebrado: ${motivo}. Parcela ${parcelaAtrasada} em atraso.`,
-      status_cobranca_resultante: 'em_aberto'
-    };
+    try {
+      // Busca cobranças originais do parcelamento master
+      const { data: cobrancasOriginais } = await supabase
+        .from('cobrancas_franqueados')
+        .select('id')
+        .eq('parcelamento_master_id', parcelamentoMasterId)
+        .eq('is_parcela', false);
 
-    await this.registrarTratativa(tratativa);
+      // Registra tratativa para todas as cobranças originais
+      for (const cobranca of cobrancasOriginais || []) {
+        const tratativa: Omit<TrativativaCobranca, 'id' | 'created_at'> = {
+          titulo_id: cobranca.id,
+          tipo_interacao: 'quebra_acordo',
+          canal: 'interno',
+          usuario_sistema: 'sistema_acordos',
+          descricao: `Acordo quebrado: ${motivo}. Parcela ${parcelaAtrasada} em atraso.`,
+          status_cobranca_resultante: 'em_aberto'
+        };
+
+        await this.registrarTratativa(tratativa);
+      }
+    } catch (error) {
+      console.error('Erro ao registrar quebra de acordo:', error);
+      throw error;
+    }
   }
 
   /**
