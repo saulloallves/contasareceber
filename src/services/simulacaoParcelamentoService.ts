@@ -160,6 +160,7 @@ export class SimulacaoParcelamentoService {
       }
 
       const simulacao: ISimulacaoParcelamento = {
+        titulo_id: cobrancas[0].id, // Usa a primeira cobrança como referência para a foreign key
         parcelamento_master_id: parcelamentoMaster.id,
         cnpj_unidade: cnpjUnidade,
         valor_original: valorOriginalTotal,
