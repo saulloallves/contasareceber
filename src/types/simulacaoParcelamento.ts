@@ -1,6 +1,6 @@
 export interface ISimulacaoParcelamento {
   id?: string;
-  titulo_id: string;
+  parcelamento_master_id: string;
   cnpj_unidade: string;
   valor_original: number;
   valor_atualizado: number;
@@ -12,6 +12,7 @@ export interface ISimulacaoParcelamento {
   parcelas: ParcelaSimulacao[];
   valor_total_parcelamento: number;
   economia_total?: number;
+  cobrancas_origem_ids: string[];
   metadados_consolidacao?: {
     quantidade_cobrancas: number;
     titulos_ids: string[];
@@ -39,7 +40,7 @@ export interface ParcelaSimulacao {
 export interface PropostaParcelamento {
   id?: string;
   simulacao_id: string;
-  titulo_id: string;
+  parcelamento_master_id: string;
   cnpj_unidade: string;
   mensagem_proposta: string;
   canais_envio: ('whatsapp' | 'email')[];
@@ -58,7 +59,7 @@ export interface PropostaParcelamento {
 export interface RegistroAceite {
   id?: string;
   proposta_id: string;
-  titulo_id: string;
+  parcelamento_master_id: string;
   cnpj_unidade: string;
   data_aceite: string;
   ip_aceite: string;
@@ -73,7 +74,7 @@ export interface ConfiguracaoParcelamento {
   id: string;
   percentual_juros_parcela: number;
   valor_minimo_parcela: number;
-  quantidade_maxima_parcelas: number;
+  quantidade_maxima_parcelas: number; // Agora suporta até 42 parcelas
   percentual_entrada_minimo?: number;
   dias_entre_parcelas: number;
   prazo_validade_proposta_dias: number;
@@ -101,4 +102,16 @@ export interface EstatisticasParcelamento {
   taxa_conversao: number;
   valor_total_parcelado: number;
   tempo_medio_resposta: number;
+}
+
+export interface ParcelamentoMaster {
+  id?: string;
+  cnpj_unidade: string;
+  valor_total_original_parcelado: number;
+  valor_total_atualizado_parcelado: number;
+  data_parcelamento?: string;
+  status: 'proposto' | 'aceito' | 'cancelado' | 'quebrado' | 'cumprido';
+  observacoes?: string;
+  created_at?: string;
+  updated_at?: string;
 }

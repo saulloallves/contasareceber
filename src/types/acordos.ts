@@ -1,6 +1,6 @@
 export interface AcordoParcelamento {
   id?: string;
-  titulo_id: string;
+  parcelamento_master_id: string;
   cnpj_unidade: string;
   valor_original: number;
   valor_atualizado: number;
@@ -58,7 +58,7 @@ export interface ConfiguracaoAcordos {
   id: string;
   percentual_entrada_minimo: number;
   valor_parcela_minimo: number;
-  quantidade_maxima_parcelas: number;
+  quantidade_maxima_parcelas: number; // Agora suporta até 42 parcelas
   percentual_multa: number;
   percentual_juros_mes: number;
   percentual_desconto_entrada: number;

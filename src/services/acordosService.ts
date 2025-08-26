@@ -13,31 +13,27 @@ export class AcordosService {
    * Simula parcelamento para um débito
    */
   async simularParcelamento(
-    tituloId: string,
+    parcelamentoMasterId: string,
     quantidadeParcelas: number,
     valorEntrada?: number
   ): Promise<SimulacaoParcelamento> {
     try {
-      // Busca dados da cobrança
-      const { data: cobranca, error } = await supabase
-        .from('cobrancas_franqueados')
+      // Busca dados do parcelamento master
+      const { data: parcelamentoMaster, error } = await supabase
+        .from('parcelamentos_master')
         .select('*')
-        .eq('id', tituloId)
-        .maybeSingle();
+        .eq('id', parcelamentoMasterId)
+        .single();
 
-      if (error || !cobranca) {
-        throw new Error('Cobrança não encontrada');
+      if (error || !parcelamentoMaster) {
+        throw new Error('Parcelamento master não encontrado');
       }
 
       // Busca configurações
       const config = await this.buscarConfiguracaoAcordos();
 
       // Calcula valor atualizado
-      const valorAtualizado = this.calcularValorAtualizado(
-        cobranca.valor_original,
-        cobranca.dias_em_atraso || 0,
-        config
-      );
+      const valorAtualizado = parcelamentoMaster.valor_total_atualizado_parcelado;
 
       // Valida parâmetros
       if (quantidadeParcelas > config.quantidade_maxima_parcelas) {
@@ -87,7 +83,7 @@ export class AcordosService {
       const valorTotalAcordo = entradaCalculada + (valorParcela * quantidadeParcelas) - economiaDesconto;
 
       return {
-        valor_original: cobranca.valor_original,
+        valor_original: parcelamentoMaster.valor_total_original_parcelado,
         valor_atualizado: valorAtualizado,
         valor_entrada: entradaCalculada,
         quantidade_parcelas: quantidadeParcelas,
@@ -109,32 +105,32 @@ export class AcordosService {
    * Cria acordo de parcelamento
    */
   async criarAcordo(
-    tituloId: string,
+    parcelamentoMasterId: string,
     simulacao: SimulacaoParcelamento,
     observacoes?: string
   ): Promise<AcordoParcelamento> {
     try {
-      // Busca dados da cobrança
-      const { data: cobranca } = await supabase
-        .from('cobrancas_franqueados')
-        .select('cnpj')
-        .eq('id', tituloId)
+      // Busca dados do parcelamento master
+      const { data: parcelamentoMaster } = await supabase
+        .from('parcelamentos_master')
+        .select('cnpj_unidade')
+        .eq('id', parcelamentoMasterId)
         .single();
 
-      if (!cobranca) {
-        throw new Error('Cobrança não encontrada');
+      if (!parcelamentoMaster) {
+        throw new Error('Parcelamento master não encontrado');
       }
 
       // Valida se pode fazer acordo
-      const validacao = await this.validarAcordo(cobranca.cnpj);
+      const validacao = await this.validarAcordo(parcelamentoMaster.cnpj_unidade);
       if (!validacao.pode_fazer_acordo) {
         throw new Error(validacao.motivo_bloqueio || 'Não é possível fazer acordo');
       }
 
       // Cria o acordo
       const acordo: Omit<AcordoParcelamento, 'id' | 'created_at' | 'updated_at'> = {
-        titulo_id: tituloId,
-        cnpj_unidade: cobranca.cnpj,
+        parcelamento_master_id: parcelamentoMasterId,
+        cnpj_unidade: parcelamentoMaster.cnpj_unidade,
         valor_original: simulacao.valor_original,
         valor_atualizado: simulacao.valor_atualizado,
         valor_entrada: simulacao.valor_entrada,
@@ -160,13 +156,22 @@ export class AcordosService {
       // Cria as parcelas
       await this.criarParcelas(acordoCriado.id!, simulacao);
 
-      // Registra tratativa
-      await this.tratativasService.registrarObservacao(
-        tituloId,
-        'sistema_acordos',
-        `Acordo de parcelamento criado: ${simulacao.quantidade_parcelas}x de R$ ${simulacao.valor_parcela.toFixed(2)} + entrada de R$ ${simulacao.valor_entrada.toFixed(2)}`,
-        'negociando'
-      );
+      // Busca cobranças originais do parcelamento master para registrar tratativas
+      const { data: cobrancasOriginais } = await supabase
+        .from('cobrancas_franqueados')
+        .select('id')
+        .eq('parcelamento_master_id', parcelamentoMasterId)
+        .eq('is_parcela', false);
+
+      // Registra tratativa para todas as cobranças originais
+      for (const cobranca of cobrancasOriginais || []) {
+        await this.tratativasService.registrarObservacao(
+          cobranca.id,
+          'sistema_acordos',
+          `Acordo de parcelamento criado: ${simulacao.quantidade_parcelas}x de R$ ${simulacao.valor_parcela.toFixed(2)} + entrada de R$ ${simulacao.valor_entrada.toFixed(2)}`,
+          'negociando'
+        );
+      }
 
       return acordoCriado;
     } catch (error) {
@@ -191,11 +196,11 @@ export class AcordosService {
         .from('acordos_parcelamento')
         .select(`
           *,
-          cobrancas_franqueados (
+          parcelamentos_master (
             id,
-            valor_original,
-            valor_atualizado,
-            cnpj
+            cnpj_unidade,
+            valor_total_original_parcelado,
+            valor_total_atualizado_parcelado
           )
         `)
         .eq('id', acordoId)
@@ -212,7 +217,7 @@ export class AcordosService {
 
       // Simula novo parcelamento
       const novaSimulacao = await this.simularParcelamento(
-        acordoAtual.titulo_id,
+        acordoAtual.parcelamento_master_id,
         novaQuantidadeParcelas,
         novoValorEntrada
       );
@@ -232,7 +237,7 @@ export class AcordosService {
 
       // Cria novo acordo
       const novoAcordo: Omit<AcordoParcelamento, 'id' | 'created_at' | 'updated_at'> = {
-        titulo_id: acordoAtual.titulo_id,
+        parcelamento_master_id: acordoAtual.parcelamento_master_id,
         cnpj_unidade: acordoAtual.cnpj_unidade,
         valor_original: novaSimulacao.valor_original,
         valor_atualizado: novaSimulacao.valor_atualizado,
@@ -504,13 +509,21 @@ export class AcordosService {
         // Busca título para registrar tratativa
         const { data: acordo } = await supabase
           .from('acordos_parcelamento')
-          .select('titulo_id')
+          .select('parcelamento_master_id')
           .eq('id', parcela.acordo_id)
           .single();
 
-        if (acordo) {
+        // Busca cobranças originais do parcelamento master para registrar tratativas
+        const { data: cobrancasOriginais } = await supabase
+          .from('cobrancas_franqueados')
+          .select('id')
+          .eq('parcelamento_master_id', acordo?.parcelamento_master_id)
+          .eq('is_parcela', false);
+
+        // Registra tratativa para todas as cobranças originais
+        for (const cobranca of cobrancasOriginais || []) {
           await this.tratativasService.registrarObservacao(
-            acordo.titulo_id,
+            cobranca.id,
             'sistema_acordos',
             'Acordo de parcelamento cumprido integralmente',
             'quitado'
@@ -586,19 +599,35 @@ export class AcordosService {
       // Busca dados do acordo
       const { data: acordo } = await supabase
         .from('acordos_parcelamento')
-        .select('titulo_id, cnpj_unidade')
+        .select('parcelamento_master_id, cnpj_unidade')
         .eq('id', acordoId)
         .single();
 
-      if (acordo) {
-        // Registra tratativa
+      // Busca cobranças originais do parcelamento master para registrar tratativas
+      const { data: cobrancasOriginais } = await supabase
+        .from('cobrancas_franqueados')
+        .select('id')
+        .eq('parcelamento_master_id', acordoAtual.parcelamento_master_id)
+        .eq('is_parcela', false);
+
+      // Busca cobranças originais do parcelamento master para registrar tratativas
+      const { data: cobrancasOriginais } = await supabase
+        .from('cobrancas_franqueados')
+        .select('id')
+        .eq('parcelamento_master_id', acordo?.parcelamento_master_id)
+        .eq('is_parcela', false);
+
+      // Registra tratativa para todas as cobranças originais
+      for (const cobranca of cobrancasOriginais || []) {
         await this.tratativasService.registrarObservacao(
-          acordo.titulo_id,
+          cobranca.id,
           'sistema_acordos',
           `Acordo quebrado: ${motivo}`,
           'em_aberto'
         );
+      }
 
+      if (acordo) {
         // Adiciona pontos de risco
         await this.adicionarPontosRisco(acordo.cnpj_unidade, 'parcelamento_quebrado');
       }
@@ -616,10 +645,10 @@ export class AcordosService {
         .from('acordos_parcelamento')
         .select(`
           *,
-          cobrancas_franqueados (
-            cliente,
-            cnpj,
-            valor_original
+          parcelamentos_master (
+            cnpj_unidade,
+            valor_total_original_parcelado,
+            valor_total_atualizado_parcelado
           ),
           parcelas_acordo (
             numero_parcela,
@@ -859,7 +888,7 @@ export class AcordosService {
       // Dados
       const linhas = acordos.map(acordo => [
         new Date(acordo.created_at!).toLocaleDateString('pt-BR'),
-        (acordo as any).cobrancas_franqueados?.cliente || '',
+        `Parcelamento consolidado`,
         acordo.cnpj_unidade,
         acordo.valor_original.toFixed(2),
         acordo.valor_atualizado.toFixed(2),

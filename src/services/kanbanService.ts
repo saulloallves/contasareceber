@@ -27,10 +27,11 @@ export class KanbanService {
         { id: "em_aberto", nome: "📥 Atrasadas", descricao: "Valor atrasado em aberto", cor: "#6B7280", ordem: 1, ativa: true, },
         { id: "em_negociacao", nome: "🤝 Negociando", descricao: "Negociando", cor: "#F59E0B", ordem: 2, ativa: true, },
         { id: "parcelado", nome: "🗂️ Parcelado", descricao: "Cobrança parcelada", cor: "#7031AF", ordem: 3, ativa: true, },
-        { id: "inadimplencia", nome: "❌ Inadimplência", descricao: "Cobrança atrasada mais de 30 dias", cor: "#8d4925", ordem: 4, ativa: true, },
-        { id: "juridico", nome: "⚖️ Jurídico", descricao: "Cobrança no jurídico", cor: "#31A3FB", ordem: 5, ativa: true, },
-        { id: "perda", nome: "🚫 Perda", descricao: "Cobrança perdida a mais de 180 dias", cor: "#FF0A0E", ordem: 6, ativa: true, },
-        { id: "quitado", nome: "✅ Quitado", descricao: "Totalmente quitado", cor: "#2EBF11", ordem: 7, ativa: true, },
+        { id: "parcelas", nome: "📅 Parcelas Futuras", descricao: "Parcelas de parcelamentos a vencer", cor: "#8B5CF6", ordem: 4, ativa: true, },
+        { id: "inadimplencia", nome: "❌ Inadimplência", descricao: "Cobrança atrasada mais de 30 dias", cor: "#8d4925", ordem: 5, ativa: true, },
+        { id: "juridico", nome: "⚖️ Jurídico", descricao: "Cobrança no jurídico", cor: "#31A3FB", ordem: 6, ativa: true, },
+        { id: "perda", nome: "🚫 Perda", descricao: "Cobrança perdida a mais de 180 dias", cor: "#FF0A0E", ordem: 7, ativa: true, },
+        { id: "quitado", nome: "✅ Quitado", descricao: "Totalmente quitado", cor: "#2EBF11", ordem: 8, ativa: true, },
       ];
     } catch (error) {
       console.error("Erro ao buscar colunas:", error);
@@ -184,10 +185,20 @@ export class KanbanService {
       .map((cobranca) => {
         const unidade = cobranca.unidades_franqueadas;
         const valorAtual = cobranca.valor_atualizado || cobranca.valor_original;
+        
+        // Para parcelas, ajustar o nome para mostrar informações da parcela
+        let nomeUnidade = unidade?.nome_unidade || cobranca.cliente;
+        let descricaoCobranca = cobranca.descricao;
+        
+        if (cobranca.is_parcela) {
+          nomeUnidade = `${nomeUnidade} - ${cobranca.cliente}`;
+          descricaoCobranca = `Parcela de parcelamento - ${cobranca.descricao || ''}`;
+        }
+        
         const card: CardCobranca = {
           id: cobranca.id, // UUID direto do banco
           codigo_unidade: unidade?.codigo_unidade || cobranca.cnpj,
-          nome_unidade: unidade?.nome_unidade || cobranca.cliente,
+          nome_unidade: nomeUnidade,
           cnpj: cobranca.cnpj,
           cpf: cobranca.cpf || "",
           tipo_debito: this.determinarTipoDebito([cobranca]),
@@ -203,7 +214,7 @@ export class KanbanService {
             cobranca.data_vencimento
           ),
           data_entrada_etapa: cobranca.created_at || new Date().toISOString(),
-          descricao_cobranca: cobranca.descricao,
+          descricao_cobranca: descricaoCobranca,
           valor_recebido: cobranca.valor_recebido || 0,
           quantidade_titulos: 1,
           observacoes: cobranca.observacoes || "",
@@ -658,6 +669,7 @@ export class KanbanService {
       em_negociacao: "em_negociacao",
       negociando: "em_negociacao",
       parcelado: "parcelado",
+      parcelas: "parcelas",
       quitado: "quitado",
       juridico: "juridico",
       inadimplencia: "inadimplencia",
@@ -691,6 +703,8 @@ export class KanbanService {
     const acoes: Record<string, string> = {
       em_aberto: "Cobrança atrasada em sistema",
       negociando: "Em processo de negociação",
+      parcelado: "Cobrança parcelada",
+      parcelas: "Parcela de parcelamento",
       quitado: "Débito quitado",
       em_tratativa_juridica: "Escalado para jurídico",
     };
