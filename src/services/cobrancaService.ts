@@ -393,4 +393,117 @@ export class CobrancaService {
             mensagem_enviada: row.mensagem_enviada || "Mensagem não capturada",
             status_envio: row.sucesso ? "sucesso" : "falha",
             erro_detalhes: row.erro_detalhes,
-            data_envio: row
+            data_envio: row.data_envio || row.created_at,
+            destinatario: row.destinatario
+          }))
+        );
+      }
+    } catch (error) {
+      console.error("Erro ao buscar logs de WhatsApp:", error);
+    }
+
+    // 2) Logs de Email
+    try {
+      const { data, error } = await supabase
+        .from("logs_envio_email")
+        .select("id, destinatario, mensagem, sucesso, message_id, erro_detalhes, data_envio, created_at, cobranca_id")
+        .eq("cobranca_id", cobrancaId)
+        .order("data_envio", { ascending: false });
+
+      if (!error && data) {
+        historico.push(
+          ...data.map((row: any): HistoricoEnvio => ({
+            id: row.id,
+            canal: "email",
+            tipo: "email_cobranca",
+            destinatario: row.destinatario,
+            mensagem: row.mensagem || "Mensagem não capturada",
+            status_envio: row.sucesso ? "sucesso" : "falha",
+            erro_detalhes: row.erro_detalhes,
+            data_envio: row.data_envio || row.created_at
+          }))
+        );
+      }
+    } catch (error) {
+      console.error("Erro ao buscar logs de Email:", error);
+    }
+
+    // 3) Histórico completo unificado
+    try {
+      const { data, error } = await supabase
+        .from("historico_envios_completo")
+        .select("*")
+        .eq("cobranca_id", cobrancaId)
+        .order("data_envio", { ascending: false });
+
+      if (!error && data) {
+        historico.push(
+          ...data.map((row: any): HistoricoEnvio => ({
+            id: row.id,
+            canal: row.canal,
+            tipo: row.tipo_envio,
+            destinatario: row.destinatario,
+            mensagem: row.mensagem,
+            assunto: row.assunto,
+            usuario: row.usuario,
+            status_envio: row.status_envio,
+            erro_detalhes: row.erro_detalhes,
+            data_envio: row.data_envio,
+            metadados: row.metadados
+          }))
+        );
+      }
+    } catch (error) {
+      console.error("Erro ao buscar histórico completo:", error);
+    }
+
+    // Ordena por data de envio (mais recente primeiro)
+    return historico.sort((a, b) => new Date(b.data_envio).getTime() - new Date(a.data_envio).getTime());
+  }
+
+  /**
+   * Busca cobranças disponíveis para parcelamento (não parceladas e não quitadas)
+   */
+  async buscarCobrancasDisponiveis(cnpjCpf?: string): Promise<CobrancaFranqueado[]> {
+    let query = supabase
+      .from("cobrancas_franqueados")
+      .select("*")
+      .eq("is_parcela", false)
+      .not("status", "in", "(quitado,parcelado)");
+
+    if (cnpjCpf) {
+      const documento = cnpjCpf.replace(/\D/g, "");
+      if (documento.length === 11) {
+        query = query.eq("cpf", documento);
+      } else if (documento.length === 14) {
+        query = query.eq("cnpj", documento);
+      }
+    }
+
+    const { data, error } = await query.order("data_vencimento", { ascending: false });
+
+    if (error) {
+      throw new Error(`Erro ao buscar cobranças disponíveis: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  /**
+   * Busca parcelas de um parcelamento específico
+   */
+  async buscarParcelas(parcelamentoMasterId: string): Promise<CobrancaFranqueado[]> {
+    const { data, error } = await supabase
+      .from("cobrancas_franqueados")
+      .select("*")
+      .eq("is_parcela", true)
+      .eq("parcelamento_master_id", parcelamentoMasterId)
+      .order("data_vencimento", { ascending: true });
+
+    if (error) {
+      throw new Error(`Erro ao buscar parcelas: ${error.message}`);
+    }
+
+    return data || [];
+  }
+}
