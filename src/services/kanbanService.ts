@@ -24,14 +24,70 @@ export class KanbanService {
     try {
       // Colunas do Kanban na ordem e nomes definidos pelo cliente
       return [
-        { id: "em_aberto", nome: "📥 Atrasadas", descricao: "Valor atrasado em aberto", cor: "#6B7280", ordem: 1, ativa: true, },
-        { id: "em_negociacao", nome: "🤝 Negociando", descricao: "Negociando", cor: "#F59E0B", ordem: 2, ativa: true, },
-        { id: "parcelado", nome: "🗂️ Parcelado", descricao: "Cobrança parcelada", cor: "#7031AF", ordem: 3, ativa: true, },
-        { id: "parcelas", nome: "📅 Parcelas Futuras", descricao: "Parcelas de parcelamentos a vencer", cor: "#8B5CF6", ordem: 4, ativa: true, },
-        { id: "inadimplencia", nome: "❌ Inadimplência", descricao: "Cobrança atrasada mais de 30 dias", cor: "#8d4925", ordem: 5, ativa: true, },
-        { id: "juridico", nome: "⚖️ Jurídico", descricao: "Cobrança no jurídico", cor: "#31A3FB", ordem: 6, ativa: true, },
-        { id: "perda", nome: "🚫 Perda", descricao: "Cobrança perdida a mais de 180 dias", cor: "#FF0A0E", ordem: 7, ativa: true, },
-        { id: "quitado", nome: "✅ Quitado", descricao: "Totalmente quitado", cor: "#2EBF11", ordem: 8, ativa: true, },
+        {
+          id: "em_aberto",
+          nome: "📥 Atrasadas",
+          descricao: "Valor atrasado em aberto",
+          cor: "#6B7280",
+          ordem: 1,
+          ativa: true,
+        },
+        {
+          id: "em_negociacao",
+          nome: "🤝 Negociando",
+          descricao: "Negociando",
+          cor: "#F59E0B",
+          ordem: 2,
+          ativa: true,
+        },
+        {
+          id: "parcelado",
+          nome: "🗂️ Parcelado",
+          descricao: "Cobrança parcelada",
+          cor: "#7031AF",
+          ordem: 3,
+          ativa: true,
+        },
+        {
+          id: "parcelas",
+          nome: "📅 Parcelas Futuras",
+          descricao: "Parcelas de parcelamentos a vencer",
+          cor: "#8B5CF6",
+          ordem: 4,
+          ativa: true,
+        },
+        {
+          id: "inadimplencia",
+          nome: "❌ Inadimplência",
+          descricao: "Cobrança atrasada mais de 30 dias",
+          cor: "#8d4925",
+          ordem: 5,
+          ativa: true,
+        },
+        {
+          id: "juridico",
+          nome: "⚖️ Jurídico",
+          descricao: "Cobrança no jurídico",
+          cor: "#31A3FB",
+          ordem: 6,
+          ativa: true,
+        },
+        {
+          id: "perda",
+          nome: "🚫 Perda",
+          descricao: "Cobrança perdida a mais de 180 dias",
+          cor: "#FF0A0E",
+          ordem: 7,
+          ativa: true,
+        },
+        {
+          id: "quitado",
+          nome: "✅ Quitado",
+          descricao: "Totalmente quitado",
+          cor: "#2EBF11",
+          ordem: 8,
+          ativa: true,
+        },
       ];
     } catch (error) {
       console.error("Erro ao buscar colunas:", error);
@@ -79,18 +135,33 @@ export class KanbanService {
 
       if (filtros.tipo_debito) {
         // O nome da coluna no banco é 'tipo_cobranca'
-        queryNaoQuitadas = queryNaoQuitadas.eq('tipo_cobranca', filtros.tipo_debito);
-        queryQuitadas = queryQuitadas.eq('tipo_cobranca', filtros.tipo_debito);
+        queryNaoQuitadas = queryNaoQuitadas.eq(
+          "tipo_cobranca",
+          filtros.tipo_debito
+        );
+        queryQuitadas = queryQuitadas.eq("tipo_cobranca", filtros.tipo_debito);
       }
 
       // Aplica filtros que funcionam em ambas as tabelas diretamente
       if (filtros.valor_min) {
-        queryNaoQuitadas = queryNaoQuitadas.gte("valor_atualizado", filtros.valor_min);
-        queryQuitadas = queryQuitadas.gte("valor_atualizado", filtros.valor_min);
+        queryNaoQuitadas = queryNaoQuitadas.gte(
+          "valor_atualizado",
+          filtros.valor_min
+        );
+        queryQuitadas = queryQuitadas.gte(
+          "valor_atualizado",
+          filtros.valor_min
+        );
       }
       if (filtros.valor_max) {
-        queryNaoQuitadas = queryNaoQuitadas.lte("valor_atualizado", filtros.valor_max);
-        queryQuitadas = queryQuitadas.lte("valor_atualizado", filtros.valor_max);
+        queryNaoQuitadas = queryNaoQuitadas.lte(
+          "valor_atualizado",
+          filtros.valor_max
+        );
+        queryQuitadas = queryQuitadas.lte(
+          "valor_atualizado",
+          filtros.valor_max
+        );
       }
       // Aplica filtro de unidade (CNPJ/Código) apenas na query que suporta o join
       if (filtros.unidade) {
@@ -99,7 +170,6 @@ export class KanbanService {
         // Para a query de quitadas, o filtro de unidade será aplicado depois da junção manual
       }
 
-
       // Executa as duas consultas em paralelo para otimizar o tempo
       const [
         { data: naoQuitadasData, error: naoQuitadasError },
@@ -107,37 +177,48 @@ export class KanbanService {
       ] = await Promise.all([queryNaoQuitadas, queryQuitadas]);
 
       if (naoQuitadasError) {
-        throw new Error(`Erro ao buscar cobranças pendentes: ${naoQuitadasError.message}`);
+        throw new Error(
+          `Erro ao buscar cobranças pendentes: ${naoQuitadasError.message}`
+        );
       }
       if (quitadasError) {
-        throw new Error(`Erro ao buscar cobranças quitadas: ${quitadasError.message}`);
+        throw new Error(
+          `Erro ao buscar cobranças quitadas: ${quitadasError.message}`
+        );
       }
 
       // --- JUNÇÃO MANUAL PARA COBRANÇAS QUITADAS ---
       let quitadasComUnidade: any[] = [];
       if (quitadasData && quitadasData.length > 0) {
-        const unidadeIds = [...new Set(quitadasData.map(c => c.unidade_id_fk).filter(id => id))];
+        const unidadeIds = [
+          ...new Set(
+            quitadasData.map((c) => c.unidade_id_fk).filter((id) => id)
+          ),
+        ];
 
         if (unidadeIds.length > 0) {
           const { data: unidadesData, error: unidadesError } = await supabase
-            .from('unidades_franqueadas')
-            .select('id, codigo_unidade, nome_unidade, cidade, estado')
-            .in('id', unidadeIds);
+            .from("unidades_franqueadas")
+            .select("id, codigo_unidade, nome_unidade, cidade, estado")
+            .in("id", unidadeIds);
 
           if (unidadesError) {
-            throw new Error(`Erro ao buscar unidades para cobranças quitadas: ${unidadesError.message}`);
+            throw new Error(
+              `Erro ao buscar unidades para cobranças quitadas: ${unidadesError.message}`
+            );
           }
 
-          const unidadesMap = new Map(unidadesData.map(u => [u.id, u]));
+          const unidadesMap = new Map(unidadesData.map((u) => [u.id, u]));
 
-          quitadasComUnidade = quitadasData.map(cobranca => ({
+          quitadasComUnidade = quitadasData.map((cobranca) => ({
             ...cobranca,
-            unidades_franqueadas: unidadesMap.get(cobranca.unidade_id_fk) || null
+            unidades_franqueadas:
+              unidadesMap.get(cobranca.unidade_id_fk) || null,
           }));
         } else {
-          quitadasComUnidade = quitadasData.map(cobranca => ({
+          quitadasComUnidade = quitadasData.map((cobranca) => ({
             ...cobranca,
-            unidades_franqueadas: null
+            unidades_franqueadas: null,
           }));
         }
       }
@@ -145,14 +226,21 @@ export class KanbanService {
 
       // Aplica o filtro de unidade para os quitados agora que temos os dados da unidade
       if (filtros.unidade) {
-          const filtroLowerCase = filtros.unidade.toLowerCase();
-          quitadasComUnidade = quitadasComUnidade.filter(c => {
-              const unidade = c.unidades_franqueadas;
-              const cnpjMatch = c.cnpj && c.cnpj.toLowerCase().includes(filtroLowerCase);
-              const nomeMatch = unidade && unidade.nome_unidade && unidade.nome_unidade.toLowerCase().includes(filtroLowerCase);
-              const codigoMatch = unidade && unidade.codigo_unidade && unidade.codigo_unidade.toLowerCase().includes(filtroLowerCase);
-              return cnpjMatch || nomeMatch || codigoMatch;
-          });
+        const filtroLowerCase = filtros.unidade.toLowerCase();
+        quitadasComUnidade = quitadasComUnidade.filter((c) => {
+          const unidade = c.unidades_franqueadas;
+          const cnpjMatch =
+            c.cnpj && c.cnpj.toLowerCase().includes(filtroLowerCase);
+          const nomeMatch =
+            unidade &&
+            unidade.nome_unidade &&
+            unidade.nome_unidade.toLowerCase().includes(filtroLowerCase);
+          const codigoMatch =
+            unidade &&
+            unidade.codigo_unidade &&
+            unidade.codigo_unidade.toLowerCase().includes(filtroLowerCase);
+          return cnpjMatch || nomeMatch || codigoMatch;
+        });
       }
 
       // Combina os resultados das duas consultas em um único array
@@ -185,16 +273,18 @@ export class KanbanService {
       .map((cobranca) => {
         const unidade = cobranca.unidades_franqueadas;
         const valorAtual = cobranca.valor_atualizado || cobranca.valor_original;
-        
+
         // Para parcelas, ajustar o nome para mostrar informações da parcela
         let nomeUnidade = unidade?.nome_unidade || cobranca.cliente;
         let descricaoCobranca = cobranca.descricao;
-        
+
         if (cobranca.is_parcela) {
           nomeUnidade = `${nomeUnidade} - ${cobranca.cliente}`;
-          descricaoCobranca = `Parcela de parcelamento - ${cobranca.descricao || ''}`;
+          descricaoCobranca = `Parcela de parcelamento - ${
+            cobranca.descricao || ""
+          }`;
         }
-        
+
         const card: CardCobranca = {
           id: cobranca.id, // UUID direto do banco
           codigo_unidade: unidade?.codigo_unidade || cobranca.cnpj,
@@ -245,7 +335,8 @@ export class KanbanService {
         cardsMap.set(chaveUnidade, {
           id: chaveUnidade, // A ID do card agrupado é o próprio documento
           codigo_unidade: unidade?.codigo_unidade || chaveUnidade,
-          nome_unidade: unidade?.nome_unidade || cobranca.cliente || "Franqueado(a)",
+          nome_unidade:
+            unidade?.nome_unidade || cobranca.cliente || "Franqueado(a)",
           cnpj: cobranca.cnpj || "",
           cpf: cobranca.cpf || "",
           tipo_debito: "Franchising - Royalties",
@@ -270,22 +361,29 @@ export class KanbanService {
       const card = cardsMap.get(chaveUnidade)!;
       const valorAtual = cobranca.valor_atualizado || cobranca.valor_original;
       card.valor_total += valorAtual;
-      card.valor_original = (card.valor_original || 0) + (cobranca.valor_original || 0);
+      card.valor_original =
+        (card.valor_original || 0) + (cobranca.valor_original || 0);
       card.quantidade_titulos = (card.quantidade_titulos || 0) + 1;
-      
-      if (new Date(cobranca.data_vencimento) < new Date(card.data_vencimento_antiga)) {
+
+      if (
+        new Date(cobranca.data_vencimento) <
+        new Date(card.data_vencimento_antiga)
+      ) {
         card.data_vencimento_antiga = cobranca.data_vencimento;
       }
-      if (new Date(cobranca.data_vencimento) > new Date(card.data_vencimento_recente)) {
+      if (
+        new Date(cobranca.data_vencimento) >
+        new Date(card.data_vencimento_recente)
+      ) {
         card.data_vencimento_recente = cobranca.data_vencimento;
       }
-      
+
       const statusAtual = this.determinarStatusKanban(cobranca.status);
       card._statusList!.push(statusAtual);
       if (cobranca.observacoes) {
         card._observacoesList!.push(cobranca.observacoes);
       }
-      
+
       if (new Date(cobranca.created_at) > new Date(card.data_ultima_acao)) {
         card.data_ultima_acao = cobranca.created_at;
         card.ultima_acao = this.determinarUltimaAcao(cobranca);
@@ -302,9 +400,12 @@ export class KanbanService {
           statusFinal = "misto";
         }
       }
-      
-      const observacaoFinal = card._observacoesList?.find((obs) => obs && obs.trim() !== "") || "";
-      const cobrancasDoCard = cobrancas.filter((c) => (c.cnpj || c.cpf) === (card.cnpj || card.cpf));
+
+      const observacaoFinal =
+        card._observacoesList?.find((obs) => obs && obs.trim() !== "") || "";
+      const cobrancasDoCard = cobrancas.filter(
+        (c) => (c.cnpj || c.cpf) === (card.cnpj || card.cpf)
+      );
 
       // Removendo as propriedades temporárias e garantindo a tipagem correta
       const finalCard: CardCobranca = {
@@ -340,84 +441,130 @@ export class KanbanService {
     motivo: string
   ): Promise<void> {
     try {
-      console.log(`🔄 Iniciando movimentação de ${cardOrUnitId} de '${statusOrigem}' para '${novoStatus}'`);
+      console.log(
+        `🔄 Iniciando movimentação de ${cardOrUnitId} de '${statusOrigem}' para '${novoStatus}'`
+      );
 
-      const isMovingToQuitado = novoStatus === 'quitado';
-      const isMovingFromQuitado = statusOrigem === 'quitado';
-      const isIndividualMove = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cardOrUnitId);
-      
+      const isMovingToQuitado = novoStatus === "quitado";
+      const isMovingFromQuitado = statusOrigem === "quitado";
+      const isIndividualMove =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          cardOrUnitId
+        );
+
       // ===== LÓGICA DE FILTRO CORRIGIDA =====
       // Cria um filtro OR para cobrir tanto CNPJ quanto CPF quando for um movimento de unidade
       const unitFilter = `cnpj.eq.${cardOrUnitId},cpf.eq.${cardOrUnitId}`;
 
       // --- CENÁRIO 1: Movendo PARA a coluna 'Quitado' ---
       if (isMovingToQuitado && !isMovingFromQuitado) {
-        const query = supabase.from('cobrancas_franqueados').select('*');
+        const query = supabase.from("cobrancas_franqueados").select("*");
         const { data: cobrancas, error: fetchError } = isIndividualMove
-          ? await query.eq('id', cardOrUnitId)
+          ? await query.eq("id", cardOrUnitId)
           : await query.or(unitFilter);
 
-        if (fetchError) throw new Error(`Erro ao buscar cobranças para quitar: ${fetchError.message}`);
-        if (!cobrancas || cobrancas.length === 0) throw new Error('Cobrança(s) de origem não encontrada(s).');
-        
-        const cobrancasParaQuitar = cobrancas.map(c => {
-            c.status = 'quitado';
-            delete (c as any).kanban_manual_change;
-            return c;
+        if (fetchError)
+          throw new Error(
+            `Erro ao buscar cobranças para quitar: ${fetchError.message}`
+          );
+        if (!cobrancas || cobrancas.length === 0)
+          throw new Error("Cobrança(s) de origem não encontrada(s).");
+
+        const cobrancasParaQuitar = cobrancas.map((c) => {
+          c.status = "quitado";
+          delete (c as any).kanban_manual_change;
+          return c;
         });
 
-        const { error: insertError } = await supabase.from('cobrancas_quitadas').insert(cobrancasParaQuitar);
-        if (insertError) throw new Error(`Erro ao inserir em cobranças quitadas: ${insertError.message}`);
+        const { error: insertError } = await supabase
+          .from("cobrancas_quitadas")
+          .insert(cobrancasParaQuitar);
+        if (insertError)
+          throw new Error(
+            `Erro ao inserir em cobranças quitadas: ${insertError.message}`
+          );
 
-        const idsParaDeletar = cobrancas.map(c => c.id);
-        const { error: deleteError } = await supabase.from('cobrancas_franqueados').delete().in('id', idsParaDeletar);
-        if (deleteError) throw new Error(`Erro ao deletar de cobranças franqueados: ${deleteError.message}`);
+        const idsParaDeletar = cobrancas.map((c) => c.id);
+        const { error: deleteError } = await supabase
+          .from("cobrancas_franqueados")
+          .delete()
+          .in("id", idsParaDeletar);
+        if (deleteError)
+          throw new Error(
+            `Erro ao deletar de cobranças franqueados: ${deleteError.message}`
+          );
 
-        console.log(`✅ ${cobrancas.length} cobrança(s) movida(s) para a tabela de quitadas.`);
+        console.log(
+          `✅ ${cobrancas.length} cobrança(s) movida(s) para a tabela de quitadas.`
+        );
       }
 
       // --- CENÁRIO 2: Movendo DE VOLTA da coluna 'Quitado' ---
       else if (isMovingFromQuitado && !isMovingToQuitado) {
-        const query = supabase.from('cobrancas_quitadas').select('*');
-         const { data: cobrancas, error: fetchError } = isIndividualMove
-          ? await query.eq('id', cardOrUnitId)
+        const query = supabase.from("cobrancas_quitadas").select("*");
+        const { data: cobrancas, error: fetchError } = isIndividualMove
+          ? await query.eq("id", cardOrUnitId)
           : await query.or(unitFilter);
 
-        if (fetchError) throw new Error(`Erro ao buscar cobranças para reabrir: ${fetchError.message}`);
-        if (!cobrancas || cobrancas.length === 0) throw new Error('Cobrança(s) quitada(s) de origem não encontrada(s).');
-        
-        const cobrancasParaReabrir = cobrancas.map(c => {
-            c.status = this.mapearStatusKanbanParaCobranca(novoStatus);
-            return c;
+        if (fetchError)
+          throw new Error(
+            `Erro ao buscar cobranças para reabrir: ${fetchError.message}`
+          );
+        if (!cobrancas || cobrancas.length === 0)
+          throw new Error(
+            "Cobrança(s) quitada(s) de origem não encontrada(s)."
+          );
+
+        const cobrancasParaReabrir = cobrancas.map((c) => {
+          c.status = this.mapearStatusKanbanParaCobranca(novoStatus);
+          return c;
         });
 
-        const { error: insertError } = await supabase.from('cobrancas_franqueados').insert(cobrancasParaReabrir);
-        if (insertError) throw new Error(`Erro ao inserir de volta em cobranças franqueados: ${insertError.message}`);
+        const { error: insertError } = await supabase
+          .from("cobrancas_franqueados")
+          .insert(cobrancasParaReabrir);
+        if (insertError)
+          throw new Error(
+            `Erro ao inserir de volta em cobranças franqueados: ${insertError.message}`
+          );
 
-        const idsParaDeletar = cobrancas.map(c => c.id);
-        const { error: deleteError } = await supabase.from('cobrancas_quitadas').delete().in('id', idsParaDeletar);
-        if (deleteError) throw new Error(`Erro ao deletar de cobranças quitadas: ${deleteError.message}`);
-        
-        console.log(`✅ ${cobrancas.length} cobrança(s) retornada(s) para a tabela de franqueados.`);
+        const idsParaDeletar = cobrancas.map((c) => c.id);
+        const { error: deleteError } = await supabase
+          .from("cobrancas_quitadas")
+          .delete()
+          .in("id", idsParaDeletar);
+        if (deleteError)
+          throw new Error(
+            `Erro ao deletar de cobranças quitadas: ${deleteError.message}`
+          );
+
+        console.log(
+          `✅ ${cobrancas.length} cobrança(s) retornada(s) para a tabela de franqueados.`
+        );
       }
 
       // --- CENÁRIO 3: Movimentação padrão (dentro de cobranças_franqueados) ---
       else if (!isMovingToQuitado && !isMovingFromQuitado) {
-        const novoStatusMapeado = this.mapearStatusKanbanParaCobranca(novoStatus);
-        const query = supabase.from('cobrancas_franqueados')
+        const novoStatusMapeado =
+          this.mapearStatusKanbanParaCobranca(novoStatus);
+        const query = supabase
+          .from("cobrancas_franqueados")
           .update({ status: novoStatusMapeado, kanban_manual_change: true });
 
         const { error: updateError } = isIndividualMove
-          ? await query.eq('id', cardOrUnitId)
+          ? await query.eq("id", cardOrUnitId)
           : await query.or(unitFilter);
 
-        if (updateError) throw new Error(`Erro ao atualizar status: ${updateError.message}`);
-        
-        console.log(`✅ Status de ${cardOrUnitId} atualizado para ${novoStatusMapeado}.`);
-      }
-      
-      else {
-          console.log("Movimentação na mesma tabela de origem, nenhuma ação de migração necessária.");
+        if (updateError)
+          throw new Error(`Erro ao atualizar status: ${updateError.message}`);
+
+        console.log(
+          `✅ Status de ${cardOrUnitId} atualizado para ${novoStatusMapeado}.`
+        );
+      } else {
+        console.log(
+          "Movimentação na mesma tabela de origem, nenhuma ação de migração necessária."
+        );
       }
 
       await this.registrarMovimentacao({
@@ -429,13 +576,11 @@ export class KanbanService {
         data_movimentacao: new Date().toISOString(),
         automatica: false,
       });
-
     } catch (error) {
       console.error("❌ Erro fatal ao mover card:", error);
       throw error;
     }
   }
-
 
   /**
    * Executa ação rápida em um card
@@ -469,7 +614,13 @@ export class KanbanService {
       }
 
       if (novoStatus !== card.status_atual) {
-        await this.moverCard(cardId, card.status_atual, novoStatus, usuario, descricaoAcao);
+        await this.moverCard(
+          cardId,
+          card.status_atual,
+          novoStatus,
+          usuario,
+          descricaoAcao
+        );
       } else {
         await this.registrarLog({
           card_id: cardId,
@@ -546,7 +697,8 @@ export class KanbanService {
         .range(0, 5000);
       // Considera apenas cobranças realmente em aberto
       const abertas = (brutas || []).filter(
-        (c: any) => c.status !== "quitado" && c.status !== "perda");
+        (c: any) => c.status !== "quitado" && c.status !== "perda"
+      );
       const totalOriginalAberto = abertas.reduce(
         (sum: number, c: any) => sum + (Number(c.valor_original) || 0),
         0
