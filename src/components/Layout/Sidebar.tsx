@@ -181,7 +181,7 @@ export function Sidebar({
     },
     { 
       id: "simulacao-parcelamento", 
-      label: "Simulação Parcelamento", 
+      label: "Central de Parcelamento", 
       icon: Calculator, 
       permissions: ["admin", "financeiro", "cobranca"],
       badge: null
