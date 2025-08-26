@@ -3,7 +3,6 @@ import { ReactNode } from "react";
 
 export interface SimulacaoParcelamentoType {
   id?: string;
-  titulo_id?: string;
   parcelamento_master_id: string;
   cnpj_unidade: string;
   valor_original: number;
