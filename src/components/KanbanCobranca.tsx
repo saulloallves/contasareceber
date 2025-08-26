@@ -1736,11 +1736,11 @@ _Mensagem Automática do Sistema_
               </div>
               <div className="text-sm text-blue-800">Total de Cards</div>
             </div>
-            <div className="bg-red-100 rounded-lg p-4">
-              <div className="text-2xl font-bold text-red-700">
+            <div className="bg-purple-100 rounded-lg p-4">
+              <div className="text-2xl font-bold text-purple-700">
                 {estatisticas.inadimplentes_perda}
               </div>
-              <div className="text-sm text-red-700">Cobranças Inadimplentes/Perda</div>
+              <div className="text-sm text-purple-700">Cobranças Inadimplentes/Perda</div>
             </div>
             <div className="bg-yellow-100 rounded-lg p-4">
               <div className="text-2xl font-bold text-yellow-700">
@@ -1748,13 +1748,13 @@ _Mensagem Automática do Sistema_
               </div>
               <div className="text-sm text-yellow-700">Cards Críticos</div>
             </div>
-            <div className="bg-green-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-green-600">
+            <div className="bg-red-50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-red-600">
                 {formatarMoeda(
                   estatisticas.valor_total_original_aberto || 0
                 )}
               </div>
-              <div className="text-sm text-green-800">Valor Total em Aberto (Original)</div>
+              <div className="text-sm text-red-800">Valor Total em Aberto (Original)</div>
             </div>
           </div>
         )}
