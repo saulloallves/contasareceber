@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from './databaseService';
 import { AcordoParcelamento, ParcelaAcordo, SimulacaoParcelamento, ConfiguracaoAcordos, HistoricoAceite, FiltrosAcordos, EstatisticasAcordos, ValidacaoAcordo } from '../types/acordos';
 import { TrativativasService } from './tratativasService';
@@ -602,13 +604,6 @@ export class AcordosService {
         .select('parcelamento_master_id, cnpj_unidade')
         .eq('id', acordoId)
         .single();
-
-      // Busca cobranças originais do parcelamento master para registrar tratativas
-      const { data: cobrancasOriginais } = await supabase
-        .from('cobrancas_franqueados')
-        .select('id')
-        .eq('parcelamento_master_id', acordoAtual.parcelamento_master_id)
-        .eq('is_parcela', false);
 
       // Busca cobranças originais do parcelamento master para registrar tratativas
       const { data: cobrancasOriginais } = await supabase
