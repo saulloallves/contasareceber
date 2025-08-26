@@ -546,7 +546,7 @@ export class KanbanService {
         .range(0, 5000);
       // Considera apenas cobranças realmente em aberto
       const abertas = (brutas || []).filter(
-        (c: any) => c.status !== "quitado");
+        (c: any) => c.status !== "quitado" && c.status !== "perda");
       const totalOriginalAberto = abertas.reduce(
         (sum: number, c: any) => sum + (Number(c.valor_original) || 0),
         0
