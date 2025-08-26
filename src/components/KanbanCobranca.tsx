@@ -474,6 +474,7 @@ export class KanbanService {
         if (parcelaError || !parcela) {
           throw new Error("Parcela não encontrada ou dados inválidos");
         }
+      }
 
       // --- CENÁRIO 1: Movendo PARA a coluna 'Quitado' ---
       if (isMovingToQuitado && !isMovingFromQuitado) {
