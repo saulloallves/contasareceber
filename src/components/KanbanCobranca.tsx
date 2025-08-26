@@ -1,33 +1,38 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable react-hooks/exhaustive-deps */
-import { useState, useEffect, useCallback, useRef } from "react";
-import { DragDropContext, Droppable, Draggable, DropResult, } from "react-beautiful-dnd";
-import { MessageSquare, Calendar, DollarSign, AlertTriangle, Filter, Download, RefreshCw, Edit, X, Save, CircleDollarSign, Lock } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import {
+  CircleDollarSign,
+  Filter,
+  RefreshCw,
+  Download,
+  MessageSquare,
+  Calendar,
+  FileText,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  Building2,
+  User,
+  Phone,
+  Mail,
+  Eye,
+  Edit,
+  Save,
+  X,
+  CreditCard,
+  Package,
+  Scale,
+  Ban,
+} from "lucide-react";
 import { KanbanService } from "../services/kanbanService";
-import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban, } from "../types/kanban";
-import { formatarCNPJCPF, formatarMoeda, formatarData, } from "../utils/formatters";
-import { supabase } from "../lib/supabaseClient";
+import { cobrancaService } from "../services/cobrancaService";
 import { n8nService } from "../services/n8nService";
+import { emailService } from "../services/emailService";
+import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban } from "../types/kanban";
+import { formatarCNPJCPF, formatarMoeda } from "../utils/formatters";
+import { connectionService } from "../services/connectionService";
 import { toast } from "react-hot-toast";
-
-// Flag para logs detalhados
-const DEBUG = false;
-
-type UnitKanbanCard = {
-  codigo_unidade: string;
-  nome_unidade: string;
-  cnpj: string;
-  cpf?: string;
-  tipo_debito: string;
-  data_vencimento_antiga: string;
-  valor_total: number;
-  valor_original?: number;
-  status_atual: string;
-  responsavel_atual: string;
-  charges: CardCobranca[];
-  observacoes?: string;
-};
 
 export function KanbanCobranca() {
   const [colunas, setColunas] = useState<ColunaKanban[]>([]);
@@ -35,1629 +40,503 @@ export function KanbanCobranca() {
   const [carregando, setCarregando] = useState(true);
   const [filtros, setFiltros] = useState<FiltrosKanban>({});
   const [estatisticas, setEstatisticas] = useState<EstatisticasKanban | null>(null);
-  const [unitSelecionada, setUnitSelecionada] = useState<UnitKanbanCard | null>(null);
-  const [modalAberto, setModalAberto] = useState<"detalhes" | "acao" | "observacao" | null>(null);
-  const [observacaoEditando, setObservacaoEditando] = useState("");
-  const [processando, setProcessando] = useState(false);
-  const [aba, setAba] = useState<"unidade" | "individual">("unidade");
-  const [cobrancaSelecionada, setCobrancaSelecionada] = useState<CardCobranca | null>(null);
-  const [modalConfirmacaoAberto, setModalConfirmacaoAberto] = useState(false);
-  const [movimentoPendente, setMovimentoPendente] = useState<DropResult | null>(null);
-  const [movimentacaoIndividualFeita, setMovimentacaoIndividualFeita] = useState(false);
-  const [unidadesComStatusMisto, setUnidadesComStatusMisto] = useState< Set<string> >(new Set());
-  const [showMixedStatusWarning, setShowMixedStatusWarning] = useState(false);
-  const [todasCobrancasUnidade, setTodasCobrancasUnidade] = useState< CardCobranca[] >([]);
-  const [filtrosAvancados, setFiltrosAvancados] = useState({ nomeUnidade: "", cnpj: "", codigo: "", statusCobranca: "", valorMin: "", valorMax: "", tipoCobranca: "", });
-  const [showFiltrosAvancados, setShowFiltrosAvancados] = useState(false);
-  const [detalhesStatusMisto, setDetalhesStatusMisto] = useState<Record<string, { statusList: string[], nomeUnidade: string }>>({});
-  const [modalDetalhesStatusMisto, setModalDetalhesStatusMisto] = useState<string | null>(null);
-  const [quantidadesTotaisPorUnidade, setQuantidadesTotaisPorUnidade] = useState<Record<string, number>>({});
-  const [modalConfirmacaoWhatsAppUnidade, setModalConfirmacaoWhatsAppUnidade] = useState(false);
-  const [unidadeParaWhatsApp, setUnidadeParaWhatsApp] = useState<UnitKanbanCard | null>(null);
-  const [monitoramentoAtivo, setMonitoramentoAtivo] = useState(false);
-  const kanbanService = new KanbanService();
-  const processandoAnteriorRef = useRef(processando);
-  const [cardsVisiveisPorColuna, setCardsVisiveisPorColuna] = useState<{ [colunaId: string]: number }>({});
+  const [agrupadoPorUnidade, setAgrupadoPorUnidade] = useState(true);
+  const [modalObservacao, setModalObservacao] = useState<{
+    aberto: boolean;
+    cardId: string;
+    observacaoAtual: string;
+  }>({ aberto: false, cardId: "", observacaoAtual: "" });
+  const [modalDetalhes, setModalDetalhes] = useState<{
+    aberto: boolean;
+    card: CardCobranca | null;
+  }>({ aberto: false, card: null });
+  const [salvandoObservacao, setSalvandoObservacao] = useState(false);
+  const [processandoAcao, setProcessandoAcao] = useState<string | null>(null);
 
-  // Chaves para localStorage
-  const STORAGE_KEY_STATUS_MISTO = "kanban_unidades_status_misto";
-  const STORAGE_KEY_MOVIMENTACAO_INDIVIDUAL = "kanban_movimentacao_individual";
+  const kanbanService = useMemo(() => new KanbanService(), []);
 
-  /**
-   * Salva o estado de unidades com status misto no localStorage
-   */
-  const salvarStatusMistoStorage = (
-    unidadesMistas: Set<string>,
-    detalhes: Record<string, { statusList: string[]; nomeUnidade: string }>
-  ) => {
-    try {
-      const data = {
-        unidades: Array.from(unidadesMistas),
-        detalhes,
-        timestamp: Date.now(),
-      };
-      localStorage.setItem(STORAGE_KEY_STATUS_MISTO, JSON.stringify(data));
-      console.log("💾 Status misto salvo no localStorage:", data);
-    } catch (error) {
-      console.warn("Erro ao salvar status misto no localStorage:", error);
-    }
-  };
-
-  /**
-   * Carrega o estado de unidades com status misto do localStorage
-   */
-  const carregarStatusMistoStorage = (): {
-    unidades: Set<string>;
-    detalhes: Record<string, { statusList: string[]; nomeUnidade: string }>;
-  } => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_STATUS_MISTO);
-      if (stored) {
-        const data = JSON.parse(stored);
-
-        // Verifica se os dados não são muito antigos (máximo 1 hora)
-        const tempoLimite = 60 * 60 * 1000; // 1 hora em ms
-        if (Date.now() - data.timestamp > tempoLimite) {
-          localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
-          return { unidades: new Set(), detalhes: {} };
-        }
-
-        console.log("📂 Status misto carregado do localStorage:", data);
-        return {
-          unidades: new Set(data.unidades || []),
-          detalhes: data.detalhes || {},
-        };
-      }
-    } catch (error) {
-      console.warn("Erro ao carregar status misto do localStorage:", error);
-    }
-    return { unidades: new Set(), detalhes: {} };
-  };
-
-  /**
-   * Salva o estado de movimentação individual no sessionStorage
-   */
-  const salvarMovimentacaoIndividualStorage = (movimentou: boolean) => {
-    try {
-      sessionStorage.setItem(
-        STORAGE_KEY_MOVIMENTACAO_INDIVIDUAL,
-        JSON.stringify({
-          movimentou,
-          timestamp: Date.now(),
-        })
-      );
-    } catch (error) {
-      console.warn("Erro ao salvar movimentação individual:", error);
-    }
-  };
-
-  /**
-   * Carrega o estado de movimentação individual do sessionStorage
-   */
-  const carregarMovimentacaoIndividualStorage = (): boolean => {
-    try {
-      const stored = sessionStorage.getItem(
-        STORAGE_KEY_MOVIMENTACAO_INDIVIDUAL
-      );
-      if (stored) {
-        const data = JSON.parse(stored);
-        return data.movimentou || false;
-      }
-    } catch (error) {
-      console.warn("Erro ao carregar movimentação individual:", error);
-    }
-    return false;
-  };
-
-  /**
-   * Limpa os dados de localStorage relacionados ao Kanban
-   */
-  const limparStorageKanban = () => {
-    try {
-      localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
-      sessionStorage.removeItem(STORAGE_KEY_MOVIMENTACAO_INDIVIDUAL);
-      console.log("🧹 Storage do Kanban limpo");
-    } catch (error) {
-      console.warn("Erro ao limpar storage:", error);
-    }
-  };
-
-  // Helper para reset automático das travas (equivalente ao botão "Resetar Travas")
-  const resetarTravasAutomatico = useCallback(() => {
-    try {
-      // Limpa caches
-      limparStorageKanban();
-      // Reseta flags e estados
-      setMovimentacaoIndividualFeita(false);
-      setUnidadesComStatusMisto(new Set());
-      setDetalhesStatusMisto({});
-      setShowMixedStatusWarning(false);
-      setModalDetalhesStatusMisto(null);
-      setModalConfirmacaoAberto(false);
-      setMovimentoPendente(null);
-      // Garante parada do monitoramento
-      setMonitoramentoAtivo(false);
-      // Retorna para o modo por unidade automaticamente
-      setAba("unidade");
-      console.log("✅ Travas resetadas automaticamente após liberação total");
-    } catch (e) {
-      console.warn("Erro ao resetar travas automaticamente:", e);
-    }
-  }, []);
-
-  // ===== carregarDados vem antes das funções de verificação para evitar closures obsoletas =====
   const carregarDados = useCallback(async () => {
     setCarregando(true);
     try {
-      // Carrega estados do storage primeiro
-      const movimentacaoIndividualDoStorage =
-        carregarMovimentacaoIndividualStorage();
-      setMovimentacaoIndividualFeita(movimentacaoIndividualDoStorage);
-
-      // Converte filtros avançados para o formato esperado pelo serviço
-      const filtrosServico: FiltrosKanban = {};
-
-      if (filtrosAvancados.tipoCobranca) {
-        filtrosServico.tipo_debito = filtrosAvancados.tipoCobranca as any;
-      }
-
-      if (filtrosAvancados.valorMin) {
-        filtrosServico.valor_min = parseFloat(filtrosAvancados.valorMin);
-      }
-
-      if (filtrosAvancados.valorMax) {
-        filtrosServico.valor_max = parseFloat(filtrosAvancados.valorMax);
-      }
-
-      const [colunasData, cardsData, statsData] = await Promise.all([
+      const [colunasData, cardsData, estatisticasData] = await Promise.all([
         kanbanService.buscarColunas(),
-        kanbanService.buscarCards(filtrosServico, aba === "unidade"),
-        kanbanService.buscarEstatisticas(aba === "unidade"),
+        kanbanService.buscarCards(filtros, agrupadoPorUnidade),
+        kanbanService.buscarEstatisticas(agrupadoPorUnidade),
       ]);
+
       setColunas(colunasData);
-
-      // Aplica filtros locais que não são suportados pelo serviço
-      let cardsFiltrados = cardsData;
-
-      if (filtrosAvancados.nomeUnidade) {
-        cardsFiltrados = cardsFiltrados.filter((card) =>
-          card.nome_unidade
-            .toLowerCase()
-            .includes(filtrosAvancados.nomeUnidade.toLowerCase())
-        );
-      }
-
-      if (filtrosAvancados.cnpj) {
-        cardsFiltrados = cardsFiltrados.filter((card) =>
-          card.cnpj.includes(filtrosAvancados.cnpj)
-        );
-      }
-
-      if (filtrosAvancados.codigo) {
-        cardsFiltrados = cardsFiltrados.filter((card) =>
-          card.codigo_unidade
-            .toLowerCase()
-            .includes(filtrosAvancados.codigo.toLowerCase())
-        );
-      }
-
-      if (filtrosAvancados.statusCobranca) {
-        cardsFiltrados = cardsFiltrados.filter(
-          (card) => card.status_atual === filtrosAvancados.statusCobranca
-        );
-      }
-
-      setCards(cardsFiltrados);
-      setEstatisticas(statsData);
-
-      // Calcula quantidades totais de cobranças por unidade
-      if (aba === "unidade") {
-        // Busca todas as cobranças (sem filtros) para calcular totais corretos
-        const todasCobrancasSemFiltro = await kanbanService.buscarCards(
-          {},
-          false
-        );
-        const quantidadesPorUnidade: Record<string, number> = {};
-
-        todasCobrancasSemFiltro.forEach((card) => {
-          const key = card.cnpj || (card as any).cpf;
-          quantidadesPorUnidade[key] = (quantidadesPorUnidade[key] || 0) + 1;
-        });
-
-        setQuantidadesTotaisPorUnidade(quantidadesPorUnidade);
-      }
-
-      // Detecta unidades com status misto com validação em tempo real
-      if (aba === "unidade") {
-        console.log(
-          "🔍 Detectando status misto em tempo real (ignorando storage temporariamente)..."
-        );
-        const resultado = await detectarUnidadesComStatusMisto();
-
-        // Carrega dados do storage apenas para comparação/log
-        const { unidades: unidadesMistasStorage } =
-          carregarStatusMistoStorage();
-
-        console.log("📊 Comparação storage vs banco:");
-        console.log("  - Storage:", Array.from(unidadesMistasStorage));
-        console.log("  - Banco:", Array.from(resultado.unidadesMistas));
-
-        // SEMPRE usa os dados do banco (fonte da verdade)
-        setUnidadesComStatusMisto(resultado.unidadesMistas);
-        setDetalhesStatusMisto(resultado.detalhes);
-
-        // Se há diferença, atualiza o storage ou remove se não há unidades bloqueadas
-        if (resultado.unidadesMistas.size === 0) {
-          console.log(
-            "🧹 Nenhuma unidade bloqueada no banco - limpando storage"
-          );
-          try {
-            localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
-          } catch (error) {
-            console.warn("Erro ao limpar localStorage:", error);
-          }
-        } else {
-          console.log(
-            `💾 Salvando ${resultado.unidadesMistas.size} unidades bloqueadas no storage`
-          );
-          salvarStatusMistoStorage(
-            resultado.unidadesMistas,
-            resultado.detalhes
-          );
-        }
-
-        // Inicia/para monitoramento conforme necessário
-        if (resultado.unidadesMistas.size > 0 && !monitoramentoAtivo) {
-          console.log("🤖 Iniciando monitoramento automático...");
-          setMonitoramentoAtivo(true);
-        } else if (resultado.unidadesMistas.size === 0 && monitoramentoAtivo) {
-          console.log("🛑 Parando monitoramento - nenhuma unidade bloqueada");
-          setMonitoramentoAtivo(false);
-        }
-      }
+      setCards(cardsData);
+      setEstatisticas(estatisticasData);
     } catch (error) {
-      console.error("❌ Erro ao carregar dados do Kanban:", error);
-      toast.error("Erro ao carregar dados do Kanban. Verifique a conexão.", {
-        duration: 5000,
-        style: {
-          background: "#ef4444",
-          color: "#fff",
-        },
-      });
+      console.error("Erro ao carregar dados do Kanban:", error);
+      toast.error("Erro ao carregar dados do Kanban");
     } finally {
       setCarregando(false);
     }
-  }, [filtros, aba, filtrosAvancados, monitoramentoAtivo]);
-
-  // Botão Atualizar: se houver travas, aplica reset automático; caso contrário, apenas recarrega
-  const handleAtualizarClick = useCallback(async () => {
-    if (movimentacaoIndividualFeita || unidadesComStatusMisto.size > 0) {
-      resetarTravasAutomatico();
-      await carregarDados();
-      toast.success('Travas resetadas e dados atualizados');
-    } else {
-      carregarDados();
-    }
-  }, [movimentacaoIndividualFeita, unidadesComStatusMisto.size, resetarTravasAutomatico, carregarDados]);
-
-  /**
-   * Monitora mudanças de status e libera travas automaticamente
-   */
-  const monitorarELiberarTravas = useCallback(async () => {
-    try {
-      console.log(
-        "🔍 Monitorando status das unidades bloqueadas...",
-        Array.from(unidadesComStatusMisto)
-      );
-
-      // SEMPRE verifica o estado real no banco, ignorando localStorage temporariamente
-      const resultado = await detectarUnidadesComStatusMisto();
-      const novasUnidadesMistas = resultado.unidadesMistas;
-      const novosDetalhes = resultado.detalhes;
-
-      console.log("📊 Comparação de estados:");
-      console.log(
-        "  - Unidades bloqueadas antes:",
-        Array.from(unidadesComStatusMisto)
-      );
-      console.log(
-        "  - Unidades bloqueadas no banco agora:",
-        Array.from(novasUnidadesMistas)
-      );
-
-      // Se não há mais unidades com status misto no banco, limpa TUDO
-      if (novasUnidadesMistas.size === 0) {
-        console.log(
-          "🎉 TODAS AS UNIDADES FORAM LIBERADAS! Limpando estado completo..."
-        );
-
-        // Para o monitoramento PRIMEIRO para evitar loops
-        setMonitoramentoAtivo(false);
-
-        // Limpa os estados locais
-        setUnidadesComStatusMisto(new Set());
-        setDetalhesStatusMisto({});
-        // Também limpa flag de movimentação individual e storage (como o botão Resetar Travas)
-        setMovimentacaoIndividualFeita(false);
-        try {
-          sessionStorage.removeItem(STORAGE_KEY_MOVIMENTACAO_INDIVIDUAL);
-        } catch (e) {
-          console.warn("Falha ao limpar sessionStorage:", e);
-        }
-
-        // FORÇA a limpeza do localStorage
-        try {
-          localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
-          console.log("🧹 localStorage limpo com sucesso");
-        } catch (error) {
-          console.warn("Erro ao limpar localStorage:", error);
-        }
-
-        // Notificação de liberação total usando toast
-        if (unidadesComStatusMisto.size > 0) {
-          const nomesLiberadas = Array.from(unidadesComStatusMisto)
-            .map((cnpj) => detalhesStatusMisto[cnpj]?.nomeUnidade || cnpj)
-            .join(", ");
-
-          toast.success(
-            `🎉 TODAS AS TRAVAS FORAM LIBERADAS!\n\nUnidades desbloqueadas: ${nomesLiberadas}\n\nVocê pode voltar ao modo por unidade.`,
-            {
-              id: "liberacao-total",
-              duration: 8000,
-              style: {
-                background: "#22c55e",
-                color: "#fff",
-                fontSize: "14px",
-                padding: "16px",
-                maxWidth: "500px",
-              },
-            }
-          );
-        }
-
-        console.log(
-          "🛑 Monitoramento interrompido - todas as unidades foram liberadas"
-        );
-
-        // Aplica reset automático (equivalente ao botão) e recarrega dados
-        resetarTravasAutomatico();
-        setTimeout(() => {
-          carregarDados();
-        }, 800);
-
-        return;
-      }
-
-      // Verifica se alguma unidade específica foi liberada
-      const unidadesLiberadas = Array.from(unidadesComStatusMisto).filter(
-        (cnpj) => !novasUnidadesMistas.has(cnpj)
-      );
-
-      if (unidadesLiberadas.length > 0) {
-        console.log("🎉 Unidades específicas liberadas:", unidadesLiberadas);
-
-        const nomesLiberadas = unidadesLiberadas
-          .map((cnpj) => detalhesStatusMisto[cnpj]?.nomeUnidade || cnpj)
-          .join(", ");
-
-        // Notificação de liberação parcial usando toast
-        const keyParcial = `liberacao-parcial-${unidadesLiberadas
-          .sort()
-          .join("|")}`;
-        if (unidadesLiberadas.length === 1) {
-          toast.success(
-            `✅ TRAVA LIBERADA!\n\nA unidade "${nomesLiberadas}" foi desbloqueada automaticamente.`,
-            {
-              id: keyParcial,
-              duration: 6000,
-              style: {
-                background: "#22c55e",
-                color: "#fff",
-                fontSize: "14px",
-                padding: "16px",
-                maxWidth: "400px",
-              },
-            }
-          );
-        } else {
-          toast.success(
-            `✅ ${unidadesLiberadas.length} TRAVAS LIBERADAS!\n\nUnidades desbloqueadas: ${nomesLiberadas}`,
-            {
-              id: keyParcial,
-              duration: 7000,
-              style: {
-                background: "#22c55e",
-                color: "#fff",
-                fontSize: "14px",
-                padding: "16px",
-                maxWidth: "500px",
-              },
-            }
-          );
-        }
-      }
-
-      // Atualiza os estados sempre (mesmo se não houve mudança para garantir sincronização)
-      setUnidadesComStatusMisto(novasUnidadesMistas);
-      setDetalhesStatusMisto(novosDetalhes);
-
-      // Salva no localStorage apenas se ainda há unidades bloqueadas
-      if (novasUnidadesMistas.size > 0) {
-        salvarStatusMistoStorage(novasUnidadesMistas, novosDetalhes);
-        console.log(
-          `📊 Estado atualizado - ${novasUnidadesMistas.size} unidades ainda bloqueadas`
-        );
-      }
-    } catch (error) {
-      console.error("❌ Erro no monitoramento de travas:", error);
-
-      // Notifica erro via toast em vez de alert
-      toast.error(
-        "Erro no monitoramento de travas. Tentando recuperar estados...",
-        {
-          duration: 5000,
-          style: {
-            background: "#ef4444",
-            color: "#fff",
-          },
-        }
-      );
-
-      // Em caso de erro, tenta limpar estados inconsistentes
-      console.log(
-        "🔧 Tentando limpar estados inconsistentes devido ao erro..."
-      );
-      setUnidadesComStatusMisto(new Set());
-      setDetalhesStatusMisto({});
-      setMonitoramentoAtivo(false);
-      localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
-    }
-  }, [
-    unidadesComStatusMisto,
-    detalhesStatusMisto,
-    salvarStatusMistoStorage,
-    carregarDados,
-    resetarTravasAutomatico,
-  ]);
-
-  /**
-   * Inicia o monitoramento automático quando há unidades bloqueadas
-   */
-  const iniciarMonitoramento = useCallback(() => {
-    if (unidadesComStatusMisto.size > 0 && !monitoramentoAtivo) {
-      setMonitoramentoAtivo(true);
-      console.log("🚀 Monitoramento automático iniciado");
-    }
-  }, [unidadesComStatusMisto.size, monitoramentoAtivo]);
-
-  // (Parar monitoramento) — removido: o reset automático já desliga via setMonitoramentoAtivo(false)
-
-  /**
-   * Força uma verificação imediata das travas (sem depender do intervalo)
-   */
-  const forcarVerificacaoTravas = useCallback(async () => {
-    console.log("🔍 VERIFICAÇÃO FORÇADA DE TRAVAS SOLICITADA");
-    try {
-      const { unidadesMistas: novasUnidadesMistas, detalhes: novosDetalhes } =
-        await detectarUnidadesComStatusMisto();
-
-      console.log("📊 Verificação forçada - Unidades antes:", Array.from(unidadesComStatusMisto));
-      console.log("📊 Verificação forçada - Unidades agora:", Array.from(novasUnidadesMistas));
-
-      const unidadesLiberadas = Array.from(unidadesComStatusMisto).filter(
-        (cnpj) => !novasUnidadesMistas.has(cnpj)
-      );
-      if (unidadesLiberadas.length > 0) {
-        const nomesLiberadas = unidadesLiberadas
-          .map((cnpj) => detalhesStatusMisto[cnpj]?.nomeUnidade || cnpj)
-          .join(", ");
-        toast.success(`🔓 Unidades liberadas: ${nomesLiberadas}` , {
-          id: `liberacao-parcial-${unidadesLiberadas.sort().join('-')}`,
-          duration: 4000,
-          style: { background: '#16a34a', color: '#fff' }
-        });
-      }
-
-      if (novasUnidadesMistas.size === 0) {
-        toast.success('🔓 Todas as travas foram liberadas.', {
-          id: 'liberacao-total',
-          duration: 4000,
-          style: { background: '#16a34a', color: '#fff' }
-        });
-        resetarTravasAutomatico();
-        setTimeout(() => { carregarDados(); }, 800);
-        return;
-      }
-
-      setUnidadesComStatusMisto(novasUnidadesMistas);
-      setDetalhesStatusMisto(novosDetalhes);
-      if (novasUnidadesMistas.size > 0) {
-        salvarStatusMistoStorage(novasUnidadesMistas, novosDetalhes);
-      }
-    } catch (error) {
-      console.error("❌ Erro na verificação forçada:", error);
-      toast.error("Erro na verificação de travas. Tentando novamente...", {
-        duration: 5000,
-        style: { background: "#ef4444", color: "#fff" },
-      });
-    }
-  }, [unidadesComStatusMisto, detalhesStatusMisto, salvarStatusMistoStorage, carregarDados, resetarTravasAutomatico]);
-
-  // (Funções de liberação forçada removidas)
-
-  // Aviso temporário para funcionalidade de reuniões ainda não implementada
-  const avisarReuniaoIndisponivel = useCallback(() => {
-    toast("Funcionalidade de reuniões ainda não foi implementada.", {
-      duration: 4000,
-      style: { background: "#7c3aed", color: "#fff" },
-    });
-  }, []);
-
-  /**
-   * Função auxiliar para buscar o nome do franqueado baseado no CNPJ
-   */
-  const buscarNomeFranqueado = useCallback(
-    async (cnpj: string): Promise<string> => {
-      try {
-        // Busca dados completos da unidade via Supabase com relacionamentos
-        const { data: unidade, error } = await supabase
-          .from("unidades_franqueadas")
-          .select(
-            `
-          nome_unidade,
-          franqueado_unidades!left (
-            franqueados!left (
-              nome_completo
-            )
-          )
-        `
-          )
-          .eq("codigo_interno", cnpj)
-          .single();
-
-        if (error) {
-          console.warn("Erro ao buscar unidade por CNPJ:", error);
-          return "Cliente";
-        }
-
-        // Prioriza APENAS nome do franqueado - nunca usar nome da unidade
-        const nomeFranqueado = (unidade as any)?.franqueado_unidades?.[0]
-          ?.franqueados?.nome_completo;
-
-        // Se tem franqueado vinculado e o nome não é "Sem nome cadastrado"
-        if (nomeFranqueado && nomeFranqueado !== "Sem nome cadastrado") {
-          return nomeFranqueado;
-        }
-
-        // Para TODOS os outros casos (sem franqueado, franqueado com "Sem nome cadastrado", etc.)
-        // SEMPRE retorna "Franqueado(a)" - nunca o nome da unidade
-        return "Franqueado(a)";
-      } catch (error) {
-        console.warn("Erro ao buscar nome do franqueado:", error);
-        return "Franqueado(a)";
-      }
-    },
-    []
-  );
-
-  // Função para limpar estados do modal
-  const limparEstadosModal = () => {
-    setUnitSelecionada(null);
-    setCobrancaSelecionada(null);
-    setTodasCobrancasUnidade([]);
-    setObservacaoEditando("");
-    setModalAberto(null);
-    setModalConfirmacaoWhatsAppUnidade(false);
-    setUnidadeParaWhatsApp(null);
-  };
-
-  // Função para obter quantidade total de cobranças de uma unidade
-  const obterQuantidadeTotalCobrancas = (doc: string): number => {
-    return quantidadesTotaisPorUnidade[doc] || 0;
-  };
-
-  // Função para buscar todas as cobranças de uma unidade específica (por cnpj ou cpf)
-  const buscarTodasCobrancasUnidade = async (doc: string) => {
-    try {
-      const todasCobrancas = await kanbanService.buscarCards({}, false); // Busca todas as cobranças individuais
-      const cobrancasUnidade = todasCobrancas.filter(
-        (card) => (card.cnpj || (card as any).cpf) === doc
-      );
-      setTodasCobrancasUnidade(cobrancasUnidade);
-      setQuantidadesTotaisPorUnidade((prev) => ({
-        ...prev,
-        [doc]: cobrancasUnidade.length,
-      }));
-    } catch (error) {
-      console.error("Erro ao buscar todas as cobranças da unidade:", error);
-      setTodasCobrancasUnidade([]);
-    }
-  };
-
-  // Detecta unidades com status misto
-  const detectarUnidadesComStatusMisto = async (): Promise<{
-    unidadesMistas: Set<string>;
-    detalhes: Record<string, { statusList: string[]; nomeUnidade: string }>;
-  }> => {
-    try {
-      if (DEBUG) console.log("🔍 Buscando cobranças no banco para detectar status misto...");
-      const { data: cobrancas, error } = await supabase
-        .from("cobrancas_franqueados")
-        .select(
-          `
-          id, 
-          cnpj,
-          cpf, 
-          status,
-          unidades_franqueadas!unidade_id_fk (
-            nome_unidade
-          )
-        `
-        );
-      if (error) {
-        if (DEBUG) console.error("❌ Erro ao detectar status misto:", error);
-        return { unidadesMistas: new Set(), detalhes: {} };
-      }
-      if (DEBUG) console.log(`📊 Encontradas ${cobrancas?.length || 0} cobranças no banco`);
-      const unidadesMistas = new Set<string>();
-      const statusPorUnidade = new Map<string, Set<string>>();
-      const nomesPorUnidade = new Map<string, string>();
-      const detalhesCompletos: Record<string, { statusList: string[]; nomeUnidade: string }> = {};
-      cobrancas?.forEach((cobranca: any) => {
-        if (cobranca.status === "quitado") return; // IGNORA quitados
-
-        const doc = cobranca.cnpj || cobranca.cpf;
-        if (!doc) return; // Pula se não tiver nenhum documento
-        const nomeUnidade = cobranca.unidades_franqueadas?.nome_unidade || "Unidade não identificada";
-        if (!statusPorUnidade.has(doc)) {
-          statusPorUnidade.set(doc, new Set());
-          nomesPorUnidade.set(doc, nomeUnidade);
-        }
-        statusPorUnidade.get(doc)!.add(cobranca.status);
-      });
-      if (DEBUG) console.log(`📋 Analisando ${statusPorUnidade.size} unidades diferentes`);
-      statusPorUnidade.forEach((statusSet, doc) => {
-        const statusArray = Array.from(statusSet);
-        if (statusSet.size > 1) {
-          unidadesMistas.add(doc);
-          detalhesCompletos[doc] = {
-            statusList: statusArray.sort(),
-            nomeUnidade: nomesPorUnidade.get(doc) || "Unidade não identificada",
-          };
-          if (DEBUG) console.log(`⚠️  UNIDADE COM STATUS MISTO DETECTADA: ${nomesPorUnidade.get(doc)}`);
-        }
-      });
-      if (DEBUG) console.log(`🎯 RESULTADO FINAL: ${unidadesMistas.size} unidades com status misto encontradas`);
-      return { unidadesMistas, detalhes: detalhesCompletos };
-    } catch (error) {
-      if (DEBUG) console.error("❌ Erro ao detectar unidades com status misto:", error);
-      try { localStorage.removeItem(STORAGE_KEY_STATUS_MISTO); } catch { /* empty */ }
-      return { unidadesMistas: new Set(), detalhes: {} };
-    }
-  };
-
-  // Removido: definição duplicada de carregarDados
+  }, [kanbanService, filtros, agrupadoPorUnidade]);
 
   useEffect(() => {
     carregarDados();
   }, [carregarDados]);
 
-  // Após concluir uma operação (processando: true -> false), verifica e limpa travas automaticamente
+  // Monitora status de conexão
   useEffect(() => {
-    const terminou = processandoAnteriorRef.current && !processando;
-    if (terminou) {
-      // Se havia travas/monitoramento, força uma verificação imediata
-      if (monitoramentoAtivo || unidadesComStatusMisto.size > 0) {
-        forcarVerificacaoTravas();
-      }
-    }
-    processandoAnteriorRef.current = processando;
-  }, [processando, monitoramentoAtivo, unidadesComStatusMisto.size]);
-
-  // Effect para carregar estados do localStorage na inicialização
-  useEffect(() => {
-    try {
-      const movimentacaoIndividual = carregarMovimentacaoIndividualStorage();
-      if (movimentacaoIndividual) {
-        setMovimentacaoIndividualFeita(true);
-        console.log(
-          "📂 Restaurado estado de movimentação individual do sessionStorage"
-        );
-      }
-
-      const { unidades, detalhes } = carregarStatusMistoStorage();
-      if (unidades.size > 0) {
-        setUnidadesComStatusMisto(unidades);
-        setDetalhesStatusMisto(detalhes);
-        console.log(
-          "📂 Restaurado estado de unidades com status misto do localStorage"
-        );
-      }
-    } catch (error) {
-      console.warn("Erro ao carregar dados do storage, limpando cache:", error);
-      limparStorageKanban();
-    }
-  }, []);
-
-  // Effect para detectar o atalho de teclado para limpar cache (Ctrl+Shift+K)
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey && event.shiftKey && event.key === "K") {
-        event.preventDefault();
-        // Usa toast em vez de confirm para evitar bloqueio
-        toast(
-          (t) => (
-            <div className="flex flex-col gap-3">
-              <div className="font-bold text-orange-600">
-                🧹 LIMPAR CACHE DO KANBAN
-              </div>
-              <div className="text-sm text-gray-700">
-                Esta ação irá:
-                <br />• Limpar todos os dados salvos localmente
-                <br />• Resetar travas de movimentação
-                <br />• Recarregar a página
-                <br />
-                <br />
-                Útil para resolver problemas de sincronização.
-              </div>
-              <div className="flex gap-2 justify-end">
-                <button
-                  className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
-                  onClick={() => toast.dismiss(t.id)}
-                >
-                  Cancelar
-                </button>
-                <button
-                  className="px-3 py-1 bg-orange-500 text-white rounded text-sm hover:bg-orange-600"
-                  onClick={() => {
-                    toast.dismiss(t.id);
-                    console.log(
-                      "🧹 Limpando cache do Kanban via atalho Ctrl+Shift+K"
-                    );
-                    limparStorageKanban();
-                    setTimeout(() => {
-                      window.location.reload();
-                    }, 500);
-                  }}
-                >
-                  Limpar Cache
-                </button>
-              </div>
-            </div>
-          ),
-          {
-            duration: Infinity,
-            style: {
-              background: "#fff",
-              color: "#333",
-              border: "2px solid #f97316",
-              padding: "16px",
-              maxWidth: "500px",
-            },
-          }
-        );
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  // Effect para salvar estado de movimentação individual no sessionStorage
-  useEffect(() => {
-    if (movimentacaoIndividualFeita) {
-      salvarMovimentacaoIndividualStorage(true);
-    }
-  }, [movimentacaoIndividualFeita]);
-
-  // Effect para monitoramento automático de liberação de travas
-  useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
-
-    if (monitoramentoAtivo) {
-      if (DEBUG) console.log("⏰ Iniciando monitoramento automático a cada 10 segundos");
-
-      // Executa imediatamente
-      monitorarELiberarTravas();
-
-      // Configura execução periódica
-      intervalId = setInterval(() => {
-        if (DEBUG) console.log("⏰ Executando verificação periódica...");
-        monitorarELiberarTravas();
-      }, 10000); // Verifica a cada 10 segundos
-    } else {
-      console.log("🛑 Monitoramento automático está inativo");
-    }
-
-    // Cleanup
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-        if (DEBUG) console.log("🧹 Intervalo de monitoramento limpo");
-      }
-    };
-  }, [monitoramentoAtivo, monitorarELiberarTravas]);
-
-  // Effect para iniciar monitoramento quando há unidades bloqueadas
-  useEffect(() => {
-    if (unidadesComStatusMisto.size > 0 && !monitoramentoAtivo) {
-      // Inicia monitoramento automaticamente quando há unidades bloqueadas
-      console.log(
-        "🚀 Iniciando monitoramento automático - unidades detectadas:",
-        Array.from(unidadesComStatusMisto)
-      );
-      iniciarMonitoramento();
-    }
-  }, [unidadesComStatusMisto.size, monitoramentoAtivo, iniciarMonitoramento]);
-
-  // Função para limpar filtros
-  const limparFiltros = () => {
-    setFiltrosAvancados({
-      nomeUnidade: "",
-      cnpj: "",
-      codigo: "",
-      statusCobranca: "",
-      valorMin: "",
-      valorMax: "",
-      tipoCobranca: "",
-    });
-    setFiltros({});
-    carregarDados();
-  };
-
-  // Adicionar valor_original ao UnitKanbanCard
-  const getUnitCardsByColuna = (colunaId: string): UnitKanbanCard[] => {
-    // Agrupa por cnpj ou cpf
-    const filtered = cards.filter((card) => card.status_atual === colunaId);
-    const unitMap: Record<string, UnitKanbanCard & { valor_original?: number; cpf?: string }> = {};
-    filtered.forEach((card) => {
-      const chave = card.cnpj || (card as any).cpf || card.codigo_unidade;
-      if (!unitMap[chave]) {
-        unitMap[chave] = {
-          codigo_unidade: card.codigo_unidade,
-          nome_unidade: card.nome_unidade,
-          cnpj: card.cnpj,
-          cpf: (card as any).cpf || "",
-          tipo_debito: card.tipo_debito,
-          data_vencimento_antiga: card.data_vencimento_antiga,
-          valor_total: 0,
-          valor_original: 0,
-          status_atual: card.status_atual,
-          responsavel_atual: card.responsavel_atual,
-          charges: [],
-          observacoes: card.observacoes,
-        };
-      }
-      unitMap[chave].charges.push(card);
-      unitMap[chave].valor_total += card.valor_total;
-      unitMap[chave].valor_original = (unitMap[chave].valor_original ?? 0) + (card.valor_original ?? 0);
-      if (
-        !unitMap[chave].data_vencimento_antiga ||
-        new Date(card.data_vencimento_antiga) < new Date(unitMap[chave].data_vencimento_antiga)
-      ) {
-        unitMap[chave].data_vencimento_antiga = card.data_vencimento_antiga;
-      }
-      if (card.observacoes) {
-        unitMap[chave].observacoes = card.observacoes;
+    const removeListener = connectionService.addStatusListener((status) => {
+      if (!status.isConnected) {
+        console.warn('⚠️ Conexão perdida detectada no Kanban');
       }
     });
-    return Object.values(unitMap);
-  };
+    
+    return removeListener;
+  }, []);
 
-  // Handler para drag-and-drop agrupado por unidade
-  const onDragEndUnidade = (result: DropResult) => {
-    if (
-      !result.destination ||
-      result.source.droppableId === result.destination.droppableId
-    ) {
-      return;
-    }
-
-    // Busca a unidade pelo draggableId para verificar o CNPJ
-    const unidadeCard = getUnitCardsByColuna(result.source.droppableId).find(
-    (u) => (u.cnpj || u.cpf) === result.draggableId.replace(/unit-/, '') // Adaptação se o draggableId tiver prefixo
-    // Se draggableId é o próprio documento, use: (u.cnpj || u.cpf) === result.draggableId
-    );
-
-    const documento = unidadeCard?.cnpj || unidadeCard?.cpf;
-
-    // Verifica se é uma unidade com status misto no modo agrupado usando CNPJ
-    if ( aba === "unidade" && documento && unidadesComStatusMisto.has(documento)) {
-      // Define qual unidade será mostrada no modal de detalhes
-      setModalDetalhesStatusMisto(documento ?? null);
-      setShowMixedStatusWarning(true);
-      return;
-    }
-
-    setMovimentoPendente(result);
-    setModalConfirmacaoAberto(true);
-  };
-
-  const confirmarMovimentoUnidade = async () => {
-    if (!movimentoPendente || !movimentoPendente.destination) return;
-
-    const { source, destination, draggableId } = movimentoPendente;
-    console.log(
-      `Movendo unidade: ${draggableId} de ${source.droppableId} para ${destination.droppableId}`
-    );
-
-    setProcessando(true);
-    setModalConfirmacaoAberto(false);
-
-    try {
-      // Busca a unidade pelo codigo_unidade na coluna de origem
-      const unit = getUnitCardsByColuna(source.droppableId).find(
-        (u) => u.codigo_unidade === draggableId
-      );
-
-      if (!unit) {
-        throw new Error(
-          `Unidade ${draggableId} não encontrada na coluna ${source.droppableId}`
-        );
-      }
-      const documento = unit.cnpj || unit.cpf;
-      if (!documento) {
-          throw new Error(`Unidade ${draggableId} não possui CNPJ ou CPF para movimentação.`);
-      }
-      // **CORREÇÃO APLICADA AQUI**
-      // Simplifica a chamada para mover a unidade inteira de uma vez, passando o CNPJ
-      await kanbanService.moverCard(
-        documento, // Passa o CNPJ ou CPF
-        source.droppableId, // Status de ORIGEM
-        destination.droppableId, // Status de DESTINO
-        "usuario_atual",
-        `Movimentação manual via Kanban (em massa) - Unidade: ${unit.nome_unidade}`
-      );
-
-      console.log(
-        `Todas as cobranças da unidade ${unit.nome_unidade} foram movidas com sucesso`
-      );
-
-      // Recarrega os dados para refletir as mudanças
-      await carregarDados();
-    } catch (error) {
-      console.error("Erro ao mover cobranças da unidade:", error);
-      toast.error(`Erro ao mover unidade: ${error}`, {
-        duration: 5000,
-        style: {
-          background: "#ef4444",
-          color: "#fff",
-        },
-      });
-      // Recarrega os dados mesmo em caso de erro para garantir consistência
-      await carregarDados();
-    } finally {
-      setProcessando(false);
-      setMovimentoPendente(null);
-    }
-  };
-
-  // Handler para drag-and-drop individual
-  const onDragEndIndividual = async (result: DropResult) => {
+  const handleDragEnd = async (result: any) => {
     if (!result.destination) return;
-    const { source, destination, draggableId } = result;
+
+    const { draggableId, source, destination } = result;
+    
     if (source.droppableId === destination.droppableId) return;
 
-    console.log(
-      `Movendo card individual: ${draggableId} de ${source.droppableId} para ${destination.droppableId}`
-    );
+    const card = cards.find(c => c.id === draggableId);
+    if (!card) return;
 
-    // Se está no modo individual, marca que houve movimentação individual
-    if (aba === "individual") {
-      setMovimentacaoIndividualFeita(true);
-      salvarMovimentacaoIndividualStorage(true);
+    // Verificar regras de negócio para parcelamentos - VERSÃO ATUALIZADA
+    const sourceColumn = colunas.find(c => c.id === source.droppableId);
+    const destColumn = colunas.find(c => c.id === destination.droppableId);
+    
+    if (!sourceColumn || !destColumn) return;
+
+    // Regra 1: Impedir movimento de cobranças parceladas originais para colunas incompatíveis
+    if (card.status_atual === 'parcelado' && !['parcelado', 'juridico', 'perda'].includes(destination.droppableId)) {
+      toast.error("Cobranças parceladas só podem ser movidas para Jurídico ou Perda. Para alterar o parcelamento, use a gestão de acordos.");
+      return;
     }
 
-    // Atualização otimista da UI: primeiro atualiza a UI localmente
-    const originalCards = [...cards];
-    const updatedCards = cards.map((card) =>
-      card.id === draggableId
-        ? { ...card, status_atual: destination.droppableId }
-        : card
-    );
-    setCards(updatedCards);
+    // Regra 2: Parcelas futuras só podem ser quitadas, permanecer como parcelas ou ir para inadimplência/jurídico
+    if (card.status_atual === 'parcelas' && !['quitado', 'parcelas', 'inadimplencia', 'juridico'].includes(destination.droppableId)) {
+      toast.error("Parcelas futuras só podem ser quitadas, permanecer como parcelas ou ir para inadimplência/jurídico se vencidas.");
+      return;
+    }
 
-    setProcessando(true);
+    // Regra 3: Impedir movimento de parcelas para negociação (parcelas não são negociáveis individualmente)
+    if (card.status_atual === 'parcelas' && destination.droppableId === 'em_negociacao') {
+      toast.error("Parcelas individuais não podem ser negociadas. Para renegociar, use a gestão de acordos do parcelamento original.");
+      return;
+    }
+
+    // Regra 4: Confirmação para movimentos críticos
+    if (['perda', 'juridico'].includes(destination.droppableId)) {
+      const confirmacao = confirm(`Tem certeza que deseja mover "${card.nome_unidade}" para "${destColumn.nome}"?`);
+      if (!confirmacao) return;
+    }
+
+    // Regra 5: Validação especial para quitação de parcelas
+    if (card.status_atual === 'parcelas' && destination.droppableId === 'quitado') {
+      const confirmacao = confirm(`Confirma o pagamento da parcela "${card.nome_unidade}"?\n\nEsta ação marcará a parcela como paga no sistema de acordos.`);
+      if (!confirmacao) return;
+    }
     try {
-      // **CORREÇÃO APLICADA AQUI**
-      // Adiciona o argumento 'source.droppableId' que estava faltando
       await kanbanService.moverCard(
         draggableId,
-        source.droppableId, // Status de ORIGEM
-        destination.droppableId, // Status de DESTINO
+        source.droppableId,
+        destination.droppableId,
         "usuario_atual",
-        "Movimentação manual via Kanban"
+        `Movido via Kanban de ${sourceColumn.nome} para ${destColumn.nome}`
       );
 
-      console.log(`Card ${draggableId} movido com sucesso`);
+      // Atualiza localmente para feedback imediato
+      setCards(prevCards => 
+        prevCards.map(c => 
+          c.id === draggableId 
+            ? { ...c, status_atual: destination.droppableId }
+            : c
+        )
+      );
 
-      // Inicia monitoramento se não estiver ativo
-      if (!monitoramentoAtivo && unidadesComStatusMisto.size > 0) {
-        iniciarMonitoramento();
+      toast.success(`Card movido para ${destColumn.nome}`);
+      
+      // Recarrega dados após um breve delay
+      setTimeout(carregarDados, 1000);
+    } catch (error) {
+      console.error("Erro ao mover card:", error);
+      toast.error("Erro ao mover card");
+    }
+  };
+
+  const executarAcaoRapida = async (cardId: string, acao: string) => {
+    setProcessandoAcao(cardId);
+    try {
+      const card = cards.find(c => c.id === cardId);
+      if (!card) return;
+
+      switch (acao) {
+        case "whatsapp":
+          await enviarWhatsApp(card);
+          break;
+        case "email":
+          await enviarEmail(card);
+          break;
+        case "detalhes":
+          setModalDetalhes({ aberto: true, card });
+          break;
+        default:
+          await kanbanService.executarAcaoRapida(cardId, acao, "usuario_atual", agrupadoPorUnidade);
+      }
+      
+      if (acao !== "detalhes") {
+        toast.success(`Ação ${acao} executada com sucesso`);
+        carregarDados();
+      }
+    } catch (error) {
+      console.error(`Erro ao executar ação ${acao}:`, error);
+      toast.error(`Erro ao executar ação ${acao}`);
+    } finally {
+      setProcessandoAcao(null);
+    }
+  };
+
+  const enviarWhatsApp = async (card: CardCobranca) => {
+    try {
+      // Busca dados da unidade para obter telefone
+      const { data: unidade } = await cobrancaService.buscarCobrancas({
+        cnpj: card.cnpj || card.cpf,
+        incluirParcelas: false
+      });
+
+      if (!unidade || unidade.length === 0) {
+        throw new Error("Dados da unidade não encontrados");
       }
 
-      // Força verificação imediata após movimentação (com delay para garantir que o banco foi atualizado)
-      setTimeout(async () => {
-        console.log("🔍 Verificação forçada pós-movimentação...");
-        await forcarVerificacaoTravas();
-      }, 2000); // 2 segundos de delay para garantir que a transação foi processada
-    } catch (error) {
-      console.error("Erro ao mover cobrança, revertendo:", error);
-      toast.error(`Erro ao mover cobrança: ${error}`, {
-        duration: 5000,
-        style: {
-          background: "#ef4444",
-          color: "#fff",
-        },
+      const telefone = unidade[0]?.telefone;
+      if (!telefone) {
+        throw new Error("Telefone não cadastrado para esta unidade");
+      }
+
+      const mensagem = `Olá! Temos uma pendência financeira em aberto para sua unidade.
+
+💰 Valor: ${formatarMoeda(card.valor_total)}
+📅 Vencimento: ${new Date(card.data_vencimento_antiga).toLocaleDateString('pt-BR')}
+
+Para regularizar ou negociar, entre em contato conosco.
+
+_Sistema de Cobrança Cresci e Perdi_`;
+
+      await n8nService.enviarWhatsApp({
+        number: telefone,
+        text: mensagem,
+        instanceName: "automacoes_3",
+        metadata: {
+          tipo: "cobranca_kanban",
+          cardId: card.id,
+          origem: "kanban"
+        }
       });
-      // Se falhar, reverte para o estado original
-      setCards(originalCards);
-    } finally {
-      setProcessando(false);
+
+    } catch (error) {
+      console.error("Erro ao enviar WhatsApp:", error);
+      throw error;
     }
+  };
+
+  const enviarEmail = async (card: CardCobranca) => {
+    try {
+      // Busca dados da unidade para obter email
+      const { data: unidade } = await cobrancaService.buscarCobrancas({
+        cnpj: card.cnpj || card.cpf,
+        incluirParcelas: false
+      });
+
+      if (!unidade || unidade.length === 0) {
+        throw new Error("Dados da unidade não encontrados");
+      }
+
+      const email = unidade[0]?.email_cobranca;
+      if (!email) {
+        throw new Error("Email não cadastrado para esta unidade");
+      }
+
+      await emailService.enviarMensagemCobranca(
+        "padrao",
+        "",
+        { email_franqueado: email, nome_franqueado: card.nome_unidade },
+        {
+          id: card.id,
+          cliente: card.nome_unidade,
+          cnpj: card.cnpj,
+          cpf: card.cpf,
+          valor_atualizado: card.valor_total,
+          valor_original: card.valor_original || card.valor_total,
+          data_vencimento: card.data_vencimento_antiga
+        }
+      );
+
+    } catch (error) {
+      console.error("Erro ao enviar email:", error);
+      throw error;
+    }
+  };
+
+  const abrirModalObservacao = (card: CardCobranca) => {
+    setModalObservacao({
+      aberto: true,
+      cardId: card.id,
+      observacaoAtual: card.observacoes || ""
+    });
   };
 
   const salvarObservacao = async () => {
-    setProcessando(true);
+    setSalvandoObservacao(true);
     try {
-      // Determina o ID correto para unidade (CNPJ) ou cobrança individual (UUID)
-      const idParaSalvar = aba === "unidade"
-        ? unitSelecionada?.cnpj
-        : cobrancaSelecionada?.id;
-
-      if (idParaSalvar) {
-        await kanbanService.atualizarObservacao(
-          idParaSalvar,
-          observacaoEditando.trim(), // Salva o texto (pode ser vazio para apagar)
-          "usuario_atual",
-          aba === "unidade"
-        );
-        toast.success("Observação salva com sucesso!");
-        await carregarDados(); // Recarrega os dados para atualizar a UI
-        limparEstadosModal();
-      }
+      await kanbanService.atualizarObservacao(
+        modalObservacao.cardId,
+        modalObservacao.observacaoAtual,
+        "usuario_atual",
+        agrupadoPorUnidade
+      );
+      
+      setModalObservacao({ aberto: false, cardId: "", observacaoAtual: "" });
+      toast.success("Observação salva com sucesso");
+      carregarDados();
     } catch (error) {
       console.error("Erro ao salvar observação:", error);
-      toast.error(`Erro ao salvar observação: ${error}`);
+      toast.error("Erro ao salvar observação");
     } finally {
-      setProcessando(false);
-    }
-  };
-
-  const enviarWhatsAppCobranca = async (cobranca: CardCobranca) => {
-    setProcessando(true);
-    try {
-      // Buscar telefone da unidade franqueada
-      console.log(`Buscando telefone para CNPJ: ${cobranca.cnpj}`);
-
-      const { data: unidade, error } = await supabase
-        .from("unidades_franqueadas")
-        .select("telefone_unidade")
-        .eq("codigo_interno", cobranca.cnpj)
-        .single();
-
-      if (error) {
-        console.error("Erro ao buscar unidade:", error);
-        toast.error(
-          "Erro ao buscar informações da unidade para envio do WhatsApp.",
-          {
-            duration: 5000,
-            style: {
-              background: "#ef4444",
-              color: "#fff",
-            },
-          }
-        );
-        return;
-      }
-
-      const telefoneRaw = unidade?.telefone_unidade;
-      console.log(`Telefone bruto encontrado: ${telefoneRaw}`);
-
-      // Busca nome do franqueado para personalização
-      const nomeFranqueado = await buscarNomeFranqueado(cobranca.cnpj);
-
-      // Criar mensagem personalizada para a cobrança individual
-      const mensagem = `
-🔔 *Notificação de Cobrança* 🔔
-
-Olá ${nomeFranqueado} 👋,
-
-Identificamos uma cobrança pendente para sua unidade: *${cobranca.nome_unidade}*:
-
-💰 *Valor:* ${formatarMoeda(cobranca.valor_total)}
-📅 *Vencimento:* ${formatarData(cobranca.data_vencimento_antiga)}
-🏷️ *Tipo:* ${formatarTipoDebito(cobranca.tipo_debito)}
-📋 *Status:* ${formatarStatusCobranca(cobranca.status_atual)}
-
-Para regularizar sua situação, entre em contato conosco o mais breve possível.
-
-Entre em contato diretamente com nossa Equipe de Cobrança pelo WhatsApp abaixo:
-
-📞 *Telefone: (19) 99595-7880*
-
-_Mensagem Automática do Sistema_
-      `.trim();
-
-      console.log(`Enviando WhatsApp para cobrança ${cobranca.id}`);
-
-      // O n8nService agora valida e trata o telefone automaticamente
-      const resultado = await n8nService.enviarWhatsApp({
-        number: telefoneRaw,
-        text: mensagem,
-        instanceName: "automacoes_3",
-        metadata: {
-          cobrancaId: cobranca.id,
-          cnpj: cobranca.cnpj,
-          valor: cobranca.valor_total,
-          tipo: "cobranca_individual",
-          telefoneOriginal: telefoneRaw,
-        },
-      });
-
-      if (resultado.success) {
-        toast.success("✅ WhatsApp enviado com sucesso!", {
-          duration: 4000,
-          style: {
-            background: "#22c55e",
-            color: "#fff",
-          },
-        });
-        console.log(
-          `WhatsApp enviado com sucesso. Message ID: ${resultado.messageId}`
-        );
-
-        // Opcional: registrar o envio no banco de dados
-        // await registrarEnvioWhatsApp(cobranca.id, resultado.messageId);
-      } else {
-        throw new Error("Falha no envio do WhatsApp");
-      }
-    } catch (error) {
-      console.error("Erro ao enviar WhatsApp:", error);
-      toast.error(`❌ Erro ao enviar WhatsApp: ${error}`, {
-        duration: 5000,
-        style: {
-          background: "#ef4444",
-          color: "#fff",
-        },
-      });
-    } finally {
-      setProcessando(false);
-    }
-  };
-
-  const enviarWhatsAppUnidade = async (unidade: UnitKanbanCard) => {
-    setProcessando(true);
-    try {
-      // Buscar telefone da unidade franqueada
-      console.log(`Buscando telefone para CNPJ: ${unidade.cnpj}`);
-
-      const { data: unidadeData, error } = await supabase
-        .from("unidades_franqueadas")
-        .select("telefone_unidade")
-        .eq("codigo_interno", unidade.cnpj)
-        .single();
-
-      if (error) {
-        console.error("Erro ao buscar unidade:", error);
-        toast.error(
-          "Erro ao buscar informações da unidade para envio do WhatsApp.",
-          {
-            duration: 5000,
-            style: {
-              background: "#ef4444",
-              color: "#fff",
-            },
-          }
-        );
-        return;
-      }
-
-      const telefoneRaw = unidadeData?.telefone_unidade;
-      console.log(`Telefone bruto encontrado: ${telefoneRaw}`);
-
-      // Buscar todas as cobranças da unidade para a mensagem completa
-      const todasCobrancas = await kanbanService.buscarCards({}, false);
-      const cobrancasUnidade = todasCobrancas.filter(
-        (card) => card.cnpj === unidade.cnpj
-      );
-
-      const valorTotalGeral = cobrancasUnidade.reduce(
-        (total, cobranca) => total + cobranca.valor_total,
-        0
-      );
-      const vencimentoMaisAntigo = cobrancasUnidade
-        .map((c) => c.data_vencimento_antiga)
-        .sort()[0];
-
-      // Criar lista das cobranças para a mensagem
-      const listaCobrancas = cobrancasUnidade
-        .sort(
-          (a, b) =>
-            new Date(a.data_vencimento_antiga).getTime() -
-            new Date(b.data_vencimento_antiga).getTime()
-        )
-        .map(
-          (cobranca, index) =>
-            `${index + 1}. ${formatarTipoDebito(
-              cobranca.tipo_debito
-            )} - ${formatarMoeda(cobranca.valor_total)} (Venc: ${formatarData(
-              cobranca.data_vencimento_antiga
-            )})`
-        )
-        .join("\n");
-
-      // Busca nome do franqueado para personalização
-      const nomeFranqueado = await buscarNomeFranqueado(unidade.cnpj);
-
-      // Criar mensagem personalizada para cobranças agrupadas
-      const mensagem = `
-🔔 *Notificação de Cobranças* 🔔
-
-Olá ${nomeFranqueado} 👋,
-
-Identificamos ${cobrancasUnidade.length} cobrança(s) pendente(s) para sua unidade: *${unidade.nome_unidade}*:
-
-💰 *Valor Total:* ${formatarMoeda(valorTotalGeral)}
-📅 *Vencimento mais antigo:* ${formatarData(vencimentoMaisAntigo)}
-
-*📋 Detalhamento das Cobranças:*
-${listaCobrancas}
-
-Para regularizar sua situação, entre em contato conosco o mais breve possível.
-
-Entre em contato diretamente com nossa Equipe de Cobrança pelo WhatsApp abaixo:
-
-📞 *Telefone: (19) 99595-7880*
-
-_Mensagem Automática do Sistema_
-      `.trim();
-
-      console.log(
-        `Enviando WhatsApp agrupado para unidade ${unidade.codigo_unidade}`
-      );
-
-      // O n8nService agora valida e trata o telefone automaticamente
-      const resultado = await n8nService.enviarWhatsApp({
-        number: telefoneRaw,
-        text: mensagem,
-        instanceName: "automacoes_3",
-        metadata: {
-          unidadeCodigo: unidade.codigo_unidade,
-          cnpj: unidade.cnpj,
-          valorTotal: valorTotalGeral,
-          quantidadeCobrancas: cobrancasUnidade.length,
-          tipo: "cobranca_agrupada",
-          telefoneOriginal: telefoneRaw,
-        },
-      });
-
-      if (resultado.success) {
-        toast.success("✅ WhatsApp agrupado enviado com sucesso!", {
-          duration: 4000,
-          style: {
-            background: "#22c55e",
-            color: "#fff",
-          },
-        });
-        console.log(
-          `WhatsApp agrupado enviado com sucesso. Message ID: ${resultado.messageId}`
-        );
-      } else {
-        throw new Error("Falha no envio do WhatsApp");
-      }
-    } catch (error) {
-      console.error("Erro ao enviar WhatsApp agrupado:", error);
-      toast.error(`❌ Erro ao enviar WhatsApp agrupado: ${error}`, {
-        duration: 5000,
-        style: {
-          background: "#ef4444",
-          color: "#fff",
-        },
-      });
-    } finally {
-      setProcessando(false);
-      setModalConfirmacaoWhatsAppUnidade(false);
-      setUnidadeParaWhatsApp(null);
+      setSalvandoObservacao(false);
     }
   };
 
   const exportarDados = async () => {
     try {
-      const csv = await kanbanService.exportarKanban(
-        filtros,
-        aba === "unidade"
-      );
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const csv = await kanbanService.exportarKanban(filtros, agrupadoPorUnidade);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const a = document.createElement('a');
       a.href = url;
-      a.download = `kanban-cobrancas-${aba}-${
-        new Date().toISOString().split("T")[0]
-      }.csv`;
+      a.download = `kanban-cobrancas-${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      toast.success("Dados exportados com sucesso");
     } catch (error) {
-      toast.error("Erro ao exportar dados", {
-        duration: 5000,
-        style: {
-          background: "#ef4444",
-          color: "#fff",
-        },
-      });
+      console.error("Erro ao exportar dados:", error);
+      toast.error("Erro ao exportar dados");
     }
   };
 
-  const getCriticidadeColor = (criticidade: string, status?: string) => {
-    // Se estiver quitado, sempre verde independente da criticidade
-    if (status === "quitado") {
-      return "border-green-500 bg-green-50";
-    }
+  const getCardsPorColuna = (colunaId: string) => {
+    return cards.filter(card => card.status_atual === colunaId);
+  };
 
+  const getCorCriticidade = (criticidade: string) => {
     switch (criticidade) {
-      case "critica":
-        return "border-red-500 bg-red-50";
-      case "atencao":
-        return "border-yellow-500 bg-yellow-50";
-      default:
-        return "border-gray-300 bg-white";
+      case "critica": return "border-l-4 border-red-500 bg-red-50";
+      case "atencao": return "border-l-4 border-yellow-500 bg-yellow-50";
+      default: return "border-l-4 border-gray-300 bg-white";
     }
   };
 
-  const getCriticidadeBadge = (criticidade: string, status?: string) => {
-    // Se estiver quitado, sempre verde independente da criticidade
-    if (status === "quitado") {
-      return "bg-green-100 text-green-800";
-    }
-
-    switch (criticidade) {
-      case "critica":
-        return "bg-red-100 text-red-800";
-      case "atencao":
-        return "bg-yellow-100 text-yellow-800";
-      default:
-        return "bg-green-100 text-green-800";
+  const getIconeStatus = (status: string) => {
+    switch (status) {
+      case "em_aberto": return <AlertTriangle className="w-4 h-4 text-gray-600" />;
+      case "em_negociacao": return <MessageSquare className="w-4 h-4 text-yellow-600" />;
+      case "parcelado": return <CreditCard className="w-4 h-4 text-purple-600" />;
+      case "parcelas": return <Package className="w-4 h-4 text-blue-600" />;
+      case "inadimplencia": return <AlertTriangle className="w-4 h-4 text-red-600" />;
+      case "juridico": return <Scale className="w-4 h-4 text-blue-600" />;
+      case "perda": return <Ban className="w-4 h-4 text-red-700" />;
+      case "quitado": return <CheckCircle className="w-4 h-4 text-green-600" />;
+      default: return <Clock className="w-4 h-4 text-gray-500" />;
     }
   };
 
-  const getCriticidadeTexto = (criticidade: string, status?: string) => {
-    // Se estiver quitado, mostra QUITADO
-    if (status === "quitado") {
-      return "QUITADO";
-    }
-
-    return criticidade?.toUpperCase() || "NORMAL";
-  };
-
-  const formatarStatusCobranca = (status: string) => {
-    const statusMap: Record<string, string> = {
-      em_aberto: "Em Aberto",
-      em_negociacao: "Em Negociação",
-      parcelado: "Parcelado",
-      quitado: "Quitado",
-      juridico: "Jurídico",
-      inadimplencia: "Inadimplência",
-      perda: "Perda",
-    };
+  const CardComponent = ({ card, index }: { card: CardCobranca; index: number }) => {
+    const isParcelaIndividual = card.status_atual === 'parcelas';
+    const isCobrancaParcelada = card.status_atual === 'parcelado';
+    const isParcelamentoRelacionado = isParcelaIndividual || isCobrancaParcelada;
+    
     return (
-      statusMap[status] ||
-      status.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
-    );
-  };
-
-  const formatarTipoDebito = (tipo: string) => {
-    const tipoMap: Record<string, string> = {
-      royalties: "Royalties",
-      insumos: "Insumos",
-      aluguel: "Aluguel",
-      multa: "Multa",
-      taxa: "Taxa",
-      outros: "Outros",
-    };
-    return tipoMap[tipo] || tipo.replace(/\b\w/g, (l) => l.toUpperCase());
-  };
-  const renderCardUnidade = (unit: UnitKanbanCard & { valor_original?: number }, index: number) => {
-    const documento = unit.cnpj || unit.cpf;
-    const temStatusMisto = typeof documento === "string" && unidadesComStatusMisto.has(documento);
-
-    return (
-      <Draggable
-        key={unit.codigo_unidade}
-        draggableId={unit.codigo_unidade}
-        index={index}
-        isDragDisabled={temStatusMisto}
-      >
+      <Draggable draggableId={card.id} index={index}>
         {(provided, snapshot) => (
           <div
             ref={provided.innerRef}
             {...provided.draggableProps}
             {...provided.dragHandleProps}
-            className={`p-4 mb-3 rounded-lg border-2 cursor-pointer transition-all ${
-              snapshot.isDragging ? "shadow-lg rotate-2" : "hover:shadow-md"
-            } ${getCriticidadeColor(
-              unit.charges[0]?.criticidade || "normal",
-              unit.status_atual
-            )} ${temStatusMisto ? "opacity-60" : ""}`}
-            onClick={() => {
-              // Limpa o estado da cobrança individual antes de abrir modal da unidade
-              setCobrancaSelecionada(null);
-              setUnitSelecionada(unit);
-              // Busca todas as cobranças da unidade, não apenas as da coluna atual
-              if (typeof documento === "string") {
-                buscarTodasCobrancasUnidade(documento);
-              }
-              setModalAberto("detalhes");
-            }}
+            className={`
+              ${getCorCriticidade(card.criticidade)}
+              rounded-lg p-4 mb-3 shadow-sm hover:shadow-md transition-all duration-200
+              ${snapshot.isDragging ? 'rotate-2 shadow-lg' : ''}
+              ${isParcelaIndividual ? 'border-l-4 border-blue-500 bg-blue-50' : ''}
+              ${isCobrancaParcelada ? 'border-l-4 border-purple-500 bg-purple-50' : ''}
+            `}
           >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center">
-                <CircleDollarSign className="w-5 h-5 text-blue-600 mr-2" />
-                <div>
-                  <h4 className="font-semibold text-gray-800 text-sm">
-                    {unit.nome_unidade}
-                  </h4>
-                  <p className="text-xs text-gray-600">
-                    {formatarCNPJCPF((documento || ""))}
-                  </p>
+            {/* Header do Card */}
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  {getIconeStatus(card.status_atual)}
+                  <h3 className="font-semibold text-gray-800 text-sm truncate">
+                    {card.nome_unidade}
+                  </h3>
+                  {isParcelaIndividual && (
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                      📅 Parcela
+                    </span>
+                  )}
+                  {isCobrancaParcelada && (
+                    <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+                      🗂️ Parcelado
+                    </span>
+                  )}
                 </div>
+                <p className="text-xs text-gray-600 mb-1">
+                  {formatarCNPJCPF(card.cnpj || card.cpf || "")}
+                </p>
+                {agrupadoPorUnidade && card.quantidade_titulos > 1 && (
+                  <p className="text-xs text-blue-600 font-medium">
+                    {card.quantidade_titulos} título(s)
+                  </p>
+                )}
+                {isParcelamentoRelacionado && (
+                  <p className="text-xs text-purple-600 font-medium">
+                    {isParcelaIndividual ? '💳 Parcela de acordo' : '📋 Cobrança parcelada'}
+                  </p>
+                )}
               </div>
-              {temStatusMisto && (
-                <div
-                  className="flex items-center text-orange-600"
-                  title="Unidade com status misto - bloqueada"
-                >
-                  <Lock className="w-4 h-4" />
+              <div className="text-right">
+                <p className="font-bold text-lg text-gray-900">
+                  {formatarMoeda(card.valor_total)}
+                </p>
+                {card.valor_original && card.valor_original !== card.valor_total && (
+                  <p className="text-xs text-gray-500 line-through">
+                    {formatarMoeda(card.valor_original)}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Informações do Card */}
+            <div className="space-y-2 mb-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-600">Vencimento:</span>
+                <span className="font-medium">
+                  {new Date(card.data_vencimento_antiga).toLocaleDateString('pt-BR')}
+                </span>
+              </div>
+              
+              {card.data_vencimento_recente !== card.data_vencimento_antiga && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-600">Mais recente:</span>
+                  <span className="font-medium">
+                    {new Date(card.data_vencimento_recente).toLocaleDateString('pt-BR')}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-600">Responsável:</span>
+                <span className="font-medium">{card.responsavel_atual}</span>
+              </div>
+
+              {card.descricao_cobranca && (
+                <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                  {card.descricao_cobranca}
+                </div>
+              )}
+
+              {/* Informações específicas de parcelamento */}
+              {isParcelamentoRelacionado && (
+                <div className="text-xs bg-purple-50 border border-purple-200 p-2 rounded">
+                  {isParcelaIndividual && (
+                    <p className="text-purple-700">
+                      💳 Esta é uma parcela individual de um acordo de parcelamento
+                    </p>
+                  )}
+                  {isCobrancaParcelada && (
+                    <p className="text-purple-700">
+                      📋 Cobrança original foi parcelada em acordo
+                    </p>
+                  )}
                 </div>
               )}
             </div>
 
-            {temStatusMisto && (
-              <div className="mb-2 p-2 bg-orange-50 border border-orange-200 rounded text-xs text-orange-800">
-                <div className="flex items-center justify-between">
-                  <span>⚠️ Status misto detectado</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setModalDetalhesStatusMisto(documento ?? null);
-                      setShowMixedStatusWarning(true);
-                    }}
-                    className="text-orange-600 hover:text-orange-800 underline"
-                  >
-                    Ver detalhes
-                  </button>
-                </div>
-                {detalhesStatusMisto[documento]?.statusList && (
-                  <div className="mt-1 text-xs">
-                    Status:{" "}
-                    {detalhesStatusMisto[documento].statusList
-                      .map((s) => formatarStatusCobranca(s))
-                      .join(", ")}
-                  </div>
-                )}
+            {/* Observações */}
+            {card.observacoes && (
+              <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                <p className="text-yellow-800 line-clamp-2">{card.observacoes}</p>
               </div>
             )}
 
-            <div className="space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Valor Total:</span>
-                <span className="font-semibold text-red-600">
-                  {formatarMoeda(unit.valor_total)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Valor Original:</span>
-                <span className="font-semibold text-blue-700">
-                  {formatarMoeda(unit.valor_original || 0)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Cobranças:</span>
-                <span className="font-medium">
-              {obterQuantidadeTotalCobrancas(unit.cnpj || (unit as any).cpf || "")}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Vencimento:</span>
-                <span className="font-medium">
-                  {formatarData(unit.data_vencimento_antiga)}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-2 flex items-center justify-between">
-              <span
-                className={`px-2 py-1 rounded-full text-xs font-medium ${getCriticidadeBadge(
-                  unit.charges[0]?.criticidade || "normal",
-                  unit.status_atual
-                )}`}
-              >
-                {getCriticidadeTexto(
-                  unit.charges[0]?.criticidade || "normal",
-                  unit.status_atual
+            {/* Ações do Card */}
+            <div className="flex items-center justify-between">
+              <div className="flex space-x-1">
+                {/* Ações condicionais baseadas no tipo de cobrança */}
+                {!isParcelaIndividual && (
+                  <>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        executarAcaoRapida(card.id, "whatsapp");
+                      }}
+                      disabled={processandoAcao === card.id}
+                      className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+                      title="Enviar WhatsApp"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                    </button>
+                    
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        executarAcaoRapida(card.id, "email");
+                      }}
+                      disabled={processandoAcao === card.id}
+                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-50"
+                      title="Enviar Email"
+                    >
+                      <Mail className="w-4 h-4" />
+                    </button>
+                  </>
                 )}
-              </span>
-              <span className="text-xs text-gray-500">
-                {unit.responsavel_atual}
-              </span>
-            </div>
-          </div>
-        )}
-      </Draggable>
-    );
-  };
+                
+                {/* Ação especial para parcelas */}
+                {isParcelaIndividual && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      executarAcaoRapida(card.id, "registrar_pagamento");
+                    }}
+                    disabled={processandoAcao === card.id}
+                    className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+                    title="Registrar Pagamento"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                  </button>
+                )}
+                
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    abrirModalObservacao(card);
+                  }}
+                  className="p-1.5 text-gray-600 hover:bg-gray-50 rounded transition-colors"
+                  title="Adicionar Observação"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
+              </div>
 
-  const renderCardIndividual = (card: CardCobranca, index: number) => {
-    return (
-      <Draggable key={card.id} draggableId={card.id} index={index}>
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.draggableProps}
-            {...provided.dragHandleProps}
-            className={`p-4 mb-3 rounded-lg border-2 cursor-pointer transition-all ${
-              snapshot.isDragging ? "shadow-lg rotate-2" : "hover:shadow-md"
-            } ${getCriticidadeColor(card.criticidade, card.status_atual)}`}
-            onClick={() => {
-              // Limpa o estado da unidade antes de abrir modal da cobrança individual
-              setUnitSelecionada(null);
-              setTodasCobrancasUnidade([]);
-              setCobrancaSelecionada(card);
-              setModalAberto("detalhes");
-            }}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center">
-                <DollarSign className="w-5 h-5 text-green-600 mr-2" />
-                <div>
-                  <h4 className="font-semibold text-gray-800 text-sm">
-                    {card.nome_unidade}
-                  </h4>
-                  <p className="text-xs text-gray-600">
-                    {formatarCNPJCPF((card.cnpj || card.cpf || ""))}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Valor:</span>
-                <span className="font-semibold text-red-600">
-                  {formatarMoeda(card.valor_total)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Valor Original:</span>
-                <span className="font-semibold text-blue-700">
-                  {formatarMoeda(card.valor_original || 0)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Vencimento:</span>
-                <span className="font-medium">
-                  {formatarData(card.data_vencimento_antiga)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Tipo:</span>
-                <span className="font-medium">{card.tipo_debito}</span>
-              </div>
-            </div>
-
-            <div className="mt-2 flex items-center justify-between">
-              <span
-                className={`px-2 py-1 rounded-full text-xs font-medium ${getCriticidadeBadge(
-                  card.criticidade,
-                  card.status_atual
-                )}`}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  executarAcaoRapida(card.id, "detalhes");
+                }}
+                className="p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                title="Ver Detalhes"
               >
-                {getCriticidadeTexto(card.criticidade, card.status_atual)}
-              </span>
-              <span className="text-xs text-gray-500">
-                {card.responsavel_atual}
-              </span>
+                <Eye className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}
@@ -1665,630 +544,255 @@ _Mensagem Automática do Sistema_
     );
   };
 
-  const unidadesMistasCount = unidadesComStatusMisto.size;
+  const ColunaComponent = ({ coluna }: { coluna: ColunaKanban }) => {
+    const cardsColuna = getCardsPorColuna(coluna.id);
+    const valorTotal = cardsColuna.reduce((sum, card) => sum + card.valor_total, 0);
+
+    return (
+      <div className="bg-gray-50 rounded-lg p-4 min-h-[600px] w-80 flex-shrink-0">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold text-gray-800 text-sm">{coluna.nome}</h3>
+            <p className="text-xs text-gray-600">{coluna.descricao}</p>
+          </div>
+          <div className="text-right">
+            <div className="text-sm font-bold text-gray-700">
+              {cardsColuna.length}
+            </div>
+            <div className="text-xs text-gray-500">
+              {formatarMoeda(valorTotal)}
+            </div>
+          </div>
+        </div>
+
+        <Droppable droppableId={coluna.id}>
+          {(provided, snapshot) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.droppableProps}
+              className={`
+                min-h-[500px] transition-colors duration-200
+                ${snapshot.isDraggingOver ? 'bg-blue-50 border-2 border-blue-300 border-dashed rounded-lg' : ''}
+              `}
+            >
+              {cardsColuna.map((card, index) => (
+                <CardComponent key={card.id} card={card} index={index} />
+              ))}
+              {provided.placeholder}
+              
+              {cardsColuna.length === 0 && (
+                <div className="text-center text-gray-400 py-8">
+                  <div className="text-4xl mb-2">📋</div>
+                  <p className="text-sm">Nenhum card nesta coluna</p>
+                </div>
+              )}
+            </div>
+          )}
+        </Droppable>
+      </div>
+    );
+  };
 
   return (
-    <div className="max-w-full mx-auto p-6">
-  {/* Toaster global já está em main.tsx; removido para evitar duplicidade */}
-      <div className="bg-white rounded-lg shadow-lg p-8">
-        <div className="flex items-center justify-between mb-8">
+    <div className="h-screen flex flex-col bg-gray-100">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-gradient-to-br from-[#ff9923] to-[#ffc31a] rounded-xl flex items-center justify-center shadow-lg mr-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
               <CircleDollarSign className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">
-                Kanban de Cobranças
-              </h1>
+              <h1 className="text-2xl font-bold text-gray-800">Kanban de Cobranças</h1>
               <p className="text-gray-600">
-                Gestão visual do fluxo de cobrança
-                {monitoramentoAtivo && (
-                  <span className="ml-2 inline-flex items-center">
-                    <div className="animate-pulse w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></div>
-                    <span className="text-green-600 text-xs font-medium">
-                      Monitoramento ativo
-                    </span>
-                  </span>
-                )}
-              </p>
-              <p className="text-gray-500 text-xs mt-1">
-                💡 Dica: Use Ctrl+Shift+K para limpar cache • Sistema monitora
-                travas automaticamente
+                Gestão visual do fluxo de cobrança e parcelamentos
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="agrupar"
+                checked={agrupadoPorUnidade}
+                onChange={(e) => setAgrupadoPorUnidade(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="agrupar" className="text-sm text-gray-700">
+                Agrupar por unidade
+              </label>
+            </div>
+
             <button
               onClick={exportarDados}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
               <Download className="w-4 h-4 mr-2" />
               Exportar
             </button>
+
             <button
-              onClick={handleAtualizarClick}
+              onClick={carregarDados}
               disabled={carregando}
-              title={(movimentacaoIndividualFeita || unidadesComStatusMisto.size > 0) ? 'Liberar travas e atualizar' : 'Atualizar dados'}
-              className="flex items-center px-4 py-2 bg-[#ff9923] text-white rounded-lg hover:bg-[#c5700e] disabled:opacity-50 transition-colors"
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
-              <RefreshCw
-                className={`w-4 h-4 mr-2 ${carregando ? "animate-spin" : ""}`}
-              />
+              <RefreshCw className={`w-4 h-4 mr-2 ${carregando ? 'animate-spin' : ''}`} />
               Atualizar
-            </button>
-            <button
-              onClick={() => setShowFiltrosAvancados(!showFiltrosAvancados)}
-              className="flex items-center px-4 py-2 bg-[#6b3a10] text-white rounded-lg hover:bg-[#a35919] transition-colors"
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              {showFiltrosAvancados ? "Ocultar Filtros" : "Mostrar Filtros"}
             </button>
           </div>
         </div>
 
         {/* Estatísticas */}
         {estatisticas && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-blue-600">
-                {estatisticas.total_cards}
-              </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div className="bg-blue-50 rounded-lg p-3">
+              <div className="text-lg font-bold text-blue-600">{estatisticas.total_cards}</div>
               <div className="text-sm text-blue-800">Total de Cards</div>
             </div>
-            <div className="bg-purple-100 rounded-lg p-4">
-              <div className="text-2xl font-bold text-purple-700">
-                {estatisticas.inadimplentes_perda}
-              </div>
-              <div className="text-sm text-purple-700">Cobranças Inadimplentes/Perda</div>
+            <div className="bg-red-50 rounded-lg p-3">
+              <div className="text-lg font-bold text-red-600">{estatisticas.cards_criticos}</div>
+              <div className="text-sm text-red-800">Cards Críticos</div>
             </div>
-            <div className="bg-yellow-100 rounded-lg p-4">
-              <div className="text-2xl font-bold text-yellow-700">
-                {estatisticas.cards_criticos}
-              </div>
-              <div className="text-sm text-yellow-700">Cards Críticos</div>
+            <div className="bg-orange-50 rounded-lg p-3">
+              <div className="text-lg font-bold text-orange-600">{estatisticas.inadimplentes_perda}</div>
+              <div className="text-sm text-orange-800">Inadimplência/Perda</div>
             </div>
-            <div className="bg-red-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-red-600">
-                {formatarMoeda(
-                  estatisticas.valor_total_original_aberto || 0
-                )}
+            <div className="bg-green-50 rounded-lg p-3">
+              <div className="text-lg font-bold text-green-600">
+                {formatarMoeda(estatisticas.valor_total_fluxo)}
               </div>
-              <div className="text-sm text-red-800">Valor Total em Aberto (Original)</div>
+              <div className="text-sm text-green-800">Valor Total</div>
             </div>
           </div>
         )}
 
-        {/* Seletor de Modo */}
-        <div className="space-y-4 mb-6">
-          <div className="flex items-center space-x-4">
-            <div className="flex bg-gray-100 rounded-lg p-1 flex-wrap gap-1 md:flex-nowrap">
-              <button
-                onClick={() => {
-                  if (movimentacaoIndividualFeita) {
-                    if (
-                      confirm(
-                        "⚠️ ATENÇÃO: Você moveu cobranças individuais nesta sessão.\n\n" +
-                          "Alternar para modo agrupado pode causar inconsistências.\n\n" +
-                          "Recomendamos recarregar a página antes de usar o modo agrupado.\n\n" +
-                          "Deseja continuar mesmo assim?"
-                      )
-                    ) {
-                      setAba("unidade");
-                      setMovimentacaoIndividualFeita(false);
-                    }
-                  } else {
-                    setAba("unidade");
-                  }
-                }}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                  aba === "unidade"
-                    ? "bg-[#ff9923] text-white"
-                    : "text-gray-600 hover:text-gray-800"
-                } ${movimentacaoIndividualFeita ? "opacity-50" : ""}`}
-                disabled={movimentacaoIndividualFeita}
-                title={
-                  movimentacaoIndividualFeita
-                    ? "Modo bloqueado - houve movimentação individual"
-                    : ""
-                }
-              >
-                Cobranças Agrupadas
-                {unidadesMistasCount > 0 && (
-                  <span className="ml-2 px-2 py-1 bg-orange-500 text-white rounded-full text-xs">
-                    {unidadesMistasCount} bloqueadas
-                  </span>
-                )}
-                {movimentacaoIndividualFeita && (
-                  <Lock className="w-4 h-4 ml-2" />
-                )}
-              </button>
-              <button
-                onClick={() => setAba("individual")}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                  aba === "individual"
-                    ? "bg-[#ff9923] text-white"
-                    : "text-gray-600 hover:text-gray-800"
-                }`}
-              >
-                Cobrança Individuais
-                {movimentacaoIndividualFeita && (
-                  <span className="ml-2 px-2 py-1 bg-green-500 text-white rounded-full text-xs">
-                    Ativo
-                  </span>
-                )}
-              </button>
-            </div>
+        {/* Filtros */}
+        <div className="bg-gray-50 rounded-lg p-4">
+          <div className="flex items-center mb-3">
+            <Filter className="w-5 h-5 text-gray-600 mr-2" />
+            <h3 className="font-semibold text-gray-800">Filtros</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+            <input
+              type="text"
+              value={filtros.unidade || ""}
+              onChange={(e) => setFiltros({ ...filtros, unidade: e.target.value })}
+              placeholder="Buscar unidade/CNPJ"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+            
+            <select
+              value={filtros.tipo_debito || ""}
+              onChange={(e) => setFiltros({ ...filtros, tipo_debito: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="">Todos os Tipos</option>
+              <option value="Franchising - Royalties">Royalties</option>
+              <option value="Vendas - Vendas">Vendas</option>
+              <option value="Franchising - Tx de Propagand">Taxa de Propaganda</option>
+              <option value="- Multa/Infração">Multa/Infração</option>
+              <option value="Franchising - Tx de Franquia">Taxa de Franquia</option>
+            </select>
 
-            {movimentacaoIndividualFeita && (
-              <div className="flex items-center px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg">
-                <AlertTriangle className="w-4 h-4 text-orange-600 mr-2" />
+            <select
+              value={filtros.responsavel || ""}
+              onChange={(e) => setFiltros({ ...filtros, responsavel: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="">Todos os Responsáveis</option>
+              <option value="Equipe Cobrança">Equipe Cobrança</option>
+              <option value="Jurídico">Jurídico</option>
+              <option value="Diretoria">Diretoria</option>
+            </select>
 
-                <span className="text-sm text-orange-800 font-medium">
-                  Modo Individual Ativo - O modo de movimento de cobranças por unidade está desativado até todas as cobranças terem o mesmo status!
-                </span>
-              </div>
-            )}
+            <select
+              value={filtros.criticidade || ""}
+              onChange={(e) => setFiltros({ ...filtros, criticidade: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="">Todas as Criticidades</option>
+              <option value="normal">Normal</option>
+              <option value="atencao">Atenção</option>
+              <option value="critica">Crítica</option>
+            </select>
+
+            <input
+              type="number"
+              value={filtros.valor_min || ""}
+              onChange={(e) => setFiltros({ ...filtros, valor_min: parseFloat(e.target.value) || undefined })}
+              placeholder="Valor mínimo"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+
+            <button
+              onClick={() => setFiltros({})}
+              className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm transition-colors"
+            >
+              Limpar Filtros
+            </button>
           </div>
         </div>
+      </div>
 
-        {/* Filtros Avançados */}
-        {showFiltrosAvancados && (
-          <div className="bg-gray-50 rounded-lg p-6 mb-6">
-            <div className="flex items-center mb-4">
-              <Filter className="w-5 h-5 text-gray-600 mr-2" />
-              <h3 className="text-lg font-semibold text-gray-800">
-                Filtros Avançados
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome
-                </label>
-                <input
-                  type="text"
-                  value={filtrosAvancados.nomeUnidade}
-                  onChange={(e) =>
-                    setFiltrosAvancados({
-                      ...filtrosAvancados,
-                      nomeUnidade: e.target.value,
-                    })
-                  }
-                  placeholder="Buscar por nome da unidade ou franqueado"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Documento
-                </label>
-                <input
-                  type="text"
-                  value={filtrosAvancados.cnpj}
-                  onChange={(e) =>
-                    setFiltrosAvancados({
-                      ...filtrosAvancados,
-                      cnpj: e.target.value,
-                    })
-                  }
-                  placeholder="00.000.000/0000-00 ou 000.000.000-00"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status da Cobrança
-                </label>
-                <select
-                  value={filtrosAvancados.statusCobranca}
-                  onChange={(e) =>
-                    setFiltrosAvancados({
-                      ...filtrosAvancados,
-                      statusCobranca: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Todos os Status</option>
-                  <option value="em_aberto">Em Aberto</option>
-                  <option value="em_negociacao">Em Negociação</option>
-                  <option value="parcelado">Parcelado</option>
-                  <option value="quitado">Quitado</option>
-                  <option value="juridico">Jurídico</option>
-                  <option value="inadimplencia">Inadimplência</option>
-                  <option value="perda">Perda</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Valor Mínimo (R$)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={filtrosAvancados.valorMin}
-                  onChange={(e) =>
-                    setFiltrosAvancados({
-                      ...filtrosAvancados,
-                      valorMin: e.target.value,
-                    })
-                  }
-                  placeholder="0,00"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Valor Máximo (R$)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={filtrosAvancados.valorMax}
-                  onChange={(e) =>
-                    setFiltrosAvancados({
-                      ...filtrosAvancados,
-                      valorMax: e.target.value,
-                    })
-                  }
-                  placeholder="999.999,99"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tipo de Cobrança
-                </label>
-                <select
-                  value={filtrosAvancados.tipoCobranca}
-                  onChange={(e) =>
-                    setFiltrosAvancados({
-                      ...filtrosAvancados,
-                      tipoCobranca: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Todos os Tipos</option>
-                  <option value="Franchising - Royalties">Franchising - Royalties</option>
-                  <option value="Franchising - Tx de Franquia">Franchising - Tx de Franquia</option>
-                  <option value="Franchising - Tx de Propagand">Franchising - Tx de Propagand</option>
-                  <option value="Vendas - Vendas">Vendas - Vendas</option>
-                  <option value="- Multa/Infração">Multa/Infração</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Indicador de filtros ativos */}
-            {Object.values(filtrosAvancados).some((v) => v !== "") && (
-              <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-center">
-                  <Filter className="w-4 h-4 text-blue-600 mr-2" />
-                  <span className="text-sm font-medium text-blue-800">
-                    Filtros ativos:{" "}
-                    {
-                      Object.values(filtrosAvancados).filter((v) => v !== "")
-                        .length
-                    }
-                  </span>
-                </div>
-                <button
-                  onClick={limparFiltros}
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  Limpar todos
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Avisos */}
-        {aba === "unidade" && unidadesMistasCount > 0 && (
-          <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start">
-                <AlertTriangle className="w-5 h-5 text-orange-600 mr-3 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-orange-800 font-medium mb-2">
-                    ⚠️ {unidadesMistasCount} unidade(s) com status misto
-                    detectada(s)
-                  </p>
-                  <p className="text-orange-700 text-sm mb-3">
-                    Essas unidades possuem cobranças com status diferentes e
-                    estão bloqueadas no modo agrupado.
-                  </p>
-
-                  {/* Lista resumida das unidades bloqueadas */}
-                  <div className="bg-orange-100 border border-orange-300 rounded-lg p-3 mb-3">
-                    <p className="text-orange-800 font-medium text-sm mb-2">
-                      📋 Unidades bloqueadas:
-                    </p>
-                    <div className="space-y-1 max-h-32 overflow-y-auto">
-                      {Array.from(unidadesComStatusMisto)
-                        .slice(0, 5)
-                        .map((cnpj) => {
-                          const detalhes = detalhesStatusMisto[cnpj];
-                          return (
-                            <div
-                              key={cnpj}
-                              className="text-xs text-orange-700 flex items-center justify-between"
-                            >
-                              <span className="font-medium">
-                                {detalhes?.nomeUnidade ||
-                                  "Unidade não identificada"}
-                              </span>
-                              <span className="text-orange-600">
-                                {detalhes?.statusList?.join(", ") ||
-                                  "Status não identificado"}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      {unidadesMistasCount > 5 && (
-                        <div className="text-xs text-orange-600 italic">
-                          ... e mais {unidadesMistasCount - 5} unidade(s)
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {monitoramentoAtivo && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-4">
-                      <div className="flex items-center">
-                        <div className="animate-pulse w-2 h-2 bg-green-600 rounded-full mr-2"></div>
-                        <p className="text-green-800 text-sm font-medium">
-                          🤖 Monitoramento automático ativo - O sistema está
-                          verificando a cada 10 segundos se as unidades podem
-                          ser liberadas
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Kanban Board */}
-        <DragDropContext
-          onDragEnd={aba === "unidade" ? onDragEndUnidade : onDragEndIndividual}
-        >
-          <div className="w-full overflow-x-auto pb-5">
-            <div className="flex flex-row gap-10 min-w-fit">
+      {/* Kanban Board */}
+      <div className="flex-1 overflow-hidden">
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="h-full overflow-x-auto">
+            <div className="flex space-x-4 p-6 min-w-max">
               {colunas
-                .filter((col) => col.ativa)
-                .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
-                .map((coluna) => (
-                  <Droppable key={coluna.id} droppableId={coluna.id}>
-                    {(provided, snapshot) => (
-                      // ===== CORREÇÃO PRINCIPAL =====
-                      // As propriedades `ref` e `droppableProps` foram movidas para este container principal.
-                      // Este é o elemento raiz retornado e agora a biblioteca o reconhecerá corretamente.
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={`p-4 min-w-[320px] w-[320px] flex flex-col rounded-lg bg-gray-50 border-2 transition-colors duration-200 ${
-                          snapshot.isDraggingOver
-                        }`}
-                        style={{
-                          borderColor: snapshot.isDraggingOver
-                            ? '#18429e'
-                            : coluna.cor,
-                          backgroundColor: snapshot.isDraggingOver
-                            ? '#18429E1A'
-                            : '',
-                          height: '700px', // altura fixa da coluna
-                        }}
-                      >
-                        {/* O Header continua aqui, normalmente */}
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="font-semibold text-gray-800 text-sm">
-                            {coluna.nome}
-                          </h3>
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: coluna.cor }}
-                          ></div>
-                        </div>
-
-                        {/* Cards com rolagem interna e paginação incremental */}
-                        <div className="flex-1 overflow-y-auto pr-2 pl-2">
-                          {aba === "unidade"
-                            ? (() => {
-                                const units = getUnitCardsByColuna(coluna.id);
-                                const limite = cardsVisiveisPorColuna[coluna.id] || 20;
-                                return (
-                                  <>
-                                    {units.slice(0, limite).map((unit, index) => renderCardUnidade(unit, index))}
-                                    {units.length > limite && (
-                                      <div className="flex justify-center my-2">
-                                        <button
-                                          className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs"
-                                          onClick={() => setCardsVisiveisPorColuna(v => ({ ...v, [coluna.id]: (v[coluna.id] || 20) + 20 }))
-                                          }
-                                        >
-                                          Carregar mais
-                                        </button>
-                                      </div>
-                                    )}
-                                  </>
-                                );
-                              })()
-                            : (() => {
-                                const cardsCol = cards.filter((card) => card.status_atual === coluna.id);
-                                const limite = cardsVisiveisPorColuna[coluna.id] || 20;
-                                return (
-                                  <>
-                                    {cardsCol.slice(0, limite).map((card, index) => renderCardIndividual(card, index))}
-                                    {cardsCol.length > limite && (
-                                      <div className="flex justify-center my-2">
-                                        <button
-                                          className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs"
-                                          onClick={() => setCardsVisiveisPorColuna(v => ({ ...v, [coluna.id]: (v[coluna.id] || 20) + 20 }))
-                                          }
-                                        >
-                                          Carregar mais
-                                        </button>
-                                      </div>
-                                    )}
-                                  </>
-                                );
-                              })()
-                          }
-                          {provided.placeholder}
-                        </div>
-                      </div>
-                    )}
-                  </Droppable>
+                .filter(coluna => coluna.ativa)
+                .sort((a, b) => a.ordem - b.ordem)
+                .map(coluna => (
+                  <ColunaComponent key={coluna.id} coluna={coluna} />
                 ))}
             </div>
           </div>
         </DragDropContext>
-
-        {carregando && (
-          <div className="flex items-center justify-center py-8">
-            <RefreshCw className="w-8 h-8 animate-spin text-blue-600 mr-2" />
-            <span className="text-gray-600">Carregando Kanban...</span>
-          </div>
-        )}
       </div>
 
-      {/* Modal de Confirmação de Movimento */}
-      {modalConfirmacaoAberto && movimentoPendente && (
+      {/* Modal de Observação */}
+      {modalObservacao.aberto && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4">
-              Confirmar Movimentação
-            </h3>
-            <p className="text-gray-700 mb-6">
-              Deseja mover todas as cobranças desta unidade para a nova coluna?
-            </p>
-            <div className="flex space-x-3">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Adicionar Observação</h3>
               <button
-                onClick={confirmarMovimentoUnidade}
-                disabled={processando}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                onClick={() => setModalObservacao({ aberto: false, cardId: "", observacaoAtual: "" })}
+                className="text-gray-500 hover:text-gray-700"
               >
-                {processando ? "Movendo..." : "Confirmar"}
+                <X className="w-5 h-5" />
               </button>
+            </div>
+
+            <textarea
+              value={modalObservacao.observacaoAtual}
+              onChange={(e) => setModalObservacao(prev => ({ ...prev, observacaoAtual: e.target.value }))}
+              placeholder="Digite sua observação..."
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+
+            <div className="flex space-x-3 mt-4">
               <button
-                onClick={() => {
-                  setModalConfirmacaoAberto(false);
-                  setMovimentoPendente(null);
-                }}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                onClick={salvarObservacao}
+                disabled={salvandoObservacao}
+                className="flex-1 flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {salvandoObservacao ? (
+                  <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
+                {salvandoObservacao ? "Salvando..." : "Salvar"}
+              </button>
+              
+              <button
+                onClick={() => setModalObservacao({ aberto: false, cardId: "", observacaoAtual: "" })}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
               >
                 Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Aviso de Status Misto */}
-      {showMixedStatusWarning && modalDetalhesStatusMisto && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-lg w-full">
-            <div className="flex items-center mb-4">
-              <Lock className="w-6 h-6 text-orange-600 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-800">
-                🔒 Unidade com Status Misto Bloqueada
-              </h3>
-            </div>
-
-            {(() => {
-              const detalhes = detalhesStatusMisto[modalDetalhesStatusMisto];
-              return (
-                <div className="space-y-4 mb-6">
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <h4 className="text-orange-800 font-semibold mb-3">
-                      📋 {detalhes?.nomeUnidade || "Unidade não identificada"}
-                    </h4>
-                    <p className="text-orange-700 text-sm mb-3">
-                      Esta unidade possui cobranças com{" "}
-                      <strong>
-                        {detalhes?.statusList?.length || 0} status diferentes
-                      </strong>{" "}
-                      e não pode ser movida no modo agrupado.
-                    </p>
-
-                    {detalhes?.statusList && (
-                      <div className="bg-orange-100 border border-orange-300 rounded-lg p-3">
-                        <p className="text-orange-800 text-sm font-medium mb-2">
-                          🏷️ Status encontrados:
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {detalhes.statusList.map((status, index) => (
-                            <span
-                              key={index}
-                              className="px-2 py-1 bg-orange-200 text-orange-800 text-xs rounded-full"
-                            >
-                              {formatarStatusCobranca(status)}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-blue-800 text-sm font-medium mb-2">
-                      💡 Como resolver:
-                    </p>
-                    <ul className="text-blue-700 text-sm space-y-1">
-                      <li>
-                        • <strong>Modo Individual:</strong> Acesse "Por
-                        Cobrança" para mover cada cobrança separadamente
-                      </li>
-                      <li>
-                        • <strong>Padronização:</strong> Mova todas as cobranças
-                        para o mesmo status
-                      </li>
-                      <li>
-                        • <strong>Verificação:</strong> Confirme se algumas
-                        cobranças foram quitadas parcialmente
-                      </li>
-                    </ul>
-                  </div>
-
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <p className="text-yellow-800 text-sm">
-                      ⚠️ <strong>Exemplo:</strong> Se uma unidade tem uma
-                      cobrança "quitada" e outra "em aberto", elas não podem ser
-                      movidas juntas pois estão em situações diferentes.
-                    </p>
-                  </div>
-                </div>
-              );
-            })()}
-
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setAba("individual");
-                  setShowMixedStatusWarning(false);
-                  setModalDetalhesStatusMisto(null);
-                }}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                🔄 Ir para Modo Individual
-              </button>
-              <button
-                onClick={() => {
-                  setShowMixedStatusWarning(false);
-                  setModalDetalhesStatusMisto(null);
-                }}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-              >
-                Fechar
               </button>
             </div>
           </div>
@@ -2296,441 +800,117 @@ _Mensagem Automática do Sistema_
       )}
 
       {/* Modal de Detalhes */}
-      {modalAberto === "detalhes" && (
+      {modalDetalhes.aberto && modalDetalhes.card && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full h-auto overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center">
-                {unitSelecionada ? (
-                  <>
-                    <CircleDollarSign className="w-6 h-6 text-blue-600 mr-2" />
-                    <h3 className="text-lg font-semibold text-blue-800">
-                      Detalhes da Unidade
-                    </h3>
-                  </>
-                ) : (
-                  <>
-                    <DollarSign className="w-6 h-6 text-blue-600 mr-2" />
-                    <h3 className="text-lg font-semibold text-blue-800">
-                      Detalhes da Cobrança
-                    </h3>
-                  </>
-                )}
-              </div>
-              <button
-                onClick={limparEstadosModal}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Modal de Unidade */}
-            {unitSelecionada && !cobrancaSelecionada && (
-              <div className="space-y-4">
-                {/* Informações da Unidade */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-blue-800 mb-3">
-                    Informações da Unidade
-                  </h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">
-                        Nome da Unidade
-                      </label>
-                      <p className="text-gray-800">
-                        {unitSelecionada.nome_unidade}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">
-                        CNPJ/CPF
-                      </label>
-                      <p className="text-gray-800">
-                        {formatarCNPJCPF((unitSelecionada.cnpj || (unitSelecionada as any).cpf || ""))}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">
-                        Valor Total
-                      </label>
-                      <p className="text-red-600 font-semibold">
-                        {formatarMoeda(unitSelecionada.valor_total)}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">
-                        Valor Original
-                      </label>
-                      <p className="text-blue-600 font-semibold">
-                        {formatarMoeda(unitSelecionada.valor_original ?? 0)}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">
-                        Quantidade de Cobranças
-                      </label>
-                      <p className="text-gray-800">
-                        {obterQuantidadeTotalCobrancas(unitSelecionada.cnpj || (unitSelecionada as any).cpf || "")}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                {/* Observações da Unidade */}
-                {unitSelecionada.observacoes && unitSelecionada.observacoes.trim() !== "" && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-yellow-800 mb-2">
-                      Observações
-                    </h4>
-                    <p className="text-yellow-700 text-sm whitespace-pre-wrap">
-                      {unitSelecionada.observacoes}
-                    </p>
-                  </div>
-                )}
-
-                {/* Lista de Cobranças da Unidade */}
-                {todasCobrancasUnidade.length > 0 && (
-                  <div>
-                    <h4 className="text-lg font-semibold text-gray-800 mb-4">
-                      Cobranças desta Unidade ({todasCobrancasUnidade.length})
-                    </h4>
-                    <div className="space-y-3 max-h-60 overflow-y-auto">
-                      {todasCobrancasUnidade.map((cobranca, index) => (
-                        <div
-                          key={cobranca.id}
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-medium text-gray-800">
-                                #{index + 1} -{" "}
-                                {formatarMoeda(cobranca.valor_total)}
-                                <span className="ml-2 text-blue-600 font-semibold">
-                                  Valor Original: {formatarMoeda(cobranca.valor_original ?? 0)}
-                                </span>
-                              </span>
-                              <span
-                                className={`px-2 py-1 text-xs font-medium rounded-full ${getCriticidadeBadge(
-                                  cobranca.criticidade,
-                                  cobranca.status_atual
-                                )}`}
-                              >
-                                {formatarStatusCobranca(cobranca.status_atual)}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs text-gray-600">
-                              <span>
-                                Venc:{" "}
-                                {formatarData(cobranca.data_vencimento_antiga)}
-                              </span>
-                              <span>
-                                {formatarTipoDebito(cobranca.tipo_debito)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Botões de Ação */}
-                <div className="bg-white border-t border-gray-200 pt-4">
-                  <h4 className="font-semibold text-gray-800 mb-3">
-                    Ações para Toda a Unidade
-                  </h4>
-
-                  {unitSelecionada.status_atual === "quitado" ? (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                          <span className="text-green-600 font-bold">✓</span>
-                        </div>
-                        <div>
-                          <p className="text-green-800 font-medium">
-                            Unidade Quitada
-                          </p>
-                          <p className="text-green-700 text-sm">
-                            Todas as cobranças desta unidade foram quitadas. Não
-                            é possível realizar ações de cobrança.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex space-x-3">
-                      <button
-                        onClick={() => {
-                          setUnidadeParaWhatsApp(unitSelecionada);
-                          setModalConfirmacaoWhatsAppUnidade(true);
-                        }}
-                        disabled={processando}
-                        className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                      >
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        WhatsApp
-                      </button>
-                      <button
-                        onClick={avisarReuniaoIndisponivel}
-                        disabled={processando}
-                        className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
-                      >
-                        <Calendar className="w-4 h-4 mr-2" />
-                        Reunião
-                      </button>
-                      <button
-                        onClick={() => {
-                          setObservacaoEditando(
-                            unitSelecionada.observacoes || ""
-                          );
-                          setModalAberto("observacao");
-                        }}
-                        disabled={processando}
-                        className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
-                      >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Observação
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Modal de Cobrança Individual */}
-            {cobrancaSelecionada && !unitSelecionada && (
-              <div className="space-y-4">
-                {/* Informações da Cobrança Individual */}
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-green-800 mb-3">
-                    Detalhes da Cobrança
-                  </h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">
-                        Cliente
-                      </label>
-                      <p className="text-gray-800">{cobrancaSelecionada.nome_unidade}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">
-                        CNPJ/CPF
-                      </label>
-                      <p className="text-gray-800">{formatarCNPJCPF(cobrancaSelecionada.cnpj || cobrancaSelecionada.cpf || "")}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">
-                        Valor Total
-                      </label>
-                      <p className="text-red-600 font-semibold">{formatarMoeda(cobrancaSelecionada.valor_total)}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">
-                        Valor Original
-                      </label>
-                      <p className="text-blue-600 font-semibold">{formatarMoeda(cobrancaSelecionada.valor_original ?? 0)}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">
-                        Vencimento
-                      </label>
-                      <p className="text-gray-800">{formatarData(cobrancaSelecionada.data_vencimento_antiga)}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">
-                        Status
-                      </label>
-                      <p>
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getCriticidadeBadge(cobrancaSelecionada.criticidade, cobrancaSelecionada.status_atual)}`}>
-                          {formatarStatusCobranca(cobrancaSelecionada.status_atual)}
-                        </span>
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">
-                        Tipo
-                      </label>
-                      <p className="text-gray-800">{formatarTipoDebito(cobrancaSelecionada.tipo_debito)}</p>
-                    </div>
-                  </div>
-                </div>
-                {/* Observações da Cobrança Individual */}
-                {cobrancaSelecionada.observacoes && cobrancaSelecionada.observacoes.trim() !== "" && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-yellow-800 mb-2">
-                      Observações
-                    </h4>
-                    <p className="text-yellow-700 text-sm whitespace-pre-wrap">
-                      {cobrancaSelecionada.observacoes}
-                    </p>
-                  </div>
-                )}
-
-                {/* Botões de Ação */}
-                <div className="bg-white border-t border-gray-200 pt-4">
-                  <h4 className="font-semibold text-gray-800 mb-3">
-                    Ações para Esta Cobrança
-                  </h4>
-
-                  {cobrancaSelecionada.status_atual === "quitado" ? (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                          <span className="text-green-600 font-bold">✓</span>
-                        </div>
-                        <div>
-                          <p className="text-green-800 font-medium">
-                            Cobrança Quitada
-                          </p>
-                          <p className="text-green-700 text-sm">
-                            Esta cobrança já foi quitada. Não é possível
-                            realizar ações.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex space-x-3">
-                      <button
-                        onClick={() =>
-                          enviarWhatsAppCobranca(cobrancaSelecionada)
-                        }
-                        disabled={processando}
-                        className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                      >
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        WhatsApp
-                      </button>
-                      <button
-                        onClick={avisarReuniaoIndisponivel}
-                        disabled={processando}
-                        className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
-                      >
-                        <Calendar className="w-4 h-4 mr-2" />
-                        Reunião
-                      </button>
-                      <button
-                        onClick={() => {
-                          setObservacaoEditando(
-                            cobrancaSelecionada.observacoes || ""
-                          );
-                          setModalAberto("observacao");
-                        }}
-                        disabled={processando}
-                        className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
-                      >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Observação
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Observação */}
-      {modalAberto === "observacao" && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Adicionar Observação</h3>
-              <button
-                onClick={limparEstadosModal}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <textarea
-              value={observacaoEditando}
-              onChange={(e) => setObservacaoEditando(e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="Digite sua observação..."
-            />
-
-            <div className="flex space-x-3 mt-4">
-              <button
-                onClick={salvarObservacao}
-                disabled={processando}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                <Save className="w-4 h-4 mr-2 inline" />
-                {processando ? "Salvando..." : "Salvar"}
-              </button>
-              <button
-                onClick={limparEstadosModal}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Confirmação WhatsApp Unidade */}
-      {modalConfirmacaoWhatsAppUnidade && unidadeParaWhatsApp && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <div className="flex items-center mb-4">
-              <MessageSquare className="w-6 h-6 text-green-600 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-800">
-                Confirmar Envio WhatsApp
+              <h3 className="text-xl font-semibold text-gray-800">
+                Detalhes - {modalDetalhes.card.nome_unidade}
               </h3>
+              <button
+                onClick={() => setModalDetalhes({ aberto: false, card: null })}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-6 h-6" />
+              </button>
             </div>
 
-            <div className="space-y-4 mb-6">
-              <p className="text-gray-700">
-                Esta ação irá enviar uma mensagem WhatsApp para a unidade{" "}
-                <strong>{unidadeParaWhatsApp.nome_unidade}</strong> informando
-                sobre <strong>todas as cobranças pendentes</strong>.
-              </p>
+            <div className="space-y-6">
+              {/* Informações Básicas */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-800 mb-2">Informações Básicas</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Código:</span>
+                      <span className="font-medium">{modalDetalhes.card.codigo_unidade}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">CNPJ/CPF:</span>
+                      <span className="font-medium">{formatarCNPJCPF(modalDetalhes.card.cnpj || modalDetalhes.card.cpf || "")}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Tipo:</span>
+                      <span className="font-medium">{modalDetalhes.card.tipo_debito}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Status:</span>
+                      <span className="font-medium">{modalDetalhes.card.status_atual}</span>
+                    </div>
+                  </div>
+                </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="text-sm">
-                  <p>
-                    <strong>Unidade:</strong> {unidadeParaWhatsApp.nome_unidade}
-                  </p>
-                  <p>
-                    <strong>Quantidade de cobranças:</strong>{" "}
-                    {obterQuantidadeTotalCobrancas(unidadeParaWhatsApp.cnpj || (unidadeParaWhatsApp as any).cpf || "")}
-                  </p>
-                  <p>
-                    <strong>Valor total aproximado:</strong>{" "}
-                    {formatarMoeda(unidadeParaWhatsApp.valor_total)}
-                  </p>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-800 mb-2">Valores</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Valor Total:</span>
+                      <span className="font-bold text-lg">{formatarMoeda(modalDetalhes.card.valor_total)}</span>
+                    </div>
+                    {modalDetalhes.card.valor_original && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Valor Original:</span>
+                        <span className="font-medium">{formatarMoeda(modalDetalhes.card.valor_original)}</span>
+                      </div>
+                    )}
+                    {modalDetalhes.card.valor_recebido && modalDetalhes.card.valor_recebido > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Valor Recebido:</span>
+                        <span className="font-medium text-green-600">{formatarMoeda(modalDetalhes.card.valor_recebido)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Quantidade:</span>
+                      <span className="font-medium">{modalDetalhes.card.quantidade_titulos} título(s)</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                <p className="text-yellow-800 text-sm font-medium">
-                  ⚠️ A mensagem incluirá o detalhamento de todas as cobranças
-                  pendentes da unidade.
-                </p>
+              {/* Datas */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-800 mb-2">Cronologia</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Vencimento Mais Antigo:</span>
+                    <span className="font-medium">{new Date(modalDetalhes.card.data_vencimento_antiga).toLocaleDateString('pt-BR')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Vencimento Mais Recente:</span>
+                    <span className="font-medium">{new Date(modalDetalhes.card.data_vencimento_recente).toLocaleDateString('pt-BR')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Última Ação:</span>
+                    <span className="font-medium">{new Date(modalDetalhes.card.data_ultima_acao).toLocaleDateString('pt-BR')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Responsável:</span>
+                    <span className="font-medium">{modalDetalhes.card.responsavel_atual}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Observações */}
+              {modalDetalhes.card.observacoes && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-yellow-800 mb-2">Observações</h4>
+                  <p className="text-yellow-700 text-sm">{modalDetalhes.card.observacoes}</p>
+                </div>
+              )}
+
+              {/* Última Ação */}
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-800 mb-2">Última Ação</h4>
+                <p className="text-blue-700 text-sm">{modalDetalhes.card.ultima_acao}</p>
               </div>
             </div>
 
-            <div className="flex space-x-3">
+            <div className="flex justify-end mt-6">
               <button
-                onClick={() => enviarWhatsAppUnidade(unidadeParaWhatsApp)}
-                disabled={processando}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                onClick={() => setModalDetalhes({ aberto: false, card: null })}
+                className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
               >
-                {processando ? "Enviando..." : "Confirmar Envio"}
-              </button>
-              <button
-                onClick={() => {
-                  setModalConfirmacaoWhatsAppUnidade(false);
-                  setUnidadeParaWhatsApp(null);
-                }}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-              >
-                Cancelar
+                Fechar
               </button>
             </div>
           </div>
