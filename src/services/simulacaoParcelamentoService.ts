@@ -167,7 +167,7 @@ export class SimulacaoParcelamentoService {
         quantidade_parcelas: quantidadeParcelas,
         valor_entrada: valorEntrada,
         percentual_multa: 10.0,
-        percentual_juros_mora: 1.5,
+        percentual_juros_mora: 1,
         data_primeira_parcela: dataPrimeiraParcela,
         parcelas,
         valor_total_parcelamento: valorTotalParcelamento,
@@ -204,6 +204,8 @@ export class SimulacaoParcelamentoService {
         .select()
         .single();
 
+      console.log("[salvarSimulacao] Registro salvo:", data);
+
       if (error) {
         throw new Error(`Erro ao salvar simulação: ${error.message}`);
       }
@@ -224,8 +226,9 @@ export class SimulacaoParcelamentoService {
     usuario: string
   ): Promise<PropostaParcelamento> {
     try {
+      console.log("[gerarProposta] simulacaoId recebido:", simulacaoId);
       // Busca dados da simulação com parcelamento master
-      const { data: simulacao } = await supabase
+      let { data: simulacoes } = await supabase
         .from("simulacoes_parcelamento")
         .select(
           `
@@ -237,10 +240,58 @@ export class SimulacaoParcelamentoService {
           )
         `
         )
-        .eq("id", simulacaoId)
-        .single();
+        .eq("id", String(simulacaoId))
+        .limit(1);
+      let simulacao = simulacoes && simulacoes.length > 0 ? simulacoes[0] : null;
 
       if (!simulacao) {
+        // Fallback: buscar pelo par (parcelamento_master_id, cnpj_unidade, quantidade_parcelas)
+        console.warn("[gerarProposta] Simulação não encontrada pelo id, tentando pelo par parcelamento_master_id + cnpj_unidade + quantidade_parcelas...");
+        const { data: possiveis } = await supabase
+          .from("simulacoes_parcelamento")
+          .select(
+            `
+            *,
+            parcelamentos_master!left (
+              cnpj_unidade,
+              valor_total_original_parcelado,
+              valor_total_atualizado_parcelado
+            )
+          `
+          )
+          .eq("parcelamento_master_id", simulacaoId)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        console.log("[gerarProposta] Possíveis simulações encontradas:", possiveis);
+        if (possiveis && possiveis.length > 0) {
+          simulacao = possiveis[0];
+        }
+      }
+
+      if (!simulacao) {
+        // Último recurso: buscar o registro mais recente
+        console.warn("[gerarProposta] Simulação não encontrada por id/par, buscando o registro mais recente...");
+        const { data: recentSimulacoes } = await supabase
+          .from("simulacoes_parcelamento")
+          .select(
+            `
+            *,
+            parcelamentos_master!left (
+              cnpj_unidade,
+              valor_total_original_parcelado,
+              valor_total_atualizado_parcelado
+            )
+          `
+          )
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (recentSimulacoes && recentSimulacoes.length > 0) {
+          simulacao = recentSimulacoes[0];
+        }
+      }
+
+      if (!simulacao) {
+        console.error("[gerarProposta] Simulação não encontrada. simulacaoId:", simulacaoId);
         throw new Error("Simulação não encontrada");
       }
 
@@ -827,7 +878,7 @@ export class SimulacaoParcelamentoService {
           dias_em_atraso
         `)
         .or(`cnpj.eq.${cnpjCpf},cpf.eq.${cnpjCpf}`)
-        .in("status", ["em_aberto", "em_atraso", "negociando"])
+        .in("status", ["em_aberto", "em_negociacao"])
         .is("parcelamento_master_id", null) // Apenas cobranças que ainda não foram parceladas
         .eq("is_parcela", false) // Apenas cobranças originais, não parcelas
         .order("data_vencimento", { ascending: true });
@@ -839,6 +890,42 @@ export class SimulacaoParcelamentoService {
       return data || [];
     } catch (error) {
       console.error("Erro ao buscar cobranças para parcelamento:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Busca todas as cobranças disponíveis para parcelamento (sem filtro de CNPJ/CPF)
+   */
+  async buscarTodasCobrancasDisponiveis(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from("cobrancas_franqueados")
+        .select(`
+          id,
+          cnpj,
+          cpf,
+          cliente,
+          valor_original,
+          valor_atualizado,
+          data_vencimento,
+          status,
+          tipo_cobranca,
+          descricao,
+          dias_em_atraso
+        `)
+        .in("status", ["em_aberto", "em_negociacao"])
+        .is("parcelamento_master_id", null)
+        .eq("is_parcela", false)
+        .order("cliente", { ascending: true })
+        .order("data_vencimento", { ascending: true });
+
+      if (error) {
+        throw new Error(`Erro ao buscar cobranças: ${error.message}`);
+      }
+      return data || [];
+    } catch (error) {
+      console.error("Erro ao buscar todas as cobranças para parcelamento:", error);
       throw error;
     }
   }
@@ -1167,7 +1254,7 @@ export class SimulacaoParcelamentoService {
       return {
         id: "default",
         percentual_juros_parcela: 3.0,
-        valor_minimo_parcela: 200.0,
+        valor_minimo_parcelas: 200.0,
         quantidade_maxima_parcelas: 42, // Novo máximo de 42 parcelas
         percentual_entrada_minimo: 20.0,
         dias_entre_parcelas: 30,
