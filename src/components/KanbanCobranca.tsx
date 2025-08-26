@@ -1,921 +1,961 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import { supabase } from "./databaseService";
 import {
-  CircleDollarSign,
-  Filter,
-  RefreshCw,
-  Download,
-  MessageSquare,
-  Calendar,
-  FileText,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  Building2,
-  User,
-  Phone,
-  Mail,
-  Eye,
-  Edit,
-  Save,
-  X,
-  CreditCard,
-  Package,
-  Scale,
-  Ban,
-} from "lucide-react";
-import { KanbanService } from "../services/kanbanService";
-import { cobrancaService } from "../services/cobrancaService";
-import { n8nService } from "../services/n8nService";
-import { emailService } from "../services/emailService";
-import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban } from "../types/kanban";
-import { formatarCNPJCPF, formatarMoeda } from "../utils/formatters";
-import { connectionService } from "../services/connectionService";
-import { toast } from "react-hot-toast";
+  CardCobranca,
+  ColunaKanban,
+  MovimentacaoCard,
+  FiltrosKanban,
+  EstatisticasKanban,
+  LogMovimentacao,
+} from "../types/kanban";
+import { TrativativasService } from "./tratativasService";
 
-export function KanbanCobranca() {
-  const [colunas, setColunas] = useState<ColunaKanban[]>([]);
-  const [cards, setCards] = useState<CardCobranca[]>([]);
-  const [carregando, setCarregando] = useState(true);
-  const [filtros, setFiltros] = useState<FiltrosKanban>({});
-  const [estatisticas, setEstatisticas] = useState<EstatisticasKanban | null>(null);
-  const [agrupadoPorUnidade, setAgrupadoPorUnidade] = useState(true);
-  const [modalObservacao, setModalObservacao] = useState<{
-    aberto: boolean;
-    cardId: string;
-    observacaoAtual: string;
-  }>({ aberto: false, cardId: "", observacaoAtual: "" });
-  const [modalDetalhes, setModalDetalhes] = useState<{
-    aberto: boolean;
-    card: CardCobranca | null;
-  }>({ aberto: false, card: null });
-  const [salvandoObservacao, setSalvandoObservacao] = useState(false);
-  const [processandoAcao, setProcessandoAcao] = useState<string | null>(null);
+export class KanbanService {
+  private tratativasService: TrativativasService;
 
-  const kanbanService = useMemo(() => new KanbanService(), []);
+  constructor() {
+    this.tratativasService = new TrativativasService();
+  }
 
-  const carregarDados = useCallback(async () => {
-    setCarregando(true);
+  /**
+   * Busca todas as colunas do Kanban
+   */
+  async buscarColunas(): Promise<ColunaKanban[]> {
     try {
-      const [colunasData, cardsData, estatisticasData] = await Promise.all([
-        kanbanService.buscarColunas(),
-        kanbanService.buscarCards(filtros, agrupadoPorUnidade),
-        kanbanService.buscarEstatisticas(agrupadoPorUnidade),
-      ]);
-
-      setColunas(colunasData);
-      setCards(cardsData);
-      setEstatisticas(estatisticasData);
+      // Colunas do Kanban na ordem e nomes definidos pelo cliente
+      return [
+        {
+          id: "em_aberto",
+          nome: "📥 Atrasadas",
+          descricao: "Valor atrasado em aberto",
+          cor: "#6B7280",
+          ordem: 1,
+          ativa: true,
+        },
+        {
+          id: "em_negociacao",
+          nome: "🤝 Negociando",
+          descricao: "Negociando",
+          cor: "#F59E0B",
+          ordem: 2,
+          ativa: true,
+        },
+        {
+          id: "parcelado",
+          nome: "🗂️ Parcelado",
+          descricao: "Cobrança parcelada",
+          cor: "#7031AF",
+          ordem: 3,
+          ativa: true,
+        },
+        {
+          id: "parcelas",
+          nome: "📅 Parcelas Futuras",
+          descricao: "Parcelas de parcelamentos a vencer",
+          cor: "#8B5CF6",
+          ordem: 4,
+          ativa: true,
+        },
+        {
+          id: "inadimplencia",
+          nome: "❌ Inadimplência",
+          descricao: "Cobrança atrasada mais de 30 dias",
+          cor: "#8d4925",
+          ordem: 5,
+          ativa: true,
+        },
+        {
+          id: "juridico",
+          nome: "⚖️ Jurídico",
+          descricao: "Cobrança no jurídico",
+          cor: "#31A3FB",
+          ordem: 6,
+          ativa: true,
+        },
+        {
+          id: "perda",
+          nome: "🚫 Perda",
+          descricao: "Cobrança perdida a mais de 180 dias",
+          cor: "#FF0A0E",
+          ordem: 7,
+          ativa: true,
+        },
+        {
+          id: "quitado",
+          nome: "✅ Quitado",
+          descricao: "Totalmente quitado",
+          cor: "#2EBF11",
+          ordem: 8,
+          ativa: true,
+        },
+      ];
     } catch (error) {
-      console.error("Erro ao carregar dados do Kanban:", error);
-      toast.error("Erro ao carregar dados do Kanban");
-    } finally {
-      setCarregando(false);
+      console.error("Erro ao buscar colunas:", error);
+      return [];
     }
-  }, [kanbanService, filtros, agrupadoPorUnidade]);
+  }
 
-  useEffect(() => {
-    carregarDados();
-  }, [carregarDados]);
+  /**
+   * Busca cards do Kanban com opção de agrupamento.
+   */
+  async buscarCards(
+    filtros: FiltrosKanban = {},
+    agruparPorUnidade: boolean = false
+  ): Promise<CardCobranca[]> {
+    try {
+      // Seleção de colunas para a tabela principal (com a junção que funciona)
+      const selectComJoin = `
+          id, cnpj, cpf, cliente, valor_original, valor_atualizado, valor_recebido,
+          data_vencimento, status, tipo_cobranca, descricao, created_at,
+          observacoes, unidade_id_fk,
+          unidades_franqueadas!unidade_id_fk (
+            id, codigo_unidade, nome_unidade, cidade, estado
+          )
+        `;
 
-  // Monitora status de conexão
-  useEffect(() => {
-    const removeListener = connectionService.addStatusListener((status) => {
-      if (!status.isConnected) {
-        console.warn('⚠️ Conexão perdida detectada no Kanban');
+      // Seleção de colunas para a tabela de quitadas (sem a junção e sem a coluna removida)
+      const selectSemJoin = `
+          id, cnpj, cpf, cliente, valor_original, valor_atualizado, valor_recebido,
+          data_vencimento, status, tipo_cobranca, descricao, created_at,
+          observacoes, unidade_id_fk
+        `;
+
+      // Query para buscar cobranças que NÃO estão quitadas
+      let queryNaoQuitadas = supabase
+        .from("cobrancas_franqueados")
+        .select(selectComJoin)
+        .not("status", "eq", "quitado")
+        .range(0, 5000);
+
+      // Query para buscar as cobranças da nova tabela de quitadas
+      let queryQuitadas = supabase
+        .from("cobrancas_quitadas")
+        .select(selectSemJoin)
+        .range(0, 5000);
+
+      if (filtros.tipo_debito) {
+        // O nome da coluna no banco é 'tipo_cobranca'
+        queryNaoQuitadas = queryNaoQuitadas.eq(
+          "tipo_cobranca",
+          filtros.tipo_debito
+        );
+        queryQuitadas = queryQuitadas.eq("tipo_cobranca", filtros.tipo_debito);
+      }
+
+      // Aplica filtros que funcionam em ambas as tabelas diretamente
+      if (filtros.valor_min) {
+        queryNaoQuitadas = queryNaoQuitadas.gte(
+          "valor_atualizado",
+          filtros.valor_min
+        );
+        queryQuitadas = queryQuitadas.gte(
+          "valor_atualizado",
+          filtros.valor_min
+        );
+      }
+      if (filtros.valor_max) {
+        queryNaoQuitadas = queryNaoQuitadas.lte(
+          "valor_atualizado",
+          filtros.valor_max
+        );
+        queryQuitadas = queryQuitadas.lte(
+          "valor_atualizado",
+          filtros.valor_max
+        );
+      }
+      // Aplica filtro de unidade (CNPJ/Código) apenas na query que suporta o join
+      if (filtros.unidade) {
+        const orFilter = `cnpj.ilike.%${filtros.unidade}%,unidades_franqueadas.codigo_unidade.ilike.%${filtros.unidade}%`;
+        queryNaoQuitadas = queryNaoQuitadas.or(orFilter);
+        // Para a query de quitadas, o filtro de unidade será aplicado depois da junção manual
+      }
+
+      // Executa as duas consultas em paralelo para otimizar o tempo
+      const [
+        { data: naoQuitadasData, error: naoQuitadasError },
+        { data: quitadasData, error: quitadasError },
+      ] = await Promise.all([queryNaoQuitadas, queryQuitadas]);
+
+      if (naoQuitadasError) {
+        throw new Error(
+          `Erro ao buscar cobranças pendentes: ${naoQuitadasError.message}`
+        );
+      }
+      if (quitadasError) {
+        throw new Error(
+          `Erro ao buscar cobranças quitadas: ${quitadasError.message}`
+        );
+      }
+
+      // --- JUNÇÃO MANUAL PARA COBRANÇAS QUITADAS ---
+      let quitadasComUnidade: any[] = [];
+      if (quitadasData && quitadasData.length > 0) {
+        const unidadeIds = [
+          ...new Set(
+            quitadasData.map((c) => c.unidade_id_fk).filter((id) => id)
+          ),
+        ];
+
+        if (unidadeIds.length > 0) {
+          const { data: unidadesData, error: unidadesError } = await supabase
+            .from("unidades_franqueadas")
+            .select("id, codigo_unidade, nome_unidade, cidade, estado")
+            .in("id", unidadeIds);
+
+          if (unidadesError) {
+            throw new Error(
+              `Erro ao buscar unidades para cobranças quitadas: ${unidadesError.message}`
+            );
+          }
+
+          const unidadesMap = new Map(unidadesData.map((u) => [u.id, u]));
+
+          quitadasComUnidade = quitadasData.map((cobranca) => ({
+            ...cobranca,
+            unidades_franqueadas:
+              unidadesMap.get(cobranca.unidade_id_fk) || null,
+          }));
+        } else {
+          quitadasComUnidade = quitadasData.map((cobranca) => ({
+            ...cobranca,
+            unidades_franqueadas: null,
+          }));
+        }
+      }
+      // --- FIM DA JUNÇÃO MANUAL ---
+
+      // Aplica o filtro de unidade para os quitados agora que temos os dados da unidade
+      if (filtros.unidade) {
+        const filtroLowerCase = filtros.unidade.toLowerCase();
+        quitadasComUnidade = quitadasComUnidade.filter((c) => {
+          const unidade = c.unidades_franqueadas;
+          const cnpjMatch =
+            c.cnpj && c.cnpj.toLowerCase().includes(filtroLowerCase);
+          const nomeMatch =
+            unidade &&
+            unidade.nome_unidade &&
+            unidade.nome_unidade.toLowerCase().includes(filtroLowerCase);
+          const codigoMatch =
+            unidade &&
+            unidade.codigo_unidade &&
+            unidade.codigo_unidade.toLowerCase().includes(filtroLowerCase);
+          return cnpjMatch || nomeMatch || codigoMatch;
+        });
+      }
+
+      // Combina os resultados das duas consultas em um único array
+      const cobrancas = [...(naoQuitadasData || []), ...quitadasComUnidade];
+
+      if (!cobrancas || cobrancas.length === 0) {
+        return [];
+      }
+
+      // O restante da lógica para agrupar ou criar cards individuais permanece o mesmo
+      if (agruparPorUnidade) {
+        return this.agruparCobrancasPorUnidade(cobrancas, filtros);
+      } else {
+        return this.criarCardsIndividuais(cobrancas, filtros);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar cards:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Cria cards individuais para cada cobrança
+   */
+  private criarCardsIndividuais(
+    cobrancas: any[],
+    filtros: FiltrosKanban
+  ): CardCobranca[] {
+    return cobrancas
+      .map((cobranca) => {
+        const unidade = cobranca.unidades_franqueadas;
+        const valorAtual = cobranca.valor_atualizado || cobranca.valor_original;
+
+        // Para parcelas, ajustar o nome para mostrar informações da parcela
+        let nomeUnidade = unidade?.nome_unidade || cobranca.cliente;
+        let descricaoCobranca = cobranca.descricao;
+
+        if (cobranca.is_parcela) {
+          nomeUnidade = `${nomeUnidade} - ${cobranca.cliente}`;
+          descricaoCobranca = `Parcela de parcelamento - ${
+            cobranca.descricao || ""
+          }`;
+        }
+
+        const card: CardCobranca = {
+          id: cobranca.id, // UUID direto do banco
+          codigo_unidade: unidade?.codigo_unidade || cobranca.cnpj,
+          nome_unidade: nomeUnidade,
+          cnpj: cobranca.cnpj,
+          cpf: cobranca.cpf || "",
+          tipo_debito: this.determinarTipoDebito([cobranca]),
+          valor_total: valorAtual,
+          valor_original: cobranca.valor_original || 0,
+          data_vencimento_antiga: cobranca.data_vencimento,
+          data_vencimento_recente: cobranca.data_vencimento,
+          status_atual: this.determinarStatusKanban(cobranca.status),
+          ultima_acao: this.determinarUltimaAcao(cobranca),
+          data_ultima_acao: cobranca.created_at || new Date().toISOString(),
+          responsavel_atual: this.determinarResponsavel(cobranca.status),
+          criticidade: this.determinarCriticidadeIndividual(
+            cobranca.data_vencimento
+          ),
+          data_entrada_etapa: cobranca.created_at || new Date().toISOString(),
+          descricao_cobranca: descricaoCobranca,
+          valor_recebido: cobranca.valor_recebido || 0,
+          quantidade_titulos: 1,
+          observacoes: cobranca.observacoes || "",
+        };
+        return card;
+      })
+      .filter((card) => this.aplicarFiltrosCard(card, filtros));
+  }
+
+  /**
+   * Agrupa cobranças por unidade (CNPJ ou CPF) - VERSÃO CORRIGIDA
+   */
+  private agruparCobrancasPorUnidade(
+    cobrancas: any[],
+    filtros: FiltrosKanban
+  ): CardCobranca[] {
+    const cardsMap = new Map<
+      string,
+      CardCobranca & { _statusList?: string[]; _observacoesList?: string[] }
+    >();
+    cobrancas.forEach((cobranca) => {
+      // LÓGICA CPF: Esta é a mudança principal. A chave de agrupamento é o CNPJ ou, se não houver, o CPF.
+      const chaveUnidade = cobranca.cnpj || cobranca.cpf;
+      if (!chaveUnidade) return; // Ignora cobranças sem um documento
+
+      if (!cardsMap.has(chaveUnidade)) {
+        const unidade = cobranca.unidades_franqueadas;
+        cardsMap.set(chaveUnidade, {
+          id: chaveUnidade, // A ID do card agrupado é o próprio documento
+          codigo_unidade: unidade?.codigo_unidade || chaveUnidade,
+          nome_unidade:
+            unidade?.nome_unidade || cobranca.cliente || "Franqueado(a)",
+          cnpj: cobranca.cnpj || "",
+          cpf: cobranca.cpf || "",
+          tipo_debito: "Franchising - Royalties",
+          valor_total: 0,
+          valor_original: 0,
+          data_vencimento_antiga: cobranca.data_vencimento,
+          data_vencimento_recente: cobranca.data_vencimento,
+          status_atual: "em_aberto",
+          ultima_acao: "Cobranças agrupadas",
+          data_ultima_acao: cobranca.created_at || new Date().toISOString(),
+          responsavel_atual: "Equipe Cobrança",
+          dias_parado: 0,
+          criticidade: "normal",
+          data_entrada_etapa: cobranca.created_at || new Date().toISOString(),
+          quantidade_titulos: 0,
+          _statusList: [],
+          _observacoesList: [],
+          observacoes: "",
+        } as any);
+      }
+
+      const card = cardsMap.get(chaveUnidade)!;
+      const valorAtual = cobranca.valor_atualizado || cobranca.valor_original;
+      card.valor_total += valorAtual;
+      card.valor_original =
+        (card.valor_original || 0) + (cobranca.valor_original || 0);
+      card.quantidade_titulos = (card.quantidade_titulos || 0) + 1;
+
+      if (
+        new Date(cobranca.data_vencimento) <
+        new Date(card.data_vencimento_antiga)
+      ) {
+        card.data_vencimento_antiga = cobranca.data_vencimento;
+      }
+      if (
+        new Date(cobranca.data_vencimento) >
+        new Date(card.data_vencimento_recente)
+      ) {
+        card.data_vencimento_recente = cobranca.data_vencimento;
+      }
+
+      const statusAtual = this.determinarStatusKanban(cobranca.status);
+      card._statusList!.push(statusAtual);
+      if (cobranca.observacoes) {
+        card._observacoesList!.push(cobranca.observacoes);
+      }
+
+      if (new Date(cobranca.created_at) > new Date(card.data_ultima_acao)) {
+        card.data_ultima_acao = cobranca.created_at;
+        card.ultima_acao = this.determinarUltimaAcao(cobranca);
       }
     });
-    
-    return removeListener;
-  }, []);
 
-  const handleDragEnd = async (result: any) => {
-    if (!result.destination) return;
+    const cards = Array.from(cardsMap.values()).map((card) => {
+      let statusFinal = "em_aberto";
+      if (card._statusList && card._statusList.length > 0) {
+        const unique = new Set(card._statusList);
+        if (unique.size === 1) {
+          statusFinal = card._statusList[0];
+        } else {
+          statusFinal = "misto";
+        }
+      }
 
-    const { draggableId, source, destination } = result;
-    
-    if (source.droppableId === destination.droppableId) return;
+      const observacaoFinal =
+        card._observacoesList?.find((obs) => obs && obs.trim() !== "") || "";
+      const cobrancasDoCard = cobrancas.filter(
+        (c) => (c.cnpj || c.cpf) === (card.cnpj || card.cpf)
+      );
 
-    const card = cards.find(c => c.id === draggableId);
-    if (!card) return;
+      // Removendo as propriedades temporárias e garantindo a tipagem correta
+      const finalCard: CardCobranca = {
+        ...card,
+        tipo_debito: this.determinarTipoDebito(cobrancasDoCard),
+        criticidade: this.determinarCriticidade(card),
+        status_atual: statusFinal,
+        observacoes: observacaoFinal,
+      };
 
-    // Verificar regras de negócio para parcelamentos - VERSÃO ATUALIZADA
-    const sourceColumn = colunas.find(c => c.id === source.droppableId);
-    const destColumn = colunas.find(c => c.id === destination.droppableId);
-    
-    if (!sourceColumn || !destColumn) return;
+      delete (finalCard as any)._statusList;
+      delete (finalCard as any)._observacoesList;
 
-    // Regra 1: Impedir movimento de cobranças parceladas originais para colunas incompatíveis
-    if (card.status_atual === 'parcelado' && !['parcelado', 'juridico', 'perda'].includes(destination.droppableId)) {
-      toast.error("Cobranças parceladas só podem ser movidas para Jurídico ou Perda. Para alterar o parcelamento, use a gestão de acordos.");
-      return;
-    }
+      return finalCard;
+    });
 
-    // Regra 2: Parcelas futuras só podem ser quitadas, permanecer como parcelas ou ir para inadimplência/jurídico
-    if (card.status_atual === 'parcelas' && !['quitado', 'parcelas', 'inadimplencia', 'juridico'].includes(destination.droppableId)) {
-      toast.error("Parcelas futuras só podem ser quitadas, permanecer como parcelas ou ir para inadimplência/jurídico se vencidas.");
-      return;
-    }
+    return cards.filter((card) => this.aplicarFiltrosCard(card, filtros));
+  }
 
-    // Regra 3: Impedir movimento de parcelas para negociação (parcelas não são negociáveis individualmente)
-    if (card.status_atual === 'parcelas' && destination.droppableId === 'em_negociacao') {
-      toast.error("Parcelas individuais não podem ser negociadas. Para renegociar, use a gestão de acordos do parcelamento original.");
-      return;
-    }
-
-    // Regra 4: Confirmação para movimentos críticos
-    if (['perda', 'juridico'].includes(destination.droppableId)) {
-      const confirmacao = confirm(`Tem certeza que deseja mover "${card.nome_unidade}" para "${destColumn.nome}"?`);
-      if (!confirmacao) return;
-    }
-
-    // Regra 5: Validação especial para quitação de parcelas
-    if (card.status_atual === 'parcelas' && destination.droppableId === 'quitado') {
-      const confirmacao = confirm(`Confirma o pagamento da parcela "${card.nome_unidade}"?\n\nEsta ação marcará a parcela como paga no sistema de acordos.`);
-      if (!confirmacao) return;
-    }
+  /**
+   * Registra a movimentação de um Card.
+   * @param cardOrUnitId - O UUID da cobrança ou o CNPJ/CPF da unidade.
+   * @param statusOrigem - O status da coluna de onde o card está saindo.
+   * @param novoStatus - O status da coluna para onde o card está indo.
+   * @param usuario - O usuário que está realizando a ação.
+   * @param motivo - O motivo da movimentação.
+   */
+  async moverCard(
+    cardOrUnitId: string,
+    statusOrigem: string,
+    novoStatus: string,
+    usuario: string,
+    motivo: string
+  ): Promise<void> {
     try {
-      await kanbanService.moverCard(
-        draggableId,
-        source.droppableId,
-        destination.droppableId,
-        "usuario_atual",
-        `Movido via Kanban de ${sourceColumn.nome} para ${destColumn.nome}`
+      console.log(
+        `🔄 Iniciando movimentação de ${cardOrUnitId} de '${statusOrigem}' para '${novoStatus}'`
       );
 
-      // Atualiza localmente para feedback imediato
-      setCards(prevCards => 
-        prevCards.map(c => 
-          c.id === draggableId 
-            ? { ...c, status_atual: destination.droppableId }
-            : c
-        )
-      );
+      const isMovingToQuitado = novoStatus === "quitado";
+      const isMovingFromQuitado = statusOrigem === "quitado";
+      const isIndividualMove =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          cardOrUnitId
+        );
 
-      toast.success(`Card movido para ${destColumn.nome}`);
-      
-      // Recarrega dados após um breve delay
-      setTimeout(carregarDados, 1000);
+      // Verifica se é uma parcela individual sendo quitada
+      const isParcelaBeingPaid = isIndividualMove && isMovingToQuitado && statusOrigem === 'parcelas';
+
+      // ===== LÓGICA DE FILTRO CORRIGIDA =====
+      // Cria um filtro OR para cobrir tanto CNPJ quanto CPF quando for um movimento de unidade
+      const unitFilter = `cnpj.eq.${cardOrUnitId},cpf.eq.${cardOrUnitId}`;
+
+      // --- CENÁRIO ESPECIAL: Quitação de parcela individual ---
+      if (isParcelaBeingPaid) {
+        console.log(`💳 Processando quitação de parcela individual: ${cardOrUnitId}`);
+        
+        // Busca dados da parcela
+        const { data: parcela, error: parcelaError } = await supabase
+          .from("cobrancas_franqueados")
+          .select("parcela_origem_id, parcelamento_master_id, valor_original")
+          .eq("id", cardOrUnitId)
+          .eq("is_parcela", true)
+          .single();
+
+        if (parcelaError || !parcela) {
+          throw new Error("Parcela não encontrada ou dados inválidos");
+        }
+
+      // --- CENÁRIO 1: Movendo PARA a coluna 'Quitado' ---
+      if (isMovingToQuitado && !isMovingFromQuitado) {
+        const query = supabase.from("cobrancas_franqueados").select("*");
+        const { data: cobrancas, error: fetchError } = isIndividualMove
+          ? await query.eq("id", cardOrUnitId)
+          : await query.or(unitFilter);
+
+        if (fetchError)
+          throw new Error(
+            `Erro ao buscar cobranças para quitar: ${fetchError.message}`
+          );
+        if (!cobrancas || cobrancas.length === 0)
+          throw new Error("Cobrança(s) de origem não encontrada(s).");
+
+        const cobrancasParaQuitar = cobrancas.map((c) => {
+          c.status = "quitado";
+          delete (c as any).kanban_manual_change;
+          return c;
+        });
+
+        const { error: insertError } = await supabase
+          .from("cobrancas_quitadas")
+          .insert(cobrancasParaQuitar);
+        if (insertError)
+          throw new Error(
+            `Erro ao inserir em cobranças quitadas: ${insertError.message}`
+          );
+
+        const idsParaDeletar = cobrancas.map((c) => c.id);
+        const { error: deleteError } = await supabase
+          .from("cobrancas_franqueados")
+          .delete()
+          .in("id", idsParaDeletar);
+        if (deleteError)
+          throw new Error(
+            `Erro ao deletar de cobranças franqueados: ${deleteError.message}`
+          );
+
+        console.log(
+          `✅ ${cobrancas.length} cobrança(s) movida(s) para a tabela de quitadas.`
+        );
+      }
+
+      // --- CENÁRIO 2: Movendo DE VOLTA da coluna 'Quitado' ---
+      else if (isMovingFromQuitado && !isMovingToQuitado) {
+        const query = supabase.from("cobrancas_quitadas").select("*");
+        const { data: cobrancas, error: fetchError } = isIndividualMove
+          ? await query.eq("id", cardOrUnitId)
+          : await query.or(unitFilter);
+
+        if (fetchError)
+          throw new Error(
+            `Erro ao buscar cobranças para reabrir: ${fetchError.message}`
+          );
+        if (!cobrancas || cobrancas.length === 0)
+          throw new Error(
+            "Cobrança(s) quitada(s) de origem não encontrada(s)."
+          );
+
+        const cobrancasParaReabrir = cobrancas.map((c) => {
+          c.status = this.mapearStatusKanbanParaCobranca(novoStatus);
+          return c;
+        });
+
+        const { error: insertError } = await supabase
+          .from("cobrancas_franqueados")
+          .insert(cobrancasParaReabrir);
+        if (insertError)
+          throw new Error(
+            `Erro ao inserir de volta em cobranças franqueados: ${insertError.message}`
+          );
+
+        const idsParaDeletar = cobrancas.map((c) => c.id);
+        const { error: deleteError } = await supabase
+          .from("cobrancas_quitadas")
+          .delete()
+          .in("id", idsParaDeletar);
+        if (deleteError)
+          throw new Error(
+            `Erro ao deletar de cobranças quitadas: ${deleteError.message}`
+          );
+
+        console.log(
+          `✅ ${cobrancas.length} cobrança(s) retornada(s) para a tabela de franqueados.`
+        );
+      }
+
+      // --- CENÁRIO 3: Movimentação padrão (dentro de cobranças_franqueados) ---
+      else if (!isMovingToQuitado && !isMovingFromQuitado) {
+        const novoStatusMapeado =
+          this.mapearStatusKanbanParaCobranca(novoStatus);
+        const query = supabase
+          .from("cobrancas_franqueados")
+          .update({ status: novoStatusMapeado, kanban_manual_change: true });
+
+        const { error: updateError } = isIndividualMove
+          ? await query.eq("id", cardOrUnitId)
+          : await query.or(unitFilter);
+
+        if (updateError)
+          throw new Error(`Erro ao atualizar status: ${updateError.message}`);
+
+        console.log(
+          `✅ Status de ${cardOrUnitId} atualizado para ${novoStatusMapeado}.`
+        );
+      } else {
+        console.log(
+          "Movimentação na mesma tabela de origem, nenhuma ação de migração necessária."
+        );
+      }
+
+      await this.registrarMovimentacao({
+        card_id: cardOrUnitId,
+        status_origem: statusOrigem,
+        status_destino: novoStatus,
+        usuario,
+        motivo,
+        data_movimentacao: new Date().toISOString(),
+        automatica: false,
+      });
     } catch (error) {
-      console.error("Erro ao mover card:", error);
-      toast.error("Erro ao mover card");
+      console.error("❌ Erro fatal ao mover card:", error);
+      throw error;
     }
-  };
+  }
 
-  const executarAcaoRapida = async (cardId: string, acao: string) => {
-    setProcessandoAcao(cardId);
+  /**
+   * Executa ação rápida em um card
+   */
+  async executarAcaoRapida(
+    cardId: string,
+    acao: string,
+    usuario: string,
+    agrupadoPorUnidade: boolean = false
+  ): Promise<void> {
     try {
-      const card = cards.find(c => c.id === cardId);
-      if (!card) return;
+      const cards = await this.buscarCards({}, agrupadoPorUnidade);
+      const card = cards.find((c) => c.id === cardId);
+
+      if (!card) {
+        throw new Error("Card não encontrado");
+      }
+
+      let novoStatus = card.status_atual;
+      let descricaoAcao = "";
 
       switch (acao) {
         case "whatsapp":
-          await enviarWhatsApp(card);
-          break;
-        case "email":
-          await enviarEmail(card);
-          break;
-        case "detalhes":
-          setModalDetalhes({ aberto: true, card });
+          descricaoAcao = "Mensagem WhatsApp enviada";
+          if (card.status_atual === "em_aberto") {
+            novoStatus = "em_negociacao"; // Exemplo de mudança de status
+          }
           break;
         default:
-          await kanbanService.executarAcaoRapida(cardId, acao, "usuario_atual", agrupadoPorUnidade);
+          descricaoAcao = `Ação ${acao} executada`;
       }
-      
-      if (acao !== "detalhes") {
-        toast.success(`Ação ${acao} executada com sucesso`);
-        carregarDados();
+
+      if (novoStatus !== card.status_atual) {
+        await this.moverCard(
+          cardId,
+          card.status_atual,
+          novoStatus,
+          usuario,
+          descricaoAcao
+        );
+      } else {
+        await this.registrarLog({
+          card_id: cardId,
+          acao: acao,
+          usuario: usuario,
+          data_acao: new Date().toISOString(),
+          detalhes: descricaoAcao,
+        });
       }
     } catch (error) {
-      console.error(`Erro ao executar ação ${acao}:`, error);
-      toast.error(`Erro ao executar ação ${acao}`);
-    } finally {
-      setProcessandoAcao(null);
-    }
-  };
-
-  const enviarWhatsApp = async (card: CardCobranca) => {
-    try {
-      // Busca dados da unidade para obter telefone
-      const { data: unidade } = await cobrancaService.buscarCobrancas({
-        cnpj: card.cnpj || card.cpf,
-        incluirParcelas: false
-      });
-
-      if (!unidade || unidade.length === 0) {
-        throw new Error("Dados da unidade não encontrados");
-      }
-
-      const telefone = unidade[0]?.telefone;
-      if (!telefone) {
-        throw new Error("Telefone não cadastrado para esta unidade");
-      }
-
-      const mensagem = `Olá! Temos uma pendência financeira em aberto para sua unidade.
-
-💰 Valor: ${formatarMoeda(card.valor_total)}
-📅 Vencimento: ${new Date(card.data_vencimento_antiga).toLocaleDateString('pt-BR')}
-
-Para regularizar ou negociar, entre em contato conosco.
-
-_Sistema de Cobrança Cresci e Perdi_`;
-
-      await n8nService.enviarWhatsApp({
-        number: telefone,
-        text: mensagem,
-        instanceName: "automacoes_3",
-        metadata: {
-          tipo: "cobranca_kanban",
-          cardId: card.id,
-          origem: "kanban"
-        }
-      });
-
-    } catch (error) {
-      console.error("Erro ao enviar WhatsApp:", error);
+      console.error("Erro ao executar ação rápida:", error);
       throw error;
     }
-  };
+  }
 
-  const enviarEmail = async (card: CardCobranca) => {
+  /**
+   * Atualiza observação de um card ou de todas as cobranças de uma unidade
+   */
+  async atualizarObservacao(
+    id: string, // Pode ser o UUID da cobrança ou o CNPJ da unidade
+    observacao: string,
+    _usuario: string, // _usuario para indicar que não será usado diretamente aqui
+    agrupadoPorUnidade: boolean = false
+  ): Promise<void> {
     try {
-      // Busca dados da unidade para obter email
-      const { data: unidade } = await cobrancaService.buscarCobrancas({
-        cnpj: card.cnpj || card.cpf,
-        incluirParcelas: false
-      });
+      if (agrupadoPorUnidade) {
+        // Se for uma unidade, atualiza a observação em TODAS as cobranças com o mesmo CNPJ
+        console.log(
+          `Atualizando observação para todas as cobranças do CNPJ: ${id}`
+        );
+        const { error } = await supabase
+          .from("cobrancas_franqueados")
+          .update({ observacoes: observacao })
+          .or(`cnpj.eq.${id},cpf.eq.${id}`); // O 'id' aqui é o CNPJ ou CPF
 
-      if (!unidade || unidade.length === 0) {
-        throw new Error("Dados da unidade não encontrados");
-      }
-
-      const email = unidade[0]?.email_cobranca;
-      if (!email) {
-        throw new Error("Email não cadastrado para esta unidade");
-      }
-
-      await emailService.enviarMensagemCobranca(
-        "padrao",
-        "",
-        { email_franqueado: email, nome_franqueado: card.nome_unidade },
-        {
-          id: card.id,
-          cliente: card.nome_unidade,
-          cnpj: card.cnpj,
-          cpf: card.cpf,
-          valor_atualizado: card.valor_total,
-          valor_original: card.valor_original || card.valor_total,
-          data_vencimento: card.data_vencimento_antiga
+        if (error) {
+          throw new Error(
+            `Erro ao atualizar observações da unidade: ${error.message}`
+          );
         }
-      );
+      } else {
+        // Se for uma cobrança individual, atualiza apenas ela
+        console.log(`Atualizando observação para a cobrança ID: ${id}`);
+        const { error } = await supabase
+          .from("cobrancas_franqueados")
+          .update({ observacoes: observacao })
+          .eq("id", id); // O 'id' aqui é o UUID
 
+        if (error) {
+          throw new Error(
+            `Erro ao atualizar observação individual: ${error.message}`
+          );
+        }
+      }
+      console.log("✅ Observação salva com sucesso!");
     } catch (error) {
-      console.error("Erro ao enviar email:", error);
+      console.error("❌ Erro ao atualizar observação:", error);
       throw error;
     }
-  };
+  }
 
-  const abrirModalObservacao = (card: CardCobranca) => {
-    setModalObservacao({
-      aberto: true,
-      cardId: card.id,
-      observacaoAtual: card.observacoes || ""
-    });
-  };
-
-  const salvarObservacao = async () => {
-    setSalvandoObservacao(true);
+  /**
+   * Busca estatísticas do Kanban
+   */
+  async buscarEstatisticas(
+    _agruparPorUnidade?: boolean
+  ): Promise<EstatisticasKanban> {
     try {
-      await kanbanService.atualizarObservacao(
-        modalObservacao.cardId,
-        modalObservacao.observacaoAtual,
-        "usuario_atual",
-        agrupadoPorUnidade
+      void _agruparPorUnidade;
+      // Busca todas as cobranças diretamente do banco, sem agrupamento
+      const { data: brutas } = await supabase
+        .from("cobrancas_franqueados")
+        .select("valor_original, status")
+        .range(0, 5000);
+      // Considera apenas cobranças realmente em aberto
+      const abertas = (brutas || []).filter(
+        (c: any) => c.status !== "quitado" && c.status !== "perda"
       );
-      
-      setModalObservacao({ aberto: false, cardId: "", observacaoAtual: "" });
-      toast.success("Observação salva com sucesso");
-      carregarDados();
+      const totalOriginalAberto = abertas.reduce(
+        (sum: number, c: any) => sum + (Number(c.valor_original) || 0),
+        0
+      );
+      // O restante permanece igual
+      const cards = await this.buscarCards({}, false);
+      const inadimplentesPerda = cards.filter(
+        (c) => c.status_atual === "inadimplencia" || c.status_atual === "perda"
+      ).length;
+      const stats: EstatisticasKanban = {
+        total_cards: cards.length,
+        cards_criticos: cards.filter((c) => c.criticidade === "critica").length,
+        inadimplentes_perda: inadimplentesPerda,
+        valor_total_fluxo: cards.reduce((sum, c) => sum + c.valor_total, 0),
+        valor_total_original_aberto: totalOriginalAberto,
+        valor_total_atualizado_aberto: 0, // não usado
+        distribuicao_por_status: {},
+      };
+      cards.forEach((card) => {
+        stats.distribuicao_por_status[card.status_atual] =
+          (stats.distribuicao_por_status[card.status_atual] || 0) + 1;
+      });
+      return stats;
     } catch (error) {
-      console.error("Erro ao salvar observação:", error);
-      toast.error("Erro ao salvar observação");
-    } finally {
-      setSalvandoObservacao(false);
+      console.error("Erro ao buscar estatísticas:", error);
+      return {
+        total_cards: 0,
+        cards_criticos: 0,
+        inadimplentes_perda: 0,
+        valor_total_fluxo: 0,
+        distribuicao_por_status: {},
+      };
     }
-  };
+  }
 
-  const exportarDados = async () => {
+  /**
+   * Exporta dados do Kanban
+   */
+  async exportarKanban(
+    filtros: FiltrosKanban = {},
+    agrupadoPorUnidade: boolean = false
+  ): Promise<string> {
     try {
-      const csv = await kanbanService.exportarKanban(filtros, agrupadoPorUnidade);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `kanban-cobrancas-${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      toast.success("Dados exportados com sucesso");
+      const cards = await this.buscarCards(filtros, agrupadoPorUnidade);
+
+      const cabecalho = [
+        "ID",
+        "Código Unidade",
+        "Nome Unidade",
+        "CNPJ",
+        "Tipo Débito",
+        "Valor Total",
+        "Status Atual",
+        "Responsável",
+        "Dias Parado",
+        "Última Ação",
+        "Data Última Ação",
+        "Criticidade",
+        agrupadoPorUnidade ? "Qtd Títulos" : "Descrição",
+      ].join(",");
+
+      const linhas = cards.map((card) =>
+        [
+          card.id,
+          card.codigo_unidade,
+          card.nome_unidade,
+          card.cnpj,
+          card.tipo_debito,
+          card.valor_total.toFixed(2),
+          card.status_atual,
+          card.responsavel_atual,
+          card.ultima_acao.replace(/,/g, ";"),
+          new Date(card.data_ultima_acao).toLocaleDateString("pt-BR"),
+          card.criticidade,
+          agrupadoPorUnidade
+            ? card.quantidade_titulos || 1
+            : card.descricao_cobranca || "",
+        ].join(",")
+      );
+
+      return [cabecalho, ...linhas].join("\n");
     } catch (error) {
-      console.error("Erro ao exportar dados:", error);
-      toast.error("Erro ao exportar dados");
+      console.error("Erro ao exportar Kanban:", error);
+      throw error;
     }
-  };
+  }
 
-  const getCardsPorColuna = (colunaId: string) => {
-    return cards.filter(card => card.status_atual === colunaId);
-  };
-
-  const getCorCriticidade = (criticidade: string) => {
-    switch (criticidade) {
-      case "critica": return "border-l-4 border-red-500 bg-red-50";
-      case "atencao": return "border-l-4 border-yellow-500 bg-yellow-50";
-      default: return "border-l-4 border-gray-300 bg-white";
-    }
-  };
-
-  const getIconeStatus = (status: string) => {
-    switch (status) {
-      case "em_aberto": return <AlertTriangle className="w-4 h-4 text-gray-600" />;
-      case "em_negociacao": return <MessageSquare className="w-4 h-4 text-yellow-600" />;
-      case "parcelado": return <CreditCard className="w-4 h-4 text-purple-600" />;
-      case "parcelas": return <Package className="w-4 h-4 text-blue-600" />;
-      case "inadimplencia": return <AlertTriangle className="w-4 h-4 text-red-600" />;
-      case "juridico": return <Scale className="w-4 h-4 text-blue-600" />;
-      case "perda": return <Ban className="w-4 h-4 text-red-700" />;
-      case "quitado": return <CheckCircle className="w-4 h-4 text-green-600" />;
-      default: return <Clock className="w-4 h-4 text-gray-500" />;
-    }
-  };
-
-  const CardComponent = ({ card, index }: { card: CardCobranca; index: number }) => {
-    const isParcelaIndividual = card.status_atual === 'parcelas';
-    const isCobrancaParcelada = card.status_atual === 'parcelado';
-    const isParcelamentoRelacionado = isParcelaIndividual || isCobrancaParcelada;
-    
-    return (
-      <Draggable draggableId={card.id} index={index}>
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.draggableProps}
-            {...provided.dragHandleProps}
-            className={`
-              ${getCorCriticidade(card.criticidade)}
-              rounded-lg p-4 mb-3 shadow-sm hover:shadow-md transition-all duration-200
-              ${snapshot.isDragging ? 'rotate-2 shadow-lg' : ''}
-              ${isParcelaIndividual ? 'border-l-4 border-blue-500 bg-blue-50' : ''}
-              ${isCobrancaParcelada ? 'border-l-4 border-purple-500 bg-purple-50' : ''}
-            `}
-          >
-            {/* Header do Card */}
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  {getIconeStatus(card.status_atual)}
-                  <h3 className="font-semibold text-gray-800 text-sm truncate">
-                    {card.nome_unidade}
-                  </h3>
-                  {isParcelaIndividual && (
-                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                      📅 Parcela
-                    </span>
-                  )}
-                  {isCobrancaParcelada && (
-                    <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
-                      🗂️ Parcelado
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-gray-600 mb-1">
-                  {formatarCNPJCPF(card.cnpj || card.cpf || "")}
-                </p>
-                {agrupadoPorUnidade && card.quantidade_titulos > 1 && (
-                  <p className="text-xs text-blue-600 font-medium">
-                    {card.quantidade_titulos} título(s)
-                  </p>
-                )}
-                {isParcelamentoRelacionado && (
-                  <p className="text-xs text-purple-600 font-medium">
-                    {isParcelaIndividual ? '💳 Parcela de acordo' : '📋 Cobrança parcelada'}
-                  </p>
-                )}
-              </div>
-              <div className="text-right">
-                <p className="font-bold text-lg text-gray-900">
-                  {formatarMoeda(card.valor_total)}
-                </p>
-                {card.valor_original && card.valor_original !== card.valor_total && (
-                  <p className="text-xs text-gray-500 line-through">
-                    {formatarMoeda(card.valor_original)}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Informações do Card */}
-            <div className="space-y-2 mb-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600">Vencimento:</span>
-                <span className="font-medium">
-                  {new Date(card.data_vencimento_antiga).toLocaleDateString('pt-BR')}
-                </span>
-              </div>
-              
-              {card.data_vencimento_recente !== card.data_vencimento_antiga && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-600">Mais recente:</span>
-                  <span className="font-medium">
-                    {new Date(card.data_vencimento_recente).toLocaleDateString('pt-BR')}
-                  </span>
-                </div>
-              )}
-
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600">Responsável:</span>
-                <span className="font-medium">{card.responsavel_atual}</span>
-              </div>
-
-              {card.descricao_cobranca && (
-                <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                  {card.descricao_cobranca}
-                </div>
-              )}
-
-              {/* Informações específicas de parcelamento */}
-              {isParcelamentoRelacionado && (
-                <div className="text-xs bg-purple-50 border border-purple-200 p-2 rounded">
-                  {isParcelaIndividual && (
-                    <p className="text-purple-700">
-                      💳 Esta é uma parcela individual de um acordo de parcelamento
-                    </p>
-                  )}
-                  {isCobrancaParcelada && (
-                    <p className="text-purple-700">
-                      📋 Cobrança original foi parcelada em acordo
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Observações */}
-            {card.observacoes && (
-              <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-                <p className="text-yellow-800 line-clamp-2">{card.observacoes}</p>
-              </div>
-            )}
-
-            {/* Ações do Card */}
-            <div className="flex items-center justify-between">
-              <div className="flex space-x-1">
-                {/* Ações condicionais baseadas no tipo de cobrança */}
-                {!isParcelaIndividual && (
-                  <>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        executarAcaoRapida(card.id, "whatsapp");
-                      }}
-                      disabled={processandoAcao === card.id}
-                      className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
-                      title="Enviar WhatsApp"
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                    </button>
-                    
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        executarAcaoRapida(card.id, "email");
-                      }}
-                      disabled={processandoAcao === card.id}
-                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-50"
-                      title="Enviar Email"
-                    >
-                      <Mail className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
-                
-                {/* Ação especial para parcelas */}
-                {isParcelaIndividual && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      executarAcaoRapida(card.id, "registrar_pagamento");
-                    }}
-                    disabled={processandoAcao === card.id}
-                    className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
-                    title="Registrar Pagamento"
-                  >
-                    <CreditCard className="w-4 h-4" />
-                  </button>
-                )}
-                
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    abrirModalObservacao(card);
-                  }}
-                  className="p-1.5 text-gray-600 hover:bg-gray-50 rounded transition-colors"
-                  title="Adicionar Observação"
-                >
-                  <Edit className="w-4 h-4" />
-                </button>
-              </div>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  executarAcaoRapida(card.id, "detalhes");
-                }}
-                className="p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors"
-                title="Ver Detalhes"
-              >
-                <Eye className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-      </Draggable>
+  /**
+   * Métodos auxiliares privados
+   */
+  private determinarTipoDebito(
+    cobrancas: any[]
+  ):
+    | "Franchising - Royalties"
+    | "Vendas - Vendas"
+    | "Franchising - Tx de Propagand"
+    | "- Multa/Infração"
+    | "Franchising - Tx de Franquia" {
+    const tipos = cobrancas.map(
+      (c) => c.tipo_cobranca || "Franchising - Royalties"
     );
-  };
-
-  const ColunaComponent = ({ coluna }: { coluna: ColunaKanban }) => {
-    const cardsColuna = getCardsPorColuna(coluna.id);
-    const valorTotal = cardsColuna.reduce((sum, card) => sum + card.valor_total, 0);
-
-    return (
-      <div className="bg-gray-50 rounded-lg p-4 min-h-[600px] w-80 flex-shrink-0">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-bold text-gray-800 text-sm">{coluna.nome}</h3>
-            <p className="text-xs text-gray-600">{coluna.descricao}</p>
-          </div>
-          <div className="text-right">
-            <div className="text-sm font-bold text-gray-700">
-              {cardsColuna.length}
-            </div>
-            <div className="text-xs text-gray-500">
-              {formatarMoeda(valorTotal)}
-            </div>
-          </div>
-        </div>
-
-        <Droppable droppableId={coluna.id}>
-          {(provided, snapshot) => (
-            <div
-              ref={provided.innerRef}
-              {...provided.droppableProps}
-              className={`
-                min-h-[500px] transition-colors duration-200
-                ${snapshot.isDraggingOver ? 'bg-blue-50 border-2 border-blue-300 border-dashed rounded-lg' : ''}
-              `}
-            >
-              {cardsColuna.map((card, index) => (
-                <CardComponent key={card.id} card={card} index={index} />
-              ))}
-              {provided.placeholder}
-              
-              {cardsColuna.length === 0 && (
-                <div className="text-center text-gray-400 py-8">
-                  <div className="text-4xl mb-2">📋</div>
-                  <p className="text-sm">Nenhum card nesta coluna</p>
-                </div>
-              )}
-            </div>
-          )}
-        </Droppable>
-      </div>
+    const contagem = tipos.reduce(
+      (acc: Record<string, number>, tipo: string) => {
+        acc[tipo] = (acc[tipo] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
     );
-  };
 
-  return (
-    <div className="h-screen flex flex-col bg-gray-100">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mr-4">
-              <CircleDollarSign className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">Kanban de Cobranças</h1>
-              <p className="text-gray-600">
-                Gestão visual do fluxo de cobrança e parcelamentos
-              </p>
-            </div>
-          </div>
+    const tipoMaisFrequente = Object.entries(contagem).sort(
+      ([, a], [, b]) => (b as number) - (a as number)
+    )[0]?.[0];
 
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="agrupar"
-                checked={agrupadoPorUnidade}
-                onChange={(e) => setAgrupadoPorUnidade(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <label htmlFor="agrupar" className="text-sm text-gray-700">
-                Agrupar por unidade
-              </label>
-            </div>
+    return (tipoMaisFrequente as any) || "";
+  }
 
-            <button
-              onClick={exportarDados}
-              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Exportar
-            </button>
+  private determinarStatusKanban(statusCobranca: string): string {
+    const mapeamento: Record<string, string> = {
+      em_aberto: "em_aberto",
+      em_negociacao: "em_negociacao",
+      negociando: "em_negociacao",
+      parcelado: "parcelado",
+      parcelas: "parcelas",
+      quitado: "quitado",
+      juridico: "juridico",
+      inadimplencia: "inadimplencia",
+      perda: "perda",
+      escalado_juridico: "juridico",
+      em_tratativa_juridica: "juridico",
+      inadimplencia_critica: "inadimplencia",
+    };
+    if (!(statusCobranca in mapeamento)) {
+      console.warn("Status desconhecido no Kanban:", statusCobranca);
+      return statusCobranca; // Retorna o status original, nunca força em_aberto
+    }
+    return mapeamento[statusCobranca];
+  }
 
-            <button
-              onClick={carregarDados}
-              disabled={carregando}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${carregando ? 'animate-spin' : ''}`} />
-              Atualizar
-            </button>
-          </div>
-        </div>
+  private mapearStatusKanbanParaCobranca(statusKanban: string): string {
+    // Mapeia status do Kanban de volta para status da cobrança
+    const mapeamento: Record<string, string> = {
+      em_aberto: "em_aberto",
+      em_negociacao: "negociando",
+      parcelado: "parcelado",
+      parcelas: "parcelas",
+      quitado: "quitado",
+      juridico: "em_tratativa_juridica",
+      inadimplencia: "inadimplencia",
+      perda: "perda",
+    };
+    return mapeamento[statusKanban] || statusKanban;
+  }
 
-        {/* Estatísticas */}
-        {estatisticas && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <div className="bg-blue-50 rounded-lg p-3">
-              <div className="text-lg font-bold text-blue-600">{estatisticas.total_cards}</div>
-              <div className="text-sm text-blue-800">Total de Cards</div>
-            </div>
-            <div className="bg-red-50 rounded-lg p-3">
-              <div className="text-lg font-bold text-red-600">{estatisticas.cards_criticos}</div>
-              <div className="text-sm text-red-800">Cards Críticos</div>
-            </div>
-            <div className="bg-orange-50 rounded-lg p-3">
-              <div className="text-lg font-bold text-orange-600">{estatisticas.inadimplentes_perda}</div>
-              <div className="text-sm text-orange-800">Inadimplência/Perda</div>
-            </div>
-            <div className="bg-green-50 rounded-lg p-3">
-              <div className="text-lg font-bold text-green-600">
-                {formatarMoeda(estatisticas.valor_total_fluxo)}
-              </div>
-              <div className="text-sm text-green-800">Valor Total</div>
-            </div>
-          </div>
-        )}
+  private determinarResponsavel(status: string): string {
+    const responsaveis: Record<string, string> = {
+      em_aberto: "Equipe Cobrança",
+      negociando: "Equipe Cobrança",
+      em_tratativa_juridica: "Jurídico",
+    };
+    return responsaveis[status] || "Equipe Cobrança";
+  }
 
-        {/* Filtros */}
-        <div className="bg-gray-50 rounded-lg p-4">
-          <div className="flex items-center mb-3">
-            <Filter className="w-5 h-5 text-gray-600 mr-2" />
-            <h3 className="font-semibold text-gray-800">Filtros</h3>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-            <input
-              type="text"
-              value={filtros.unidade || ""}
-              onChange={(e) => setFiltros({ ...filtros, unidade: e.target.value })}
-              placeholder="Buscar unidade/CNPJ"
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-            />
-            
-            <select
-              value={filtros.tipo_debito || ""}
-              onChange={(e) => setFiltros({ ...filtros, tipo_debito: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="">Todos os Tipos</option>
-              <option value="Franchising - Royalties">Royalties</option>
-              <option value="Vendas - Vendas">Vendas</option>
-              <option value="Franchising - Tx de Propagand">Taxa de Propaganda</option>
-              <option value="- Multa/Infração">Multa/Infração</option>
-              <option value="Franchising - Tx de Franquia">Taxa de Franquia</option>
-            </select>
+  private determinarUltimaAcao(cobranca: any): string {
+    const acoes: Record<string, string> = {
+      em_aberto: "Cobrança atrasada em sistema",
+      negociando: "Em processo de negociação",
+      parcelado: "Cobrança parcelada",
+      parcelas: "Parcela de parcelamento",
+      quitado: "Débito quitado",
+      em_tratativa_juridica: "Escalado para jurídico",
+    };
+    return acoes[cobranca.status] || "Cobrança registrada no sistema";
+  }
 
-            <select
-              value={filtros.responsavel || ""}
-              onChange={(e) => setFiltros({ ...filtros, responsavel: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="">Todos os Responsáveis</option>
-              <option value="Equipe Cobrança">Equipe Cobrança</option>
-              <option value="Jurídico">Jurídico</option>
-              <option value="Diretoria">Diretoria</option>
-            </select>
+  private determinarCriticidade(
+    card: CardCobranca
+  ): "normal" | "atencao" | "critica" {
+    if (
+      card.tipo_debito === "Franchising - Royalties" ||
+      card.quantidade_titulos >= 2
+    )
+      return "critica";
+    if (card.valor_total > 9000) return "atencao";
+    return "normal";
+  }
 
-            <select
-              value={filtros.criticidade || ""}
-              onChange={(e) => setFiltros({ ...filtros, criticidade: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="">Todas as Criticidades</option>
-              <option value="normal">Normal</option>
-              <option value="atencao">Atenção</option>
-              <option value="critica">Crítica</option>
-            </select>
+  private determinarCriticidadeIndividual(
+    dataVencimento: string
+  ): "normal" | "atencao" | "critica" {
+    const diasAtraso = this.calcularDiasAtraso(dataVencimento);
 
-            <input
-              type="number"
-              value={filtros.valor_min || ""}
-              onChange={(e) => setFiltros({ ...filtros, valor_min: parseFloat(e.target.value) || undefined })}
-              placeholder="Valor mínimo"
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-            />
+    if (diasAtraso > 30) return "critica";
+    if (diasAtraso >= 20) return "atencao";
+    return "normal";
+  }
 
-            <button
-              onClick={() => setFiltros({})}
-              className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm transition-colors"
-            >
-              Limpar Filtros
-            </button>
-          </div>
-        </div>
-      </div>
+  private calcularDiasAtraso(dataVencimento: string): number {
+    const hoje = new Date();
+    const vencimento = new Date(dataVencimento);
+    const diferenca = hoje.getTime() - vencimento.getTime();
+    return Math.max(0, Math.floor(diferenca / (1000 * 60 * 60 * 24)));
+  }
 
-      {/* Kanban Board */}
-      <div className="flex-1 overflow-hidden">
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="h-full overflow-x-auto">
-            <div className="flex space-x-4 p-6 min-w-max">
-              {colunas
-                .filter(coluna => coluna.ativa)
-                .sort((a, b) => a.ordem - b.ordem)
-                .map(coluna => (
-                  <ColunaComponent key={coluna.id} coluna={coluna} />
-                ))}
-            </div>
-          </div>
-        </DragDropContext>
-      </div>
+  private aplicarFiltrosCard(
+    card: CardCobranca,
+    filtros: FiltrosKanban
+  ): boolean {
+    if (filtros.tipo_debito && card.tipo_debito !== filtros.tipo_debito)
+      return false;
+    if (
+      filtros.responsavel &&
+      !card.responsavel_atual
+        .toLowerCase()
+        .includes(filtros.responsavel.toLowerCase())
+    )
+      return false;
+    if (filtros.criticidade && card.criticidade !== filtros.criticidade)
+      return false;
+    return true;
+  }
 
-      {/* Modal de Observação */}
-      {modalObservacao.aberto && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Adicionar Observação</h3>
-              <button
-                onClick={() => setModalObservacao({ aberto: false, cardId: "", observacaoAtual: "" })}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+  private async registrarMovimentacao(
+    movimentacao: MovimentacaoCard
+  ): Promise<void> {
+    try {
+      // Em um sistema real, isso seria salvo em uma tabela específica
+      console.log("Movimentação registrada:", movimentacao);
+    } catch (error) {
+      console.error("Erro ao registrar movimentação:", error);
+    }
+  }
 
-            <textarea
-              value={modalObservacao.observacaoAtual}
-              onChange={(e) => setModalObservacao(prev => ({ ...prev, observacaoAtual: e.target.value }))}
-              placeholder="Digite sua observação..."
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
-            />
-
-            <div className="flex space-x-3 mt-4">
-              <button
-                onClick={salvarObservacao}
-                disabled={salvandoObservacao}
-                className="flex-1 flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {salvandoObservacao ? (
-                  <RefreshCw className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  <Save className="w-4 h-4 mr-2" />
-                )}
-                {salvandoObservacao ? "Salvando..." : "Salvar"}
-              </button>
-              
-              <button
-                onClick={() => setModalObservacao({ aberto: false, cardId: "", observacaoAtual: "" })}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Detalhes */}
-      {modalDetalhes.aberto && modalDetalhes.card && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-gray-800">
-                Detalhes - {modalDetalhes.card.nome_unidade}
-              </h3>
-              <button
-                onClick={() => setModalDetalhes({ aberto: false, card: null })}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              {/* Informações Básicas */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-800 mb-2">Informações Básicas</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Código:</span>
-                      <span className="font-medium">{modalDetalhes.card.codigo_unidade}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">CNPJ/CPF:</span>
-                      <span className="font-medium">{formatarCNPJCPF(modalDetalhes.card.cnpj || modalDetalhes.card.cpf || "")}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Tipo:</span>
-                      <span className="font-medium">{modalDetalhes.card.tipo_debito}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Status:</span>
-                      <span className="font-medium">{modalDetalhes.card.status_atual}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-800 mb-2">Valores</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Valor Total:</span>
-                      <span className="font-bold text-lg">{formatarMoeda(modalDetalhes.card.valor_total)}</span>
-                    </div>
-                    {modalDetalhes.card.valor_original && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Valor Original:</span>
-                        <span className="font-medium">{formatarMoeda(modalDetalhes.card.valor_original)}</span>
-                      </div>
-                    )}
-                    {modalDetalhes.card.valor_recebido && modalDetalhes.card.valor_recebido > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Valor Recebido:</span>
-                        <span className="font-medium text-green-600">{formatarMoeda(modalDetalhes.card.valor_recebido)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Quantidade:</span>
-                      <span className="font-medium">{modalDetalhes.card.quantidade_titulos} título(s)</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Datas */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-semibold text-gray-800 mb-2">Cronologia</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Vencimento Mais Antigo:</span>
-                    <span className="font-medium">{new Date(modalDetalhes.card.data_vencimento_antiga).toLocaleDateString('pt-BR')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Vencimento Mais Recente:</span>
-                    <span className="font-medium">{new Date(modalDetalhes.card.data_vencimento_recente).toLocaleDateString('pt-BR')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Última Ação:</span>
-                    <span className="font-medium">{new Date(modalDetalhes.card.data_ultima_acao).toLocaleDateString('pt-BR')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Responsável:</span>
-                    <span className="font-medium">{modalDetalhes.card.responsavel_atual}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Observações */}
-              {modalDetalhes.card.observacoes && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-yellow-800 mb-2">Observações</h4>
-                  <p className="text-yellow-700 text-sm">{modalDetalhes.card.observacoes}</p>
-                </div>
-              )}
-
-              {/* Última Ação */}
-              <div className="bg-blue-50 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-800 mb-2">Última Ação</h4>
-                <p className="text-blue-700 text-sm">{modalDetalhes.card.ultima_acao}</p>
-              </div>
-            </div>
-
-            <div className="flex justify-end mt-6">
-              <button
-                onClick={() => setModalDetalhes({ aberto: false, card: null })}
-                className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  private async registrarLog(log: LogMovimentacao): Promise<void> {
+    try {
+      // Em um sistema real, isso seria salvo em uma tabela específica
+      console.log("Log registrado:", log);
+    } catch (error) {
+      console.error("Erro ao registrar log:", error);
+    }
+  }
 }
