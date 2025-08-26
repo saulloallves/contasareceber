@@ -209,7 +209,7 @@ export function SimulacaoParcelamento() {
     setProcessandoSimulacao(true);
     try {
       const simulacao = await simulacaoService.simularParcelamento(
-        formSimulacao.titulo_id,
+        [formSimulacao.titulo_id],
         formSimulacao.quantidade_parcelas,
         formSimulacao.data_primeira_parcela,
         formSimulacao.valor_entrada || undefined
@@ -1326,7 +1326,7 @@ export function SimulacaoParcelamento() {
                       )
                     </div>
                     <div>
-                      <span className="font-medium">Juros Mora:</span> 1.5% (
+                      <span className="font-medium">Juros Mora:</span> 1% (
                       {formatarMoeda(
                         (propostaSelecionada as any).simulacoes_parcelamento
                           .parcelas?.[0]?.juros_mora || 0

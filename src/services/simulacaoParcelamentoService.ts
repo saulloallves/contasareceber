@@ -2,7 +2,7 @@
 import { supabase } from "./databaseService";
 import { formatarCNPJCPF } from "../utils/formatters";
 import {
-  ISimulacaoParcelamento,
+  SimulacaoParcelamentoType as ISimulacaoParcelamento,
   ParcelaSimulacao,
   PropostaParcelamento,
   RegistroAceite,
@@ -124,9 +124,9 @@ export class SimulacaoParcelamentoService {
       for (let i = 1; i <= quantidadeParcelas; i++) {
         const valorBaseParcela = valorParcelar / quantidadeParcelas;
 
-        // Calcula multa (10%) e juros de mora (1.5%)
+        // Calcula multa (10%) e juros de mora (1%)
         const multa = valorBaseParcela * 0.1; // 10% de multa
-        const jurosMora = valorBaseParcela * 0.015; // 1.5% de juros de mora
+        const jurosMora = valorBaseParcela * 0.01; // 1% de juros de mora
         const jurosAplicado = multa + jurosMora;
 
         const valorParcela = valorBaseParcela + jurosAplicado;
@@ -665,7 +665,7 @@ export class SimulacaoParcelamentoService {
         user_agent: userAgent,
         metodo_aceite: metodoAceite,
         dados_proposta: proposta,
-        observacoes,
+        observacoes
       };
 
       await supabase

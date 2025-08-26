@@ -1,4 +1,7 @@
-export interface ISimulacaoParcelamento {
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { ReactNode } from "react";
+
+export interface SimulacaoParcelamentoType {
   id?: string;
   parcelamento_master_id: string;
   cnpj_unidade: string;
@@ -57,6 +60,7 @@ export interface PropostaParcelamento {
 }
 
 export interface RegistroAceite {
+  titulo_id: ReactNode;
   id?: string;
   proposta_id: string;
   parcelamento_master_id: string;
