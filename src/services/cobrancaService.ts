@@ -408,3 +408,6 @@ export class CobrancaService {
     return historico.sort((a, b) => new Date(b.data_envio).getTime() - new Date(a.data_envio).getTime());
   }
 }
+
+// Export an instance for use throughout the application
+export const cobrancaService = new CobrancaService();
