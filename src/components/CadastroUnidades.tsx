@@ -125,8 +125,8 @@ export function CadastroUnidades() {
       unidade.franqueado_unidades?.find((v: any) => v.ativo)?.franqueado_id ||
         ""
     );
-  setDestinoManualId("");
-  setMesclandoManual(false);
+    setDestinoManualId("");
+    setMesclandoManual(false);
     setModalAberto(true);
   };
 
@@ -177,13 +177,13 @@ export function CadastroUnidades() {
     try {
       setMesclandoManual(true);
       await mesclarCnpjFonteParaDestino(unidadeSelecionada, destino);
-  toast.success("CNPJ transferido com sucesso. A unidade fonte foi inativada e o CNPJ foi atribuído ao destino.");
+      toast.success("CNPJ transferido com sucesso. A unidade fonte foi inativada e o CNPJ foi atribuído ao destino.");
       setModalAberto(false);
       await carregarDados();
       setAba("todas");
     } catch (e) {
       console.error("Erro ao mesclar manualmente:", e);
-  toast.error(`Erro ao mesclar manualmente: ${String((e as any)?.message || e)}`);
+      toast.error(`Erro ao mesclar manualmente: ${String((e as any)?.message || e)}`);
     } finally {
       setMesclandoManual(false);
     }
@@ -242,21 +242,21 @@ export function CadastroUnidades() {
           const { error: errorVinculo } = await supabase
             .from("franqueado_unidades")
             .insert({
-            unidade_id: unidadeId,
-            franqueado_id: franqueadoVinculo,
-            ativo: true,
-          });
+              unidade_id: unidadeId,
+              franqueado_id: franqueadoVinculo,
+              ativo: true,
+            });
           if (errorVinculo) {
             console.warn("Erro ao criar vínculo:", errorVinculo);
           }
         }
       }
-  toast.success("Unidade salva com sucesso!");
+      toast.success("Unidade salva com sucesso!");
       fecharModal();
       carregarDados();
     } catch (error) {
       console.error("Erro detalhado ao salvar unidade:", error);
-  toast.error(`Erro ao salvar unidade: ${error}`);
+      toast.error(`Erro ao salvar unidade: ${error}`);
     } finally {
       setSalvando(false);
     }
@@ -275,7 +275,7 @@ export function CadastroUnidades() {
       (u) => (
         u?.nome_unidade === null || String(u?.nome_unidade || "").trim() === ""
       ) && String(u?.status_unidade || "").trim().toUpperCase() !== "INATIVA"
-    )
+    );
   const unidadesComNome = unidades.filter(
     (u) => u?.nome_unidade !== null && String(u?.nome_unidade || "").trim() !== ""
   );
@@ -304,11 +304,11 @@ export function CadastroUnidades() {
   });
 
   const CardUnidade = ({ unidade }: { unidade: any }) => {
-  const NOME_MAX = 32;
+    const NOME_MAX = 32;
     const CODIGO_MAX = 16;
     const statusRaw = unidade.status_unidade || "";
     const { label: statusLabel, color: statusColor } = getStatusProps(statusRaw);
-  const displayNome = String(unidade.nome_unidade || "").trim() || "(Sem nome cadastrado)";
+    const displayNome = String(unidade.nome_unidade || "").trim() || "(Sem nome cadastrado)";
 
     return (
       <div
@@ -416,7 +416,7 @@ export function CadastroUnidades() {
             </button>
           )}
         </div>
-  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-4">
           <div className="flex-1 flex items-center bg-white rounded-lg shadow-sm px-4 py-2 border border-gray-200">
             <svg className="w-5 h-5 text-gray-400 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z"></path></svg>
             <input
@@ -427,14 +427,14 @@ export function CadastroUnidades() {
               className="flex-1 bg-transparent outline-none text-gray-800"
             />
           </div>
-      <div className="flex items-center gap-2">
-        <button
-                onClick={abrirModalNova}
-                className="px-4 py-2 bg-[#ff9923] text-white rounded-lg font-semibold hover:bg-[#6b3a10] transition-colors duration-300"
-              >
-                + Nova Unidade
-              </button>
-            </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={abrirModalNova}
+              className="px-4 py-2 bg-[#ff9923] text-white rounded-lg font-semibold hover:bg-[#6b3a10] transition-colors duration-300"
+            >
+              + Nova Unidade
+            </button>
+          </div>
         </div>
         <div className="mt-2 text-xs text-gray-500">
           Mostrando {unidadesFiltradas.length} de {baseLista.length} unidades
