@@ -1,9 +1,20 @@
 import { useState } from "react";
-import { 
-  Home, Building2, 
-  Settings, ChevronLeft, ChevronRight,
-  Menu, X, Receipt, CircleDollarSign, Calculator, Users,
-  Bell, MoreHorizontal, LogOut, CheckCircle
+import {
+  Home,
+  Building2,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  Menu,
+  X,
+  Receipt,
+  CircleDollarSign,
+  Calculator,
+  Users,
+  Bell,
+  MoreHorizontal,
+  LogOut,
+  CheckCircle,
 } from "lucide-react";
 import { useAuth } from "../Auth/AuthProvider";
 import { useUserProfile } from "../../hooks/useUserProfile";
@@ -12,9 +23,13 @@ import { supabase } from "../../lib/supabaseClient";
 import { alertasService } from "../../services/alertasService";
 import { Alerta } from "../../types/alertas";
 import { formatarCNPJCPF } from "../../utils/formatters";
-import { connectionService, ConnectionStatus } from "../../services/connectionService";
+import {
+  connectionService,
+  ConnectionStatus,
+} from "../../services/connectionService";
 import { useEffect } from "react";
 import icon from "../../assets/cabeca.png";
+import { toast } from "react-hot-toast";
 
 interface SidebarProps {
   activeTab: string;
@@ -32,9 +47,11 @@ interface SidebarProps {
 }
 
 export function Sidebar({
-  activeTab, onTabChange,
+  activeTab,
+  onTabChange,
   userPermissions = ["admin"],
-  collapsed, setCollapsed,
+  collapsed,
+  setCollapsed,
   user,
 }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -47,9 +64,9 @@ export function Sidebar({
     isConnected: true,
     lastCheck: new Date(),
     reconnectAttempts: 0,
-    maxReconnectAttempts: 3
+    maxReconnectAttempts: 3,
   });
-  
+
   const { signOut } = useAuth();
   const { profile } = useUserProfile(user?.id);
 
@@ -67,9 +84,11 @@ export function Sidebar({
     fetchAlertas();
 
     // Monitora status de conexão
-    const removeConnectionListener = connectionService.addStatusListener((status) => {
-      setConnectionStatus(status);
-    });
+    const removeConnectionListener = connectionService.addStatusListener(
+      (status) => {
+        setConnectionStatus(status);
+      }
+    );
 
     // Escuta em tempo real para novos alertas
     const alertasChannel = supabase
@@ -94,12 +113,10 @@ export function Sidebar({
     setShowUserMenu(false);
     try {
       await signOut();
-      window.location.href = '/';
+      window.location.href = "/";
     } catch (error) {
-      console.error('Erro ao fazer logout:', error);
-    // usa toast para feedback consistente
-    // import dinamico para evitar conflitos se toast não estiver em escopo
-    try { const { toast } = await import('react-hot-toast'); toast.error('Erro ao fazer logout. Tente novamente.'); } catch { console.error('Toast import falhou'); }
+      console.error("Erro ao fazer logout:", error);
+      toast.error("Erro ao fazer logout. Tente novamente.");
     } finally {
       setLoggingOut(false);
     }
@@ -116,30 +133,33 @@ export function Sidebar({
 
   const getInitials = (name: string) => {
     return name
-      .split(' ')
-      .map(word => word.charAt(0))
-      .join('')
+      .split(" ")
+      .map((word) => word.charAt(0))
+      .join("")
       .toUpperCase()
       .slice(0, 2);
   };
 
   const getRoleColor = (role: string) => {
     const colors: Record<string, string> = {
-      'Admin': 'bg-red-100 text-red-800',
-      'Gestor': 'bg-blue-100 text-blue-800',
-      'Analista': 'bg-green-100 text-green-800',
-      'Observador': 'bg-gray-100 text-gray-800'
+      Admin: "bg-red-100 text-red-800",
+      Gestor: "bg-blue-100 text-blue-800",
+      Analista: "bg-green-100 text-green-800",
+      Observador: "bg-gray-100 text-gray-800",
     };
-    return colors[role] || 'bg-gray-100 text-gray-800';
+    return colors[role] || "bg-gray-100 text-gray-800";
   };
 
   const normalizeUsDateInText = (text: string) => {
     if (!text) return text;
-    return text.replace(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/g, (_m, mm: string, dd: string, yyyy: string) => {
-      const d = dd.padStart(2, "0");
-      const m = mm.padStart(2, "0");
-      return `${d}/${m}/${yyyy}`;
-    });
+    return text.replace(
+      /\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/g,
+      (_m, mm: string, dd: string, yyyy: string) => {
+        const d = dd.padStart(2, "0");
+        const m = mm.padStart(2, "0");
+        return `${d}/${m}/${yyyy}`;
+      }
+    );
   };
 
   const getUrgencyColor = (urgency: "baixa" | "media" | "alta" | "critica") => {
@@ -158,58 +178,62 @@ export function Sidebar({
   };
 
   // Verifica se o usuário tem permissão de admin_master
-  const isAdminMaster = profile?.nivel_permissao === 'admin_master';
+  const isAdminMaster = profile?.nivel_permissao === "admin_master";
   const menuItems = [
-    { 
-      id: "dashboard", 
-      label: "Dashboard", 
-      icon: Home, 
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      icon: Home,
       permissions: ["admin", "financeiro", "cobranca", "juridico", "leitura"],
-      badge: null
+      badge: null,
     },
-    { 
-      id: "cobrancas", 
-      label: "Kanban Cobranças", 
-      icon: CircleDollarSign, 
+    {
+      id: "cobrancas",
+      label: "Kanban Cobranças",
+      icon: CircleDollarSign,
       permissions: ["admin", "financeiro", "cobranca"],
-      badge: null
+      badge: null,
     },
-    { 
-      id: "cobrancas-lista", 
-      label: "Gestão de Cobranças", 
-      icon: Receipt, 
+    {
+      id: "cobrancas-lista",
+      label: "Gestão de Cobranças",
+      icon: Receipt,
       permissions: ["admin", "financeiro", "cobranca"],
-      badge: null
+      badge: null,
     },
-    { 
-      id: "simulacao-parcelamento", 
-      label: "Central de Parcelamento", 
-      icon: Calculator, 
+    {
+      id: "simulacao-parcelamento",
+      label: "Central de Parcelamento",
+      icon: Calculator,
       permissions: ["admin", "financeiro", "cobranca"],
-      badge: null
+      badge: null,
     },
-    { 
-      id: "unidades", 
-      label: "Unidades", 
-      icon: Building2, 
+    {
+      id: "unidades",
+      label: "Unidades",
+      icon: Building2,
       permissions: ["admin", "financeiro"],
-      badge: null
+      badge: null,
     },
-    { 
-      id: "franqueados", 
-      label: "Franqueados", 
-      icon: Users, 
+    {
+      id: "franqueados",
+      label: "Franqueados",
+      icon: Users,
       permissions: ["admin", "financeiro"],
-      badge: null
+      badge: null,
     },
     // Configurações - apenas para admin_master
-    ...(isAdminMaster ? [{ 
-      id: "admin", 
-      label: "Configurações", 
-      icon: Settings, 
-      permissions: ["admin"],
-      badge: null
-    }] : []),
+    ...(isAdminMaster
+      ? [
+          {
+            id: "admin",
+            label: "Configurações",
+            icon: Settings,
+            permissions: ["admin"],
+            badge: null,
+          },
+        ]
+      : []),
   ];
 
   const hasPermission = (itemPermissions: string[]) => {
@@ -229,18 +253,24 @@ export function Sidebar({
         {!collapsed && (
           <div className="flex items-center">
             <div className="w-10 h-auto rounded-lg flex items-center justify-center mr-3">
-              <img src={icon} alt="Icone Girafa" className="w-full h-full object-contain" />
+              <img
+                src={icon}
+                alt="Icone Girafa"
+                className="w-full h-full object-contain"
+              />
             </div>
             <div>
-              <h1 className="text-md font-bold text-gray-900">Gestor Financeiro CP</h1>
+              <h1 className="text-md font-bold text-gray-900">
+                Gestor Financeiro CP
+              </h1>
               <p className="text-xs text-gray-500">Sistema de Cobranças</p>
             </div>
           </div>
         )}
-        
+
         {/* Toggle button - sempre visível */}
-        <button 
-          onClick={() => setCollapsed(!collapsed)} 
+        <button
+          onClick={() => setCollapsed(!collapsed)}
           className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors hidden lg:flex items-center justify-center"
         >
           {collapsed ? (
@@ -256,17 +286,22 @@ export function Sidebar({
         {/* Seção Principal */}
         {!collapsed && (
           <div className="px-3 py-2">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Principal</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Principal
+            </p>
           </div>
         )}
-        
+
         {filteredMenuItems.slice(0, 4).map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           return (
             <div key={item.id} className="relative group">
               <button
-                onClick={() => { onTabChange(item.id); setMobileOpen(false); }}
+                onClick={() => {
+                  onTabChange(item.id);
+                  setMobileOpen(false);
+                }}
                 className={`w-full flex items-center px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
                   isActive
                     ? "bg-[#fe97210c] text-[#fe9821] border border-[#fe9821]"
@@ -274,7 +309,11 @@ export function Sidebar({
                 }`}
                 title={collapsed ? item.label : undefined}
               >
-                <div className={`flex items-center justify-center w-5 h-5 ${collapsed ? "mx-auto" : "mr-3"}`}>
+                <div
+                  className={`flex items-center justify-center w-5 h-5 ${
+                    collapsed ? "mx-auto" : "mr-3"
+                  }`}
+                >
                   <Icon className="w-5 h-5" />
                 </div>
                 {!collapsed && (
@@ -290,7 +329,11 @@ export function Sidebar({
                   </div>
                 )}
                 {isActive && (
-                  <div className={`absolute right-2 w-1.5 h-1.5 bg-[#fe9821] rounded-full ${collapsed ? 'hidden' : ''}`}></div>
+                  <div
+                    className={`absolute right-2 w-1.5 h-1.5 bg-[#fe9821] rounded-full ${
+                      collapsed ? "hidden" : ""
+                    }`}
+                  ></div>
                 )}
               </button>
 
@@ -311,17 +354,22 @@ export function Sidebar({
         {/* Seção Gestão */}
         {!collapsed && (
           <div className="px-3 py-2 mt-6">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Gestão</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Gestão
+            </p>
           </div>
         )}
-        
+
         {filteredMenuItems.slice(4).map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           return (
             <div key={item.id} className="relative group">
               <button
-                onClick={() => { onTabChange(item.id); setMobileOpen(false); }}
+                onClick={() => {
+                  onTabChange(item.id);
+                  setMobileOpen(false);
+                }}
                 className={`w-full flex items-center px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
                   isActive
                     ? "bg-[#fe97210c] text-[#fe9821] border border-[#fe9821]"
@@ -329,7 +377,11 @@ export function Sidebar({
                 }`}
                 title={collapsed ? item.label : undefined}
               >
-                <div className={`flex items-center justify-center w-5 h-5 ${collapsed ? "mx-auto" : "mr-3"}`}>
+                <div
+                  className={`flex items-center justify-center w-5 h-5 ${
+                    collapsed ? "mx-auto" : "mr-3"
+                  }`}
+                >
                   <Icon className="w-5 h-5" />
                 </div>
                 {!collapsed && (
@@ -345,7 +397,11 @@ export function Sidebar({
                   </div>
                 )}
                 {isActive && (
-                  <div className={`absolute right-2 w-1.5 h-1.5 bg-[#fe9821] rounded-full ${collapsed ? 'hidden' : ''}`}></div>
+                  <div
+                    className={`absolute right-2 w-1.5 h-1.5 bg-[#fe9821] rounded-full ${
+                      collapsed ? "hidden" : ""
+                    }`}
+                  ></div>
                 )}
               </button>
 
@@ -363,7 +419,9 @@ export function Sidebar({
         {/* Seção Notificações */}
         {!collapsed && (
           <div className="px-3 py-2 mt-6">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Notificações</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Notificações
+            </p>
             {!connectionStatus.isConnected && (
               <div className="flex items-center mt-2 px-2 py-1 bg-red-50 rounded-lg">
                 <div className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
@@ -378,7 +436,7 @@ export function Sidebar({
             )}
           </div>
         )}
-        
+
         {/* Botão de Notificações */}
         <div className="relative">
           <button
@@ -393,7 +451,11 @@ export function Sidebar({
             }`}
             title={collapsed ? "Notificações" : undefined}
           >
-            <div className={`flex items-center justify-center w-5 h-5 ${collapsed ? "mx-auto" : "mr-3"} relative`}>
+            <div
+              className={`flex items-center justify-center w-5 h-5 ${
+                collapsed ? "mx-auto" : "mr-3"
+              } relative`}
+            >
               <Bell className="w-5 h-5" />
               {alertas.length > 0 && (
                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
@@ -419,7 +481,9 @@ export function Sidebar({
           {showNotifications && !collapsed && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-80 overflow-y-auto">
               <div className="p-3 border-b border-gray-100">
-                <h4 className="font-semibold text-gray-800 text-sm">Notificações</h4>
+                <h4 className="font-semibold text-gray-800 text-sm">
+                  Notificações
+                </h4>
               </div>
               {alertas.length === 0 ? (
                 <div className="p-4 text-center text-gray-500 text-sm">
@@ -429,16 +493,28 @@ export function Sidebar({
               ) : (
                 <div className="max-h-64 overflow-y-auto">
                   {alertas.map((alerta) => (
-                    <div key={alerta.id} className="p-3 border-b border-gray-100 hover:bg-gray-50">
+                    <div
+                      key={alerta.id}
+                      className="p-3 border-b border-gray-100 hover:bg-gray-50"
+                    >
                       <div className="flex items-start space-x-3">
                         <div
-                          className={`w-2 h-2 rounded-full mt-1.5 ${getUrgencyColor(alerta.nivel_urgencia)}`}
+                          className={`w-2 h-2 rounded-full mt-1.5 ${getUrgencyColor(
+                            alerta.nivel_urgencia
+                          )}`}
                         ></div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-800 font-medium truncate">{alerta.titulo}</p>
-                          <p className="text-xs text-gray-600 mt-1 line-clamp-2">{normalizeUsDateInText(alerta.descricao)}</p>
+                          <p className="text-sm text-gray-800 font-medium truncate">
+                            {alerta.titulo}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                            {normalizeUsDateInText(alerta.descricao)}
+                          </p>
                           <div className="text-xs text-gray-500 mt-1">
-                            CNPJ: {alerta.cnpj_unidade ? formatarCNPJCPF(alerta.cnpj_unidade) : "N/A"}
+                            CNPJ:{" "}
+                            {alerta.cnpj_unidade
+                              ? formatarCNPJCPF(alerta.cnpj_unidade)
+                              : "N/A"}
                           </div>
                         </div>
                         <button
@@ -521,7 +597,11 @@ export function Sidebar({
                         {user?.email || "sistema@crescieperdi.com"}
                       </div>
                       {user?.role && (
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mt-1 ${getRoleColor(user.role)}`}>
+                        <span
+                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mt-1 ${getRoleColor(
+                            user.role
+                          )}`}
+                        >
                           {user.role}
                         </span>
                       )}
@@ -540,7 +620,9 @@ export function Sidebar({
                     <Settings className="w-4 h-4 mr-3 text-gray-400" />
                     <div className="text-left">
                       <div className="font-medium">Configurações da Conta</div>
-                      <div className="text-xs text-gray-500">Editar perfil e preferências</div>
+                      <div className="text-xs text-gray-500">
+                        Editar perfil e preferências
+                      </div>
                     </div>
                   </button>
 
@@ -553,9 +635,13 @@ export function Sidebar({
                   >
                     <LogOut className="w-4 h-4 mr-3" />
                     <div className="text-left">
-                      <div className="font-medium">{loggingOut ? 'Saindo...' : 'Sair da Conta'}</div>
+                      <div className="font-medium">
+                        {loggingOut ? "Saindo..." : "Sair da Conta"}
+                      </div>
                       <div className="text-xs text-red-500">
-                        {loggingOut ? 'Encerrando sessão...' : 'Encerrar sessão atual'}
+                        {loggingOut
+                          ? "Encerrando sessão..."
+                          : "Encerrar sessão atual"}
                       </div>
                     </div>
                   </button>
@@ -585,7 +671,7 @@ export function Sidebar({
                 </div>
               )}
             </button>
-            
+
             {/* Notificações colapsado */}
             <button
               onClick={() => {
@@ -629,7 +715,11 @@ export function Sidebar({
                         {user?.email || "sistema@crescieperdi.com"}
                       </div>
                       {user?.role && (
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mt-1 ${getRoleColor(user.role)}`}>
+                        <span
+                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mt-1 ${getRoleColor(
+                            user.role
+                          )}`}
+                        >
                           {user.role}
                         </span>
                       )}
@@ -657,7 +747,7 @@ export function Sidebar({
                     className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
                   >
                     <LogOut className="w-4 h-4 mr-3" />
-                    {loggingOut ? 'Saindo...' : 'Sair da Conta'}
+                    {loggingOut ? "Saindo..." : "Sair da Conta"}
                   </button>
                 </div>
               </div>
@@ -677,16 +767,28 @@ export function Sidebar({
                 ) : (
                   <div className="max-h-64 overflow-y-auto">
                     {alertas.map((alerta) => (
-                      <div key={alerta.id} className="p-3 border-b border-gray-100 hover:bg-gray-50">
+                      <div
+                        key={alerta.id}
+                        className="p-3 border-b border-gray-100 hover:bg-gray-50"
+                      >
                         <div className="flex items-start space-x-3">
                           <div
-                            className={`w-2 h-2 rounded-full mt-1.5 ${getUrgencyColor(alerta.nivel_urgencia)}`}
+                            className={`w-2 h-2 rounded-full mt-1.5 ${getUrgencyColor(
+                              alerta.nivel_urgencia
+                            )}`}
                           ></div>
                           <div className="flex-1">
-                            <p className="text-sm text-gray-800 font-medium">{alerta.titulo}</p>
-                            <p className="text-xs text-gray-600 mt-1">{normalizeUsDateInText(alerta.descricao)}</p>
+                            <p className="text-sm text-gray-800 font-medium">
+                              {alerta.titulo}
+                            </p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              {normalizeUsDateInText(alerta.descricao)}
+                            </p>
                             <div className="text-xs text-gray-500 mt-1">
-                              CNPJ: {alerta.cnpj_unidade ? formatarCNPJCPF(alerta.cnpj_unidade) : "N/A"}
+                              CNPJ:{" "}
+                              {alerta.cnpj_unidade
+                                ? formatarCNPJCPF(alerta.cnpj_unidade)
+                                : "N/A"}
                             </div>
                           </div>
                           <button
@@ -741,10 +843,16 @@ export function Sidebar({
             <div className="flex items-center justify-between p-4 border-b border-gray-100">
               <div className="flex items-center">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center mr-3">
-                  <img src={icon} alt="Logo" className="w-full h-full object-contain" />
+                  <img
+                    src={icon}
+                    alt="Logo"
+                    className="w-full h-full object-contain"
+                  />
                 </div>
                 <div>
-                  <h1 className="text-sm font-semibold text-gray-900">Cresci e Perdi</h1>
+                  <h1 className="text-sm font-semibold text-gray-900">
+                    Cresci e Perdi
+                  </h1>
                   <p className="text-xs text-gray-500">Sistema Financeiro</p>
                 </div>
               </div>
@@ -759,16 +867,21 @@ export function Sidebar({
             <nav className="flex-1 p-3 space-y-1 overflow-y-hidden">
               {/* Seção Principal Mobile */}
               <div className="px-3 py-2">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Principal</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Principal
+                </p>
               </div>
-              
+
               {filteredMenuItems.slice(0, 4).map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return (
-                  <button 
-                    key={item.id} 
-                    onClick={() => { onTabChange(item.id); setMobileOpen(false); }}
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      onTabChange(item.id);
+                      setMobileOpen(false);
+                    }}
                     className={`w-full flex items-center px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
                       isActive
                         ? "bg-blue-50 text-blue-700 border border-blue-200"
@@ -797,16 +910,21 @@ export function Sidebar({
 
               {/* Seção Gestão Mobile */}
               <div className="px-3 py-2 mt-6">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Gestão</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Gestão
+                </p>
               </div>
-              
+
               {filteredMenuItems.slice(4).map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return (
-                  <button 
-                    key={item.id} 
-                    onClick={() => { onTabChange(item.id); setMobileOpen(false); }}
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      onTabChange(item.id);
+                      setMobileOpen(false);
+                    }}
                     className={`w-full flex items-center px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
                       isActive
                         ? "bg-blue-50 text-blue-700 border border-blue-200"
@@ -842,15 +960,19 @@ export function Sidebar({
                     <span className="text-white text-sm font-semibold">CP</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">Sistema</p>
-                    <p className="text-xs text-gray-500 truncate">Cresci e Perdi</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      Sistema
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      Cresci e Perdi
+                    </p>
                   </div>
                 </div>
                 <button
                   onClick={handleLogout}
                   disabled={loggingOut}
                   className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                  title={loggingOut ? 'Saindo...' : 'Sair da conta'}
+                  title={loggingOut ? "Saindo..." : "Sair da conta"}
                 >
                   <LogOut className="w-5 h-5" />
                 </button>
