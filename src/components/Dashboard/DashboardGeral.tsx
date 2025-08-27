@@ -1,9 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  TrendingUp, TrendingDown, Users, AlertTriangle, CheckCircle,
-  RefreshCw, Clock, Mail, MessageSquare,
-  Calculator, Building2, Calendar, Zap,
+  TrendingUp,
+  TrendingDown,
+  Users,
+  AlertTriangle,
+  CheckCircle,
+  RefreshCw,
+  Clock,
+  Mail,
+  MessageSquare,
+  Calculator,
+  Building2,
+  Calendar,
+  Zap,
   CircleDollarSign,
   Receipt,
 } from "lucide-react";
@@ -13,7 +23,7 @@ import { DashboardService } from "../../services/dashboardService";
 import { formatMonetaryResponsive } from "../../utils/monetaryUtils";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "react-hot-toast";
-import logo from '../../assets/logo cresci-header.png';
+import logo from "../../assets/logo cresci-header.png";
 
 type DashboardGeralProps = {
   onNavigate?: (tab: string) => void;
@@ -29,8 +39,6 @@ type DashboardGeralProps = {
 export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
   const [indicadores, setIndicadores] = useState<any>(null);
   const [carregando, setCarregando] = useState(true);
-  // Filtros removidos por não terem efeito funcional no Dashboard
-
   const dashboardService = useMemo(() => new DashboardService(), []);
 
   // Normaliza o objeto de indicadores para garantir campos e defaults
@@ -239,11 +247,18 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
 
   const obterSaudacao = () => {
     const agora = new Date();
-    const hora = agora.getHours();
-    
-    if (hora >= 0 && hora <= 12) {
+    // Obtém a hora local de São Paulo
+    const hora = Number(
+      agora.toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+        hour: "2-digit",
+        hour12: false,
+      })
+    );
+
+    if (hora >= 0 && hora < 12) {
       return "Bom dia";
-    } else if (hora > 12 && hora <= 18) {
+    } else if (hora >= 12 && hora < 18) {
       return "Boa tarde";
     } else {
       return "Boa noite";
@@ -302,17 +317,13 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">{obterSaudacao()}, {obterNomeUsuario()}!</h1>
+          <h1 className="text-3xl font-bold text-gray-800">
+            {obterSaudacao()}, {obterNomeUsuario()}!
+          </h1>
           <p className="text-gray-600">Visão geral da inadimplência da rede</p>
         </div>
-          <img
-            src={logo}
-            alt="Logo Cresci e Perdi"
-            className="h-10"
-            ></img>
+        <img src={logo} alt="Logo Cresci e Perdi" className="h-10"></img>
       </div>
-
-      
 
       {/* Acesso Rápido */}
       <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300">
@@ -337,9 +348,7 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
             aria-label="Gestão Cobranças"
           >
             <Receipt className="w-5 h-5 text-emerald-600" />
-            <span className="text-gray-700 font-medium">
-              Gestão Cobranças
-            </span>
+            <span className="text-gray-700 font-medium">Gestão Cobranças</span>
           </button>
           <button
             onClick={() => onNavigate?.("simulacao-parcelamento")}
@@ -405,9 +414,12 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
                 <TrendingUp className="w-6 h-6 text-red-500" />
               </div>
               <div className="monetary-container">
-                <p className="text-sm font-medium text-gray-700">Valor com Juros e Multa</p>
+                <p className="text-sm font-medium text-gray-700">
+                  Valor com Juros e Multa
+                </p>
                 {renderMonetaryValue(
-                  indicadores.totalEmAbertoAtualizado ?? indicadores.totalEmAberto,
+                  indicadores.totalEmAbertoAtualizado ??
+                    indicadores.totalEmAberto,
                   "text-gray-900"
                 )}
                 <div className="mt-2 flex items-center text-sm">
@@ -432,13 +444,17 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
                 <TrendingUp className="w-6 h-6 text-red-500" />
               </div>
               <div className="monetary-container">
-                <p className="text-sm font-medium text-gray-700">Valor Original (Sem Juros/Multa)</p>
+                <p className="text-sm font-medium text-gray-700">
+                  Valor Original (Sem Juros/Multa)
+                </p>
                 {renderMonetaryValue(
-                  indicadores.totalEmAbertoOriginal ?? indicadores.totalEmAberto,
+                  indicadores.totalEmAbertoOriginal ??
+                    indicadores.totalEmAberto,
                   "text-gray-900"
                 )}
                 <div className="mt-2 text-sm text-gray-500">
-                  Soma dos valores originais das cobranças em aberto e negociando
+                  Soma dos valores originais das cobranças em aberto e
+                  negociando
                 </div>
               </div>
             </div>
@@ -492,7 +508,9 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
                     )}`}
                   >
                     {getVariacaoIcon(indicadores.variacaoNegociando)}
-                    {formatarPercentual(Math.abs(indicadores.variacaoNegociando))}
+                    {formatarPercentual(
+                      Math.abs(indicadores.variacaoNegociando)
+                    )}
                   </span>
                   <span className="text-gray-400 ml-2">vs. mês anterior</span>
                 </div>
