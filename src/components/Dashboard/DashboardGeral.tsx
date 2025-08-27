@@ -302,7 +302,7 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-[#ff9923]">{obterSaudacao()}, {obterNomeUsuario()}!</h1>
+          <h1 className="text-3xl font-bold text-gray-800">{obterSaudacao()}, {obterNomeUsuario()}!</h1>
           <p className="text-gray-600">Bem vindo ao Sistema de Cobrança da CP</p>
         </div>
           <img
