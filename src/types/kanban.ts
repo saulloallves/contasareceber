@@ -23,6 +23,11 @@ export interface CardCobranca {
   created_at?: string;
   updated_at?: string;
   valor_original?: number; // Valor sem juros/multa
+  // Campos opcionais para parcelamento
+  is_parcela?: boolean;
+  parcela_numero?: number | string;
+  parcelas_total?: number | string;
+  parcelamento_origem?: string;
 }
 
 export interface ColunaKanban {

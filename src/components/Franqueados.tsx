@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../services/databaseService";
 import { connectionService } from "../services/connectionService";
+import { toast } from 'react-hot-toast';
 
 function truncateText(text: string, max: number) {
   if (!text) return "";
@@ -108,7 +109,7 @@ export function Franqueados() {
 
   const salvarFranqueado = async () => {
     if (!formData.nome_completo || !formData.cpf_rnm) {
-      alert("Nome e CPF/RNM são obrigatórios");
+      toast.error("Nome e CPF/RNM são obrigatórios");
       return;
     }
     setSalvando(true);
@@ -131,11 +132,11 @@ export function Franqueados() {
         if (error) throw error;
         franqueadoId = franqueadoSelecionado.id;
       }
-      alert("Franqueado salvo com sucesso!");
+  toast.success("Franqueado salvo com sucesso!");
       fecharModal();
       carregarFranqueados();
     } catch (error) {
-      alert(`Erro ao salvar franqueado: ${error}`);
+  toast.error(`Erro ao salvar franqueado: ${error}`);
     } finally {
       setSalvando(false);
     }

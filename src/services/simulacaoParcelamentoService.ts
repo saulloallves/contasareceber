@@ -1,3 +1,4 @@
+/* eslint-disable prefer-const */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "./databaseService";
 import { formatarCNPJCPF } from "../utils/formatters";
@@ -341,10 +342,8 @@ export class SimulacaoParcelamentoService {
         dataExpiracao.getDate() + config.prazo_validade_proposta_dias
       );
 
-      const proposta: Omit<
-        PropostaParcelamento,
-        "id" | "created_at" | "updated_at"
-      > = {
+      // Adiciona campos opcionais como null para garantir compatibilidade
+      const proposta = {
         simulacao_id: simulacaoId,
         parcelamento_master_id: simulacao.parcelamento_master_id,
         cnpj_unidade: simulacao.cnpj_unidade,
@@ -353,6 +352,11 @@ export class SimulacaoParcelamentoService {
         enviado_por: usuario,
         status_proposta: "enviada",
         data_expiracao: dataExpiracao.toISOString(),
+        data_envio: null,
+        aceito_em: null,
+        aceito_por: null,
+        ip_aceite: null,
+        observacoes_aceite: null,
       };
 
       const { data, error } = await supabase
@@ -438,11 +442,15 @@ export class SimulacaoParcelamentoService {
         .limit(1);
 
       const cobranca = cobrancasOriginais?.[0];
-      const unidade = cobranca?.unidades_franqueadas;
+      // unidades_franqueadas é um array, pegar o primeiro elemento
+      const unidade = Array.isArray(cobranca?.unidades_franqueadas) ? cobranca.unidades_franqueadas[0] : cobranca?.unidades_franqueadas;
+      // franqueado_unidades também é array
+      const franqueadoUnidade = Array.isArray(unidade?.franqueado_unidades) ? unidade.franqueado_unidades[0] : unidade?.franqueado_unidades;
+      const franqueado = Array.isArray(franqueadoUnidade?.franqueados) ? franqueadoUnidade.franqueados[0] : franqueadoUnidade?.franqueados;
       const telefone =
         cobranca?.telefone ||
         unidade?.telefone_unidade ||
-        unidade?.franqueado_unidades?.[0]?.franqueados?.telefone;
+        franqueado?.telefone;
 
       if (!telefone) {
         throw new Error("Telefone não cadastrado para esta unidade.");
@@ -585,11 +593,13 @@ export class SimulacaoParcelamentoService {
         .limit(1);
 
       const cobranca = cobrancasOriginais?.[0];
-      const unidade = cobranca?.unidades_franqueadas;
+      const unidade = Array.isArray(cobranca?.unidades_franqueadas) ? cobranca.unidades_franqueadas[0] : cobranca?.unidades_franqueadas;
+      const franqueadoUnidade = Array.isArray(unidade?.franqueado_unidades) ? unidade.franqueado_unidades[0] : unidade?.franqueado_unidades;
+      const franqueado = Array.isArray(franqueadoUnidade?.franqueados) ? franqueadoUnidade.franqueados[0] : franqueadoUnidade?.franqueados;
       const email =
         cobranca?.email_cobranca ||
         unidade?.email_unidade ||
-        unidade?.franqueado_unidades?.[0]?.franqueados?.email;
+        franqueado?.email;
 
       if (!email) {
         throw new Error("Email não cadastrado para a unidade.");
@@ -608,9 +618,8 @@ export class SimulacaoParcelamentoService {
       const dadosEmail = {
         destinatario: email,
         nome_destinatario:
-          unidade?.franqueado_unidades?.[0]?.franqueados?.nome_completo ||
-          cobranca?.cliente ||
-          unidade?.nome_unidade ||
+          franqueado?.nome_completo ||
+          cobranca?.unidades_franqueadas?.[0]?.email_unidade ||
           "Franqueado(a)",
         assunto: template.assunto,
         corpo_html: template.corpo_html,
@@ -711,6 +720,7 @@ export class SimulacaoParcelamentoService {
         proposta_id: propostaId,
         parcelamento_master_id: proposta.parcelamento_master_id,
         cnpj_unidade: proposta.cnpj_unidade,
+        titulo_id: simulacao?.cobrancas_origem_ids?.[0] || null,
         data_aceite: new Date().toISOString(),
         ip_aceite: ipAceite,
         user_agent: userAgent,
@@ -764,25 +774,44 @@ export class SimulacaoParcelamentoService {
       }
 
       // 2. Criar acordo de parcelamento
+      // Garantir que o titulo_id (id da cobrança original) existe na tabela de cobranças.
+      let tituloId: string | null = simulacao?.cobrancas_origem_ids?.[0] || null;
+      if (tituloId) {
+        try {
+          const { data: tituloExistente } = await supabase
+            .from("cobrancas_franqueados")
+            .select("id")
+            .eq("id", tituloId)
+            .single();
+
+          if (!tituloExistente) {
+            tituloId = null;
+          }
+        } catch {
+          tituloId = null;
+        }
+      }
+
+      const acordoPayload: any = {
+        parcelamento_master_id: parcelamentoMasterId,
+        cnpj_unidade: simulacao.cnpj_unidade,
+        valor_original: simulacao.valor_original,
+        valor_atualizado: simulacao.valor_atualizado,
+        valor_entrada: simulacao.valor_entrada || 0,
+        quantidade_parcelas: simulacao.quantidade_parcelas,
+        valor_parcela: simulacao.parcelas[0]?.valor || 0,
+        valor_total_acordo: simulacao.valor_total_parcelamento,
+        data_vencimento_entrada: simulacao.data_primeira_parcela,
+        data_primeiro_vencimento: simulacao.data_primeira_parcela,
+        status_acordo: 'aceito',
+        aceito_em: new Date().toISOString(),
+        aceito_por: 'franqueado',
+        ip_aceite: ipAceite,
+        observacoes: `Aceito via ${metodoAceite}. ${observacoes || ''}`
+      };
       const { data: acordo, error: acordoError } = await supabase
         .from("acordos_parcelamento")
-        .insert({
-          parcelamento_master_id: parcelamentoMasterId,
-          cnpj_unidade: simulacao.cnpj_unidade,
-          valor_original: simulacao.valor_original,
-          valor_atualizado: simulacao.valor_atualizado,
-          valor_entrada: simulacao.valor_entrada || 0,
-          quantidade_parcelas: simulacao.quantidade_parcelas,
-          valor_parcela: simulacao.parcelas[0]?.valor || 0,
-          valor_total_acordo: simulacao.valor_total_parcelamento,
-          data_vencimento_entrada: simulacao.data_primeira_parcela,
-          data_primeiro_vencimento: simulacao.data_primeira_parcela,
-          status_acordo: 'aceito',
-          aceito_em: new Date().toISOString(),
-          aceito_por: 'franqueado',
-          ip_aceite: ipAceite,
-          observacoes: `Aceito via ${metodoAceite}. ${observacoes || ''}`
-        })
+        .insert(acordoPayload)
         .select()
         .single();
 
@@ -1254,7 +1283,7 @@ export class SimulacaoParcelamentoService {
       return {
         id: "default",
         percentual_juros_parcela: 3.0,
-        valor_minimo_parcelas: 200.0,
+  valor_minimo_parcela: 200.0,
         quantidade_maxima_parcelas: 42, // Novo máximo de 42 parcelas
         percentual_entrada_minimo: 20.0,
         dias_entre_parcelas: 30,
@@ -1328,7 +1357,7 @@ Equipe Financeira`,
       franqueado?.nome_completo &&
       franqueado.nome_completo !== "Sem nome cadastrado"
         ? franqueado.nome_completo
-        : cobrancaConsolidada?.cliente || "Franqueado(a)";
+        : cobrancaConsolidada?.unidades_franqueadas?.[0]?.email_unidade || "Franqueado(a)";
 
     // Documento exibível: CPF > CNPJ; fallback para código da unidade; por fim, rótulo genérico
     const documentoExibivel = simulacao.cnpj_unidade

@@ -23,6 +23,7 @@ import {
   Save,
   X,
 } from "lucide-react";
+import { toast } from 'react-hot-toast';
 import { TemplatesJuridicosService } from "../services/templatesJuridicosService";
 import {
   TemplateJuridico,
@@ -124,7 +125,7 @@ export function TemplatesJuridicos() {
 
   const salvarTemplate = async () => {
     if (!formData.nome || !formData.corpo_mensagem) {
-      alert("Nome e corpo da mensagem são obrigatórios");
+      toast.error("Nome e corpo da mensagem são obrigatórios");
       return;
     }
 
@@ -139,7 +140,7 @@ export function TemplatesJuridicos() {
       fecharModal();
       carregarDados();
     } catch (error) {
-      alert(`Erro ao salvar template: ${error}`);
+  toast.error(`Erro ao salvar template: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -147,7 +148,7 @@ export function TemplatesJuridicos() {
 
   const salvarGatilho = async () => {
     if (!formData.nome || !formData.template_id) {
-      alert("Nome e template são obrigatórios");
+      toast.error("Nome e template são obrigatórios");
       return;
     }
 
@@ -157,7 +158,7 @@ export function TemplatesJuridicos() {
       fecharModal();
       carregarDados();
     } catch (error) {
-      alert(`Erro ao salvar gatilho: ${error}`);
+  toast.error(`Erro ao salvar gatilho: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -168,14 +169,14 @@ export function TemplatesJuridicos() {
       await templatesService.ativarDesativarTemplate(id, ativo);
       carregarDados();
     } catch (error) {
-      alert(`Erro ao ${ativo ? "ativar" : "desativar"} template`);
+  toast.error(`Erro ao ${ativo ? "ativar" : "desativar"} template`);
     }
   };
 
   const testarTemplate = async (template: TemplateJuridico) => {
     try {
       if (!template.id) {
-        alert("Template inválido: ID não encontrado");
+        toast.error("Template inválido: ID não encontrado");
         return;
       }
       const preview = await templatesService.gerarPreviewTemplate(template.id, {
@@ -189,9 +190,9 @@ export function TemplatesJuridicos() {
         nome_franqueado_principal: "João Silva",
       });
 
-      alert(`Preview do template:\n\n${preview}`);
+  toast.success(`Preview do template:\n\n${preview}`);
     } catch (error) {
-      alert("Erro ao gerar preview");
+  toast.error("Erro ao gerar preview");
     }
   };
 
@@ -210,7 +211,7 @@ export function TemplatesJuridicos() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      alert("Erro ao exportar dados");
+  toast.error("Erro ao exportar dados");
     }
   };
 

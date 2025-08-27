@@ -6,6 +6,7 @@ import {
   Globe, MapPin, Building2, BarChart3, Download, Wifi, WifiOff, Clock
 } from 'lucide-react';
 import { ConfiguracaoService } from '../../services/configuracaoService';
+import { toast } from 'react-hot-toast';
 import { sessaoService, UsuarioOnline } from '../../services/sessaoService';
 import { Usuario, EstatisticasUsuarios, FiltrosUsuarios, LogSeguranca } from '../../types/configuracao';
 
@@ -102,20 +103,20 @@ export function GestaoUsuarios() {
 
     try {
       await sessaoService.forcarLogoutUsuario(usuarioId);
-      alert('Logout forçado com sucesso!');
+  toast.success('Logout forçado com sucesso!');
       carregarDados();
     } catch (error) {
-      alert(`Erro ao forçar logout: ${error}`);
+  toast.error(`Erro ao forçar logout: ${error}`);
     }
   };
 
   const limparSessoesExpiradas = async () => {
     try {
       const sessoesLimpas = await sessaoService.limparSessoesExpiradas();
-      alert(`${sessoesLimpas} sessões expiradas foram limpas`);
+  toast.success(`${sessoesLimpas} sessões expiradas foram limpas`);
       carregarDados();
     } catch (error) {
-      alert(`Erro ao limpar sessões: ${error}`);
+  toast.error(`Erro ao limpar sessões: ${error}`);
     }
   };
 
@@ -181,7 +182,7 @@ export function GestaoUsuarios() {
       setMostrarSenha(true);
     } catch (error) {
       console.error('Erro ao gerar senha:', error);
-      alert('Erro ao gerar senha. Usando configuração padrão.');
+  toast.error('Erro ao gerar senha. Usando configuração padrão.');
       
       // Fallback: gera senha simples se não conseguir buscar configurações
       const senhaFallback = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-4).toUpperCase() + Math.floor(Math.random() * 100);
@@ -192,22 +193,22 @@ export function GestaoUsuarios() {
 
   const copiarSenha = () => {
     navigator.clipboard.writeText(senhaGerada).then(() => {
-      alert('Senha copiada para a área de transferência!');
+  toast.success('Senha copiada para a área de transferência!');
     }).catch(() => {
-      alert('Não foi possível copiar a senha. Copie manualmente.');
+  toast.error('Não foi possível copiar a senha. Copie manualmente.');
     });
   };
 
   const salvarUsuario = async () => {
     if (!formData.nome_completo || !formData.email || !formData.nivel_permissao) {
-      alert('Nome, email e nível de permissão são obrigatórios');
+  toast.error('Nome, email e nível de permissão são obrigatórios');
       return;
     }
 
     try {
       if (modalAberto === 'criar') {
         if (!senhaGerada) {
-          alert('Gere uma senha para o usuário antes de criar a conta');
+          toast.error('Gere uma senha para o usuário antes de criar a conta');
           return;
         }
         
@@ -216,7 +217,7 @@ export function GestaoUsuarios() {
           password: senhaGerada,
         });
         
-        alert(`Usuário criado com sucesso!\n\nSenha gerada: ${senhaGerada}\n\nAnote esta senha e repasse ao usuário com segurança.`);
+  toast.success(`Usuário criado com sucesso!\n\nSenha gerada: ${senhaGerada}\n\nAnote esta senha e repasse ao usuário com segurança.`);
       } else if (modalAberto === 'editar' && usuarioSelecionado) {
         await configuracaoService.atualizarUsuario(
           usuarioSelecionado.id!,
@@ -229,7 +230,7 @@ export function GestaoUsuarios() {
       carregarDados();
     } catch (e) {
      const errorMessage = e instanceof Error ? e.message : String(e);
-     alert(`Erro ao salvar usuário: ${errorMessage}`);
+  toast.error(`Erro ao salvar usuário: ${errorMessage}`);
     }
   };
 
@@ -247,7 +248,7 @@ export function GestaoUsuarios() {
       carregarDados();
     } catch (e) {
       console.error('❌ Erro ao alterar status:', e);
-      alert(`Erro ao alterar status do usuário: ${e instanceof Error ? e.message : 'Erro desconhecido'}`);
+  toast.error(`Erro ao alterar status do usuário: ${e instanceof Error ? e.message : 'Erro desconhecido'}`);
     }
   };
 
@@ -259,11 +260,11 @@ export function GestaoUsuarios() {
       console.log('🔒 Iniciando bloqueio do usuário:', id);
       await configuracaoService.bloquearUsuario(id, motivo, 24);
       console.log('✅ Usuário bloqueado com sucesso');
-      alert('Usuário bloqueado por 24 horas com sucesso!');
+  toast.success('Usuário bloqueado por 24 horas com sucesso!');
       carregarDados();
     } catch (error: any) {
       console.error('❌ Erro ao bloquear usuário:', error);
-      alert(`Erro ao bloquear usuário: ${error?.message || error}`);
+  toast.error(`Erro ao bloquear usuário: ${error?.message || error}`);
     }
   };
 
@@ -294,7 +295,7 @@ export function GestaoUsuarios() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch {
-      alert('Erro ao exportar dados');
+      toast.error('Erro ao exportar dados');
     }
   };
 

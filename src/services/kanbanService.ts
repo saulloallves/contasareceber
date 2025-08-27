@@ -106,6 +106,7 @@ export class KanbanService {
       // Seleção de colunas para a tabela principal (com a junção que funciona)
       const selectComJoin = `
           id, cnpj, cpf, cliente, valor_original, valor_atualizado, valor_recebido,
+          is_parcela,
           data_vencimento, status, tipo_cobranca, descricao, created_at,
           observacoes, unidade_id_fk,
           unidades_franqueadas!unidade_id_fk (
@@ -244,18 +245,73 @@ export class KanbanService {
       }
 
       // Combina os resultados das duas consultas em um único array
-      const cobrancas = [...(naoQuitadasData || []), ...quitadasComUnidade];
+      const todas = [...(naoQuitadasData || []), ...quitadasComUnidade];
 
-      if (!cobrancas || cobrancas.length === 0) {
+      // Separa parcelas das cobranças normais
+      const parcelas = todas.filter((c) => c.is_parcela === true);
+      const naoParcelas = todas.filter((c) => !c.is_parcela);
+
+      // Logs de depuração (sanitizados) para entender dataset retornado em tempo de execução
+      try {
+        const sampleMap = (arr: any[]) =>
+          (arr || [])
+            .slice(0, 6)
+            .map((c) => ({
+              id: c.id,
+              status: c.status,
+              is_parcela: !!c.is_parcela,
+              cnpj_tail: c.cnpj ? String(c.cnpj).slice(-4) : null,
+              unidade_id_fk: c.unidade_id_fk || null,
+            }));
+
+        console.debug("[kanbanService] buscarCards: counts ->", {
+          todas: (todas || []).length,
+          naoParcelas: naoParcelas.length,
+          parcelas: parcelas.length,
+        });
+        console.debug(
+          "[kanbanService] buscarCards: sample naoParcelas ->",
+          sampleMap(naoParcelas)
+        );
+        console.debug(
+          "[kanbanService] buscarCards: sample parcelas ->",
+          sampleMap(parcelas)
+        );
+      } catch (e) {
+        // não falha a execução por logs
+        console.warn('[kanbanService] erro ao gerar logs de depuração', e);
+      }
+
+      if (
+        (!naoParcelas || naoParcelas.length === 0) &&
+        (!parcelas || parcelas.length === 0)
+      ) {
         return [];
       }
 
-      // O restante da lógica para agrupar ou criar cards individuais permanece o mesmo
-      if (agruparPorUnidade) {
-        return this.agruparCobrancasPorUnidade(cobrancas, filtros);
-      } else {
-        return this.criarCardsIndividuais(cobrancas, filtros);
+      // Primeiro trata as cobranças não-parcelas (que podem ser agrupadas)
+      let resultadoNaoParcelas: CardCobranca[] = [];
+      if (naoParcelas.length > 0) {
+        if (agruparPorUnidade) {
+          resultadoNaoParcelas = this.agruparCobrancasPorUnidade(
+            naoParcelas,
+            filtros
+          );
+        } else {
+          resultadoNaoParcelas = this.criarCardsIndividuais(
+            naoParcelas,
+            filtros
+          );
+        }
       }
+
+      // Em seguida, cria cards individuais para as parcelas e os anexa, garantindo visibilidade
+      const cartasParcelas =
+        parcelas.length > 0
+          ? this.criarCardsIndividuais(parcelas, filtros)
+          : [];
+
+      return [...resultadoNaoParcelas, ...cartasParcelas];
     } catch (error) {
       console.error("Erro ao buscar cards:", error);
       return [];
@@ -285,8 +341,17 @@ export class KanbanService {
           }`;
         }
 
+        // Helper local para procurar valores de metadados com nomes alternativos
+        const getFirst = (obj: any, keys: string[]) => {
+          for (const k of keys) {
+            if (obj[k] !== undefined && obj[k] !== null) return obj[k];
+          }
+          return null;
+        };
+
+        const generatedId = `gen-${(cobranca.cnpj || cobranca.cliente || 'card')}-${cobranca.data_vencimento || ''}-${Math.floor(Math.random()*1000000)}`;
         const card: CardCobranca = {
-          id: cobranca.id, // UUID direto do banco
+          id: cobranca.id || generatedId, // UUID direto do banco ou gerado como fallback
           codigo_unidade: unidade?.codigo_unidade || cobranca.cnpj,
           nome_unidade: nomeUnidade,
           cnpj: cobranca.cnpj,
@@ -308,6 +373,31 @@ export class KanbanService {
           valor_recebido: cobranca.valor_recebido || 0,
           quantidade_titulos: 1,
           observacoes: cobranca.observacoes || "",
+          // Propaga metadados de parcelamento, se existirem (com vários fallbacks)
+          is_parcela: !!cobranca.is_parcela,
+          parcela_numero:
+            getFirst(cobranca, [
+              "parcela_numero",
+              "parcela_num",
+              "numero_parcela",
+              "parcela",
+              "parcelaNumero",
+            ]) || null,
+          parcelas_total:
+            getFirst(cobranca, [
+              "parcelas_total",
+              "total_parcelas",
+              "qtd_parcelas",
+              "nro_parcelas",
+              "parcelasTotal",
+            ]) || null,
+          parcelamento_origem:
+            getFirst(cobranca, [
+              "parcelamento_origem",
+              "origem_parcelamento",
+              "origem",
+              "origem_parcela",
+            ]) || null,
         };
         return card;
       })
@@ -326,7 +416,12 @@ export class KanbanService {
       CardCobranca & { _statusList?: string[]; _observacoesList?: string[] }
     >();
     cobrancas.forEach((cobranca) => {
-      // LÓGICA CPF: Esta é a mudança principal. A chave de agrupamento é o CNPJ ou, se não houver, o CPF.
+      // Se for parcela, não agrupa - cada parcela deve ser exibida individualmente
+      if (cobranca.is_parcela) {
+        return; // será tratada por criarCardsIndividuais separadamente
+      }
+
+      // LÓGICA CPF: A chave de agrupamento é o CNPJ ou, se não houver, o CPF.
       const chaveUnidade = cobranca.cnpj || cobranca.cpf;
       if (!chaveUnidade) return; // Ignora cobranças sem um documento
 

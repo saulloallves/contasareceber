@@ -10,6 +10,7 @@ import {
   BarChart3, PieChart as PieChartIcon, Activity, Award
 } from 'lucide-react';
 import { supabase } from '../services/databaseService';
+import { toast } from 'react-hot-toast';
 import { RelatoriosService } from '../services/relatoriosService';
 import { RelatorioMensal, FiltroRelatorio, IndicadorEstrategico, RelatorioDetalhado } from '../types/relatorios';
 
@@ -109,17 +110,17 @@ export function RelatoriosMensais() {
 
   const gerarRelatorioMensal = async () => {
     if (!filtros.mes || !filtros.ano) {
-      alert('Mês e ano são obrigatórios');
+      toast.error('Mês e ano são obrigatórios');
       return;
     }
 
     setGerandoRelatorio(true);
     try {
       const relatorio = await RelatoriosService.gerarRelatorioMensal(filtros.mes, filtros.ano);
-      alert('Relatório mensal gerado com sucesso!');
+  toast.success('Relatório mensal gerado com sucesso!');
       carregarDados();
     } catch (error) {
-      alert(`Erro ao gerar relatório: ${error}`);
+  toast.error(`Erro ao gerar relatório: ${error}`);
     } finally {
       setGerandoRelatorio(false);
     }
@@ -144,7 +145,7 @@ export function RelatoriosMensais() {
       a.click();
       document.body.removeChild(a);
     } catch (error) {
-      alert(`Erro ao exportar: ${error}`);
+      toast.error(`Erro ao exportar: ${error}`);
     } finally {
       setExportando(false);
     }
@@ -155,10 +156,10 @@ export function RelatoriosMensais() {
     if (!emails) return;
 
     try {
-      await RelatoriosService.enviarRelatorio(relatorioId, emails.split(',').map(e => e.trim()));
-      alert('Relatório enviado com sucesso!');
+  await RelatoriosService.enviarRelatorio(relatorioId, emails.split(',').map(e => e.trim()));
+  toast.success('Relatório enviado com sucesso!');
     } catch (error) {
-      alert(`Erro ao enviar relatório: ${error}`);
+  toast.error(`Erro ao enviar relatório: ${error}`);
     }
   };
 

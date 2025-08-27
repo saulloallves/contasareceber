@@ -6,6 +6,7 @@ import {
   Instagram, MapPin, Calendar, Clock, Info,
 } from "lucide-react";
 import { supabase } from "../services/databaseService";
+import { toast } from 'react-hot-toast';
 import { formatarCNPJCPF } from "../utils/formatters";
 import { connectionService } from "../services/connectionService";
 
@@ -157,32 +158,32 @@ export function CadastroUnidades() {
     if (!unidadeSelecionada) return;
     const cnpjFonteDig = soDigitos(formData?.codigo_interno);
     if (cnpjFonteDig.length !== 14) {
-      alert("A unidade fonte não possui CNPJ válido para transferir.");
+      toast.error("A unidade fonte não possui CNPJ válido para transferir.");
       return;
     }
     if (!destinoManualId) {
-      alert("Selecione a unidade de destino (com nome e sem CNPJ).");
+      toast.error("Selecione a unidade de destino (com nome e sem CNPJ).");
       return;
     }
     const destino = unidades.find(u => u.id === destinoManualId);
     if (!destino) {
-      alert("Destino inválido");
+      toast.error("Destino inválido");
       return;
     }
     if (soDigitos(destino?.codigo_interno).length > 0) {
-      alert("A unidade de destino já possui CNPJ.");
+      toast.error("A unidade de destino já possui CNPJ.");
       return;
     }
     try {
       setMesclandoManual(true);
       await mesclarCnpjFonteParaDestino(unidadeSelecionada, destino);
-      alert("CNPJ transferido com sucesso. A unidade fonte foi inativada e o CNPJ foi atribuído ao destino.");
+  toast.success("CNPJ transferido com sucesso. A unidade fonte foi inativada e o CNPJ foi atribuído ao destino.");
       setModalAberto(false);
       await carregarDados();
       setAba("todas");
     } catch (e) {
       console.error("Erro ao mesclar manualmente:", e);
-      alert(`Erro ao mesclar manualmente: ${String((e as any)?.message || e)}`);
+  toast.error(`Erro ao mesclar manualmente: ${String((e as any)?.message || e)}`);
     } finally {
       setMesclandoManual(false);
     }
@@ -198,11 +199,11 @@ export function CadastroUnidades() {
 
   const salvarUnidade = async () => {
     if (!formData.nome_unidade) {
-      alert("Nome da unidade é obrigatório");
+      toast.error("Nome da unidade é obrigatório");
       return;
     }
     if (!formData.codigo_unidade) {
-      alert("Código da unidade é obrigatório");
+      toast.error("Código da unidade é obrigatório");
       return;
     }
     setSalvando(true);
@@ -250,12 +251,12 @@ export function CadastroUnidades() {
           }
         }
       }
-      alert("Unidade salva com sucesso!");
+  toast.success("Unidade salva com sucesso!");
       fecharModal();
       carregarDados();
     } catch (error) {
       console.error("Erro detalhado ao salvar unidade:", error);
-      alert(`Erro ao salvar unidade: ${error}`);
+  toast.error(`Erro ao salvar unidade: ${error}`);
     } finally {
       setSalvando(false);
     }

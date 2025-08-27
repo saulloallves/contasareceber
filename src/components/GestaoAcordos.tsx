@@ -5,6 +5,7 @@ import {
   TrendingUp, Users, Target, Percent, Edit
 } from 'lucide-react';
 import { AcordosService } from '../services/acordosService';
+import { toast } from 'react-hot-toast';
 import { AcordoParcelamento, SimulacaoParcelamento, FiltrosAcordos, EstatisticasAcordos } from '../types/acordos';
 
 export function GestaoAcordos() {
@@ -102,7 +103,7 @@ export function GestaoAcordos() {
 
   const simularParcelamento = async () => {
     if (!formSimulacao.titulo_id) {
-      alert('ID do título é obrigatório');
+      toast.error('ID do título é obrigatório');
       return;
     }
 
@@ -115,7 +116,7 @@ export function GestaoAcordos() {
       );
       setSimulacao(simulacaoResult);
     } catch (error) {
-      alert(`Erro na simulação: ${error}`);
+      toast.error(`Erro na simulação: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -132,10 +133,10 @@ export function GestaoAcordos() {
         'Acordo criado via painel administrativo'
       );
       fecharModal();
-      carregarDados();
-      alert('Acordo criado com sucesso!');
+  carregarDados();
+  toast.success('Acordo criado com sucesso!');
     } catch (error) {
-      alert(`Erro ao criar acordo: ${error}`);
+  toast.error(`Erro ao criar acordo: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -154,10 +155,10 @@ export function GestaoAcordos() {
         'admin_usuario'
       );
       fecharModal();
-      carregarDados();
-      alert('Acordo aceito e boletos gerados!');
+  carregarDados();
+  toast.success('Acordo aceito e boletos gerados!');
     } catch (error) {
-      alert(`Erro ao aceitar acordo: ${error}`);
+  toast.error(`Erro ao aceitar acordo: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -165,7 +166,7 @@ export function GestaoAcordos() {
 
   const renegociarAcordo = async () => {
     if (!acordoSelecionado || !formRenegociacao.justificativa || !formRenegociacao.aprovado_por) {
-      alert('Justificativa e aprovação são obrigatórios');
+  toast.error('Justificativa e aprovação são obrigatórios');
       return;
     }
 
@@ -179,10 +180,10 @@ export function GestaoAcordos() {
         formRenegociacao.aprovado_por
       );
       fecharModal();
-      carregarDados();
-      alert('Acordo renegociado com sucesso!');
+  carregarDados();
+  toast.success('Acordo renegociado com sucesso!');
     } catch (error) {
-      alert(`Erro ao renegociar acordo: ${error}`);
+  toast.error(`Erro ao renegociar acordo: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -201,7 +202,7 @@ export function GestaoAcordos() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      alert('Erro ao exportar dados');
+      toast.error('Erro ao exportar dados');
     }
   };
 

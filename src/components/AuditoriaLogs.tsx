@@ -20,6 +20,7 @@ import {
   Bell,
 } from "lucide-react";
 import { AuditoriaService } from "../services/auditoriaService";
+import { toast } from 'react-hot-toast';
 import {
   LogAuditoria,
   FiltrosAuditoria,
@@ -92,7 +93,7 @@ export function AuditoriaLogs() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      alert("Erro ao exportar logs");
+      toast.error("Erro ao exportar logs");
     } finally {
       setExportando(false);
     }
@@ -102,10 +103,10 @@ export function AuditoriaLogs() {
     if (!configuracao) return;
 
     try {
-      await auditoriaService.atualizarConfiguracao(configuracao);
-      alert("Configuração salva com sucesso!");
+  await auditoriaService.atualizarConfiguracao(configuracao);
+  toast.success("Configuração salva com sucesso!");
     } catch (error) {
-      alert("Erro ao salvar configuração");
+  toast.error("Erro ao salvar configuração");
     }
   };
 

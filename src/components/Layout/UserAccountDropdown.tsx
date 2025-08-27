@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Settings, LogOut, ChevronDown, Loader2 } from 'lucide-react';
 import { UserSettingsModal } from './UserSettingsModal';
+import { toast } from 'react-hot-toast';
 import { useAuth } from '../Auth/AuthProvider';
 
 interface UserAccountDropdownProps {
@@ -53,7 +54,7 @@ export function UserAccountDropdown({ user }: UserAccountDropdownProps) {
       window.location.href = '/';
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
-      alert('Erro ao fazer logout. Tente novamente.');
+      toast.error('Erro ao fazer logout. Tente novamente.');
     } finally {
       setLoggingOut(false);
     }

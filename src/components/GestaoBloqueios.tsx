@@ -15,6 +15,7 @@ import {
   Target,
 } from "lucide-react";
 import { BloqueioService } from "../services/bloqueioService";
+import { toast } from 'react-hot-toast';
 import { FiltrosBloqueio, EstatisticasBloqueio } from "../types/bloqueio";
 
 export function GestaoBloqueios() {
@@ -55,7 +56,7 @@ export function GestaoBloqueios() {
 
   const verificarCriteriosIndividual = async () => {
     if (!cnpjVerificacao.trim()) {
-      alert("Digite um CNPJ válido");
+      toast.error("Digite um CNPJ válido");
       return;
     }
 
@@ -66,20 +67,20 @@ export function GestaoBloqueios() {
       );
 
       if (criterio.deve_bloquear) {
-        if (
-          confirm(
-            `Unidade atende critérios de bloqueio:\n\nMotivo: ${criterio.motivo}\nUrgência: ${criterio.urgencia}\n\nDeseja executar o bloqueio?`
-          )
-        ) {
-          await bloqueioService.executarBloqueio(cnpjVerificacao, criterio);
-          alert("Bloqueio executado com sucesso!");
-          carregarDados();
-        }
+          if (
+            confirm(
+              `Unidade atende critérios de bloqueio:\n\nMotivo: ${criterio.motivo}\nUrgência: ${criterio.urgencia}\n\nDeseja executar o bloqueio?`
+            )
+          ) {
+            await bloqueioService.executarBloqueio(cnpjVerificacao, criterio);
+            toast.success("Bloqueio executado com sucesso!");
+            carregarDados();
+          }
       } else {
-        alert("Unidade não atende critérios de bloqueio no momento.");
+        toast('Unidade não atende critérios de bloqueio no momento.');
       }
     } catch (error) {
-      alert(`Erro ao verificar critérios: ${error}`);
+      toast.error(`Erro ao verificar critérios: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -101,12 +102,12 @@ export function GestaoBloqueios() {
         bloqueioService.verificarDesbloqueiosAutomaticos(),
       ]);
 
-      alert(
+      toast.success(
         `Verificação concluída:\n${bloqueios} novos bloqueios\n${desbloqueios} desbloqueios automáticos`
       );
       carregarDados();
     } catch (error) {
-      alert(`Erro na verificação: ${error}`);
+      toast.error(`Erro na verificação: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -118,10 +119,10 @@ export function GestaoBloqueios() {
 
     try {
       await bloqueioService.executarDesbloqueio(cnpjUnidade, motivo);
-      alert("Desbloqueio executado com sucesso!");
+  toast.success("Desbloqueio executado com sucesso!");
       carregarDados();
     } catch (error) {
-      alert(`Erro ao desbloquear: ${error}`);
+  toast.error(`Erro ao desbloquear: ${error}`);
     }
   };
 
@@ -149,7 +150,7 @@ export function GestaoBloqueios() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      alert("Erro ao exportar dados");
+      toast.error("Erro ao exportar dados");
     }
   };
 

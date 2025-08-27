@@ -21,6 +21,7 @@ import {
   Target,
 } from "lucide-react";
 import { ReunioesService } from "../services/reunioesService";
+import { toast } from 'react-hot-toast';
 import { UnidadesService } from "../services/unidadesService";
 import {
   FiltrosReunioes,
@@ -133,7 +134,7 @@ export function GestaoReunioes() {
 
   const agendarReuniao = async () => {
     if (!formData.titulo_id || !formData.data_agendada) {
-      alert("Cobrança e data são obrigatórios");
+      toast.error("Cobrança e data são obrigatórios");
       return;
     }
 
@@ -143,7 +144,7 @@ export function GestaoReunioes() {
       fecharModal();
       carregarDados();
     } catch (error) {
-      alert(`Erro ao agendar reunião: ${error}`);
+      toast.error(`Erro ao agendar reunião: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -151,7 +152,7 @@ export function GestaoReunioes() {
 
   const registrarInteracao = async () => {
     if (!formData.codigo_unidade || !formData.resumo_conversa) {
-      alert("Código da unidade e resumo são obrigatórios");
+      toast.error("Código da unidade e resumo são obrigatórios");
       return;
     }
 
@@ -161,7 +162,7 @@ export function GestaoReunioes() {
       fecharModal();
       carregarDados();
     } catch (error) {
-      alert(`Erro ao registrar interação: ${error}`);
+      toast.error(`Erro ao registrar interação: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -169,7 +170,7 @@ export function GestaoReunioes() {
 
   const registrarResultado = async () => {
     if (!formData.decisao_final || !formData.resumo_resultado) {
-      alert("Decisão e resumo são obrigatórios");
+      toast.error("Decisão e resumo são obrigatórios");
       return;
     }
 
@@ -184,14 +185,14 @@ export function GestaoReunioes() {
       fecharModal();
       carregarDados();
     } catch (error) {
-      alert(`Erro ao registrar resultado: ${error}`);
+      toast.error(`Erro ao registrar resultado: ${error}`);
     } finally {
       setProcessando(false);
     }
   };
 
   const marcarNaoCompareceu = async (reuniao: any) => {
-    if (!confirm("Confirma que o franqueado não compareceu à reunião?")) {
+  if (!confirm("Confirma que o franqueado não compareceu à reunião?")) {
       return;
     }
 
@@ -202,7 +203,7 @@ export function GestaoReunioes() {
       );
       carregarDados();
     } catch (error) {
-      alert(`Erro ao atualizar status: ${error}`);
+      toast.error(`Erro ao atualizar status: ${error}`);
     }
   };
 
@@ -220,7 +221,7 @@ export function GestaoReunioes() {
       );
       carregarDados();
     } catch (error) {
-      alert(`Erro ao remarcar reunião: ${error}`);
+      toast.error(`Erro ao remarcar reunião: ${error}`);
     }
   };
 
@@ -245,7 +246,7 @@ export function GestaoReunioes() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      alert("Erro ao exportar dados");
+  toast.error("Erro ao exportar dados");
     }
   };
 

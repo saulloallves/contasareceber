@@ -97,7 +97,9 @@ export function Sidebar({
       window.location.href = '/';
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
-      alert('Erro ao fazer logout. Tente novamente.');
+    // usa toast para feedback consistente
+    // import dinamico para evitar conflitos se toast não estiver em escopo
+    try { const { toast } = await import('react-hot-toast'); toast.error('Erro ao fazer logout. Tente novamente.'); } catch { console.error('Toast import falhou'); }
     } finally {
       setLoggingOut(false);
     }

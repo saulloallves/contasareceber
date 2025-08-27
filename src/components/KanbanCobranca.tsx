@@ -2,11 +2,38 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useCallback, useRef } from "react";
-import { DragDropContext, Droppable, Draggable, DropResult, } from "react-beautiful-dnd";
-import { MessageSquare, Calendar, DollarSign, AlertTriangle, Filter, Download, RefreshCw, Edit, X, Save, CircleDollarSign, Lock } from "lucide-react";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+} from "react-beautiful-dnd";
+import {
+  MessageSquare,
+  Calendar,
+  DollarSign,
+  AlertTriangle,
+  Filter,
+  Download,
+  RefreshCw,
+  Edit,
+  X,
+  Save,
+  CircleDollarSign,
+  Lock,
+} from "lucide-react";
 import { KanbanService } from "../services/kanbanService";
-import { CardCobranca, ColunaKanban, FiltrosKanban, EstatisticasKanban, } from "../types/kanban";
-import { formatarCNPJCPF, formatarMoeda, formatarData, } from "../utils/formatters";
+import {
+  CardCobranca,
+  ColunaKanban,
+  FiltrosKanban,
+  EstatisticasKanban,
+} from "../types/kanban";
+import {
+  formatarCNPJCPF,
+  formatarMoeda,
+  formatarData,
+} from "../utils/formatters";
 import { supabase } from "../lib/supabaseClient";
 import { n8nService } from "../services/n8nService";
 import { toast } from "react-hot-toast";
@@ -34,30 +61,82 @@ export function KanbanCobranca() {
   const [cards, setCards] = useState<CardCobranca[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [filtros, setFiltros] = useState<FiltrosKanban>({});
-  const [estatisticas, setEstatisticas] = useState<EstatisticasKanban | null>(null);
-  const [unitSelecionada, setUnitSelecionada] = useState<UnitKanbanCard | null>(null);
-  const [modalAberto, setModalAberto] = useState<"detalhes" | "acao" | "observacao" | null>(null);
+  const [estatisticas, setEstatisticas] = useState<EstatisticasKanban | null>(
+    null
+  );
+  const [unitSelecionada, setUnitSelecionada] = useState<UnitKanbanCard | null>(
+    null
+  );
+  const [modalAberto, setModalAberto] = useState<
+    "detalhes" | "acao" | "observacao" | null
+  >(null);
   const [observacaoEditando, setObservacaoEditando] = useState("");
   const [processando, setProcessando] = useState(false);
   const [aba, setAba] = useState<"unidade" | "individual">("unidade");
-  const [cobrancaSelecionada, setCobrancaSelecionada] = useState<CardCobranca | null>(null);
+  const [cobrancaSelecionada, setCobrancaSelecionada] =
+    useState<CardCobranca | null>(null);
   const [modalConfirmacaoAberto, setModalConfirmacaoAberto] = useState(false);
-  const [movimentoPendente, setMovimentoPendente] = useState<DropResult | null>(null);
-  const [movimentacaoIndividualFeita, setMovimentacaoIndividualFeita] = useState(false);
-  const [unidadesComStatusMisto, setUnidadesComStatusMisto] = useState< Set<string> >(new Set());
+  const [movimentoPendente, setMovimentoPendente] = useState<DropResult | null>(
+    null
+  );
+  const [movimentacaoIndividualFeita, setMovimentacaoIndividualFeita] =
+    useState(false);
+  const [unidadesComStatusMisto, setUnidadesComStatusMisto] = useState<
+    Set<string>
+  >(new Set());
   const [showMixedStatusWarning, setShowMixedStatusWarning] = useState(false);
-  const [todasCobrancasUnidade, setTodasCobrancasUnidade] = useState< CardCobranca[] >([]);
-  const [filtrosAvancados, setFiltrosAvancados] = useState({ nomeUnidade: "", cnpj: "", codigo: "", statusCobranca: "", valorMin: "", valorMax: "", tipoCobranca: "", });
+  const [todasCobrancasUnidade, setTodasCobrancasUnidade] = useState<
+    CardCobranca[]
+  >([]);
+
+  // Debug: quando abrir modal de detalhes, loga as cobranças carregadas para inspeção
+  useEffect(() => {
+    if (
+      modalAberto === "detalhes" &&
+      (unitSelecionada || cobrancaSelecionada)
+    ) {
+      console.debug(
+        "[KanbanCobranca] abrir modal detalhes - todasCobrancasUnidade ->",
+        todasCobrancasUnidade
+      );
+    }
+  }, [
+    modalAberto,
+    todasCobrancasUnidade,
+    unitSelecionada,
+    cobrancaSelecionada,
+  ]);
+  const [filtrosAvancados, setFiltrosAvancados] = useState({
+    nomeUnidade: "",
+    cnpj: "",
+    codigo: "",
+    statusCobranca: "",
+    valorMin: "",
+    valorMax: "",
+    tipoCobranca: "",
+  });
   const [showFiltrosAvancados, setShowFiltrosAvancados] = useState(false);
-  const [detalhesStatusMisto, setDetalhesStatusMisto] = useState<Record<string, { statusList: string[], nomeUnidade: string }>>({});
-  const [modalDetalhesStatusMisto, setModalDetalhesStatusMisto] = useState<string | null>(null);
-  const [quantidadesTotaisPorUnidade, setQuantidadesTotaisPorUnidade] = useState<Record<string, number>>({});
-  const [modalConfirmacaoWhatsAppUnidade, setModalConfirmacaoWhatsAppUnidade] = useState(false);
-  const [unidadeParaWhatsApp, setUnidadeParaWhatsApp] = useState<UnitKanbanCard | null>(null);
+  const [detalhesStatusMisto, setDetalhesStatusMisto] = useState<
+    Record<string, { statusList: string[]; nomeUnidade: string }>
+  >({});
+  const [modalDetalhesStatusMisto, setModalDetalhesStatusMisto] = useState<
+    string | null
+  >(null);
+  const [quantidadesTotaisPorUnidade, setQuantidadesTotaisPorUnidade] =
+    useState<Record<string, number>>({});
+  // Mapa [docUnidade] -> { parcelado: n, parcelas: n, total: n, ... }
+  const [contagensPorUnidadePorStatus, setContagensPorUnidadePorStatus] =
+    useState<Record<string, Record<string, number>>>({});
+  const [modalConfirmacaoWhatsAppUnidade, setModalConfirmacaoWhatsAppUnidade] =
+    useState(false);
+  const [unidadeParaWhatsApp, setUnidadeParaWhatsApp] =
+    useState<UnitKanbanCard | null>(null);
   const [monitoramentoAtivo, setMonitoramentoAtivo] = useState(false);
   const kanbanService = new KanbanService();
   const processandoAnteriorRef = useRef(processando);
-  const [cardsVisiveisPorColuna, setCardsVisiveisPorColuna] = useState<{ [colunaId: string]: number }>({});
+  const [cardsVisiveisPorColuna, setCardsVisiveisPorColuna] = useState<{
+    [colunaId: string]: number;
+  }>({});
 
   // Chaves para localStorage
   const STORAGE_KEY_STATUS_MISTO = "kanban_unidades_status_misto";
@@ -215,6 +294,22 @@ export function KanbanCobranca() {
         kanbanService.buscarEstatisticas(aba === "unidade"),
       ]);
       setColunas(colunasData);
+      // Log de depuração: inspeciona cards retornados pelo serviço
+      try {
+        const sample = (arr: CardCobranca[]) =>
+          (arr || []).slice(0, 6).map((c) => ({
+            id: c.id,
+            status: c.status_atual,
+            is_parcela: (c as any).is_parcela || false,
+            cnpj: c.cnpj ? String(c.cnpj).slice(-4) : null,
+          }));
+        console.debug("[KanbanCobranca] carregarDados: cardsData counts ->", {
+          total: (cardsData || []).length,
+          sample: sample(cardsData || []),
+        });
+      } catch (e) {
+        console.warn("[KanbanCobranca] erro ao gerar logs de depuração", e);
+      }
 
       // Aplica filtros locais que não são suportados pelo serviço
       let cardsFiltrados = cardsData;
@@ -258,13 +353,19 @@ export function KanbanCobranca() {
           false
         );
         const quantidadesPorUnidade: Record<string, number> = {};
+  const mapStatusPorUnidade: Record<string, Record<string, number>> = {};
 
         todasCobrancasSemFiltro.forEach((card) => {
           const key = card.cnpj || (card as any).cpf;
           quantidadesPorUnidade[key] = (quantidadesPorUnidade[key] || 0) + 1;
+
+          if (!mapStatusPorUnidade[key]) mapStatusPorUnidade[key] = {};
+          const st = card.status_atual || "outros";
+          mapStatusPorUnidade[key][st] = (mapStatusPorUnidade[key][st] || 0) + 1;
         });
 
         setQuantidadesTotaisPorUnidade(quantidadesPorUnidade);
+        setContagensPorUnidadePorStatus(mapStatusPorUnidade);
       }
 
       // Detecta unidades com status misto com validação em tempo real
@@ -334,11 +435,16 @@ export function KanbanCobranca() {
     if (movimentacaoIndividualFeita || unidadesComStatusMisto.size > 0) {
       resetarTravasAutomatico();
       await carregarDados();
-      toast.success('Travas resetadas e dados atualizados');
+      toast.success("Travas resetadas e dados atualizados");
     } else {
       carregarDados();
     }
-  }, [movimentacaoIndividualFeita, unidadesComStatusMisto.size, resetarTravasAutomatico, carregarDados]);
+  }, [
+    movimentacaoIndividualFeita,
+    unidadesComStatusMisto.size,
+    resetarTravasAutomatico,
+    carregarDados,
+  ]);
 
   /**
    * Monitora mudanças de status e libera travas automaticamente
@@ -541,8 +647,14 @@ export function KanbanCobranca() {
       const { unidadesMistas: novasUnidadesMistas, detalhes: novosDetalhes } =
         await detectarUnidadesComStatusMisto();
 
-      console.log("📊 Verificação forçada - Unidades antes:", Array.from(unidadesComStatusMisto));
-      console.log("📊 Verificação forçada - Unidades agora:", Array.from(novasUnidadesMistas));
+      console.log(
+        "📊 Verificação forçada - Unidades antes:",
+        Array.from(unidadesComStatusMisto)
+      );
+      console.log(
+        "📊 Verificação forçada - Unidades agora:",
+        Array.from(novasUnidadesMistas)
+      );
 
       const unidadesLiberadas = Array.from(unidadesComStatusMisto).filter(
         (cnpj) => !novasUnidadesMistas.has(cnpj)
@@ -551,21 +663,23 @@ export function KanbanCobranca() {
         const nomesLiberadas = unidadesLiberadas
           .map((cnpj) => detalhesStatusMisto[cnpj]?.nomeUnidade || cnpj)
           .join(", ");
-        toast.success(`🔓 Unidades liberadas: ${nomesLiberadas}` , {
-          id: `liberacao-parcial-${unidadesLiberadas.sort().join('-')}`,
+        toast.success(`🔓 Unidades liberadas: ${nomesLiberadas}`, {
+          id: `liberacao-parcial-${unidadesLiberadas.sort().join("-")}`,
           duration: 4000,
-          style: { background: '#16a34a', color: '#fff' }
+          style: { background: "#16a34a", color: "#fff" },
         });
       }
 
       if (novasUnidadesMistas.size === 0) {
-        toast.success('🔓 Todas as travas foram liberadas.', {
-          id: 'liberacao-total',
+        toast.success("🔓 Todas as travas foram liberadas.", {
+          id: "liberacao-total",
           duration: 4000,
-          style: { background: '#16a34a', color: '#fff' }
+          style: { background: "#16a34a", color: "#fff" },
         });
         resetarTravasAutomatico();
-        setTimeout(() => { carregarDados(); }, 800);
+        setTimeout(() => {
+          carregarDados();
+        }, 800);
         return;
       }
 
@@ -581,7 +695,13 @@ export function KanbanCobranca() {
         style: { background: "#ef4444", color: "#fff" },
       });
     }
-  }, [unidadesComStatusMisto, detalhesStatusMisto, salvarStatusMistoStorage, carregarDados, resetarTravasAutomatico]);
+  }, [
+    unidadesComStatusMisto,
+    detalhesStatusMisto,
+    salvarStatusMistoStorage,
+    carregarDados,
+    resetarTravasAutomatico,
+  ]);
 
   // (Funções de liberação forçada removidas)
 
@@ -657,13 +777,44 @@ export function KanbanCobranca() {
   };
 
   // Função para buscar todas as cobranças de uma unidade específica (por cnpj ou cpf)
-  const buscarTodasCobrancasUnidade = async (doc: string) => {
+  // statusFilter opcional: quando passado, filtra apenas cobranças com esse status (ex: 'parcelado' ou 'parcelas')
+  const buscarTodasCobrancasUnidade = async (
+    doc: string,
+    statusFilter?: string
+  ) => {
     try {
       const todasCobrancas = await kanbanService.buscarCards({}, false); // Busca todas as cobranças individuais
-      const cobrancasUnidade = todasCobrancas.filter(
+      let cobrancasUnidade = todasCobrancas.filter(
         (card) => (card.cnpj || (card as any).cpf) === doc
       );
-      setTodasCobrancasUnidade(cobrancasUnidade);
+
+      // Se pediu um filtro de status (ex: parcelado / parcelas), aplica também
+      if (statusFilter) {
+        cobrancasUnidade = cobrancasUnidade.filter(
+          (card) => card.status_atual === statusFilter
+        );
+      }
+      // Ordena por data de vencimento (mais próxima primeiro)
+      const ordenadas = cobrancasUnidade.slice().sort((a, b) => {
+        const ta = new Date(a.data_vencimento_antiga).getTime();
+        const tb = new Date(b.data_vencimento_antiga).getTime();
+        if (isNaN(ta) && isNaN(tb)) return 0;
+        if (isNaN(ta)) return 1;
+        if (isNaN(tb)) return -1;
+        return ta - tb;
+      });
+      console.debug("[KanbanCobranca] buscarTodasCobrancasUnidade ->", {
+        requestedDoc: doc,
+        statusFilter,
+        totalFound: ordenadas.length,
+        sample: (ordenadas || [])
+          .slice(0, 6)
+          .map((c) => ({
+            id: c.id || null,
+            venc: c.data_vencimento_antiga || null,
+          })),
+      });
+      setTodasCobrancasUnidade(ordenadas);
       setQuantidadesTotaisPorUnidade((prev) => ({
         ...prev,
         [doc]: cobrancasUnidade.length,
@@ -680,7 +831,10 @@ export function KanbanCobranca() {
     detalhes: Record<string, { statusList: string[]; nomeUnidade: string }>;
   }> => {
     try {
-      if (DEBUG) console.log("🔍 Buscando cobranças no banco para detectar status misto...");
+      if (DEBUG)
+        console.log(
+          "🔍 Buscando cobranças no banco para detectar status misto..."
+        );
       const { data: cobrancas, error } = await supabase
         .from("cobrancas_franqueados")
         .select(
@@ -698,40 +852,71 @@ export function KanbanCobranca() {
         if (DEBUG) console.error("❌ Erro ao detectar status misto:", error);
         return { unidadesMistas: new Set(), detalhes: {} };
       }
-      if (DEBUG) console.log(`📊 Encontradas ${cobrancas?.length || 0} cobranças no banco`);
+      if (DEBUG)
+        console.log(
+          `📊 Encontradas ${cobrancas?.length || 0} cobranças no banco`
+        );
       const unidadesMistas = new Set<string>();
       const statusPorUnidade = new Map<string, Set<string>>();
       const nomesPorUnidade = new Map<string, string>();
-      const detalhesCompletos: Record<string, { statusList: string[]; nomeUnidade: string }> = {};
+      const detalhesCompletos: Record<
+        string,
+        { statusList: string[]; nomeUnidade: string }
+      > = {};
       cobrancas?.forEach((cobranca: any) => {
         if (cobranca.status === "quitado") return; // IGNORA quitados
+        if (cobranca.is_parcela) return; // IGNORA parcelas para a lógica de status misto
+        // Ignora diferenças que sejam apenas relacionadas a parcelamento
+        const PARCEL_STATUS_IGNORE = new Set(["parcelado", "parcelas"]);
 
         const doc = cobranca.cnpj || cobranca.cpf;
         if (!doc) return; // Pula se não tiver nenhum documento
-        const nomeUnidade = cobranca.unidades_franqueadas?.nome_unidade || "Unidade não identificada";
+        const nomeUnidade =
+          cobranca.unidades_franqueadas?.nome_unidade ||
+          "Unidade não identificada";
         if (!statusPorUnidade.has(doc)) {
           statusPorUnidade.set(doc, new Set());
           nomesPorUnidade.set(doc, nomeUnidade);
         }
-        statusPorUnidade.get(doc)!.add(cobranca.status);
+        // Só adiciona o status se não for um status de parcelamento IGNORADO
+        if (!PARCEL_STATUS_IGNORE.has(cobranca.status)) {
+          statusPorUnidade.get(doc)!.add(cobranca.status);
+        }
       });
-      if (DEBUG) console.log(`📋 Analisando ${statusPorUnidade.size} unidades diferentes`);
+      if (DEBUG)
+        console.log(
+          `📋 Analisando ${statusPorUnidade.size} unidades diferentes`
+        );
       statusPorUnidade.forEach((statusSet, doc) => {
         const statusArray = Array.from(statusSet);
+        // Se, após ignorar status de parcelamento, houver mais de um status distinto -> misto
         if (statusSet.size > 1) {
           unidadesMistas.add(doc);
           detalhesCompletos[doc] = {
             statusList: statusArray.sort(),
             nomeUnidade: nomesPorUnidade.get(doc) || "Unidade não identificada",
           };
-          if (DEBUG) console.log(`⚠️  UNIDADE COM STATUS MISTO DETECTADA: ${nomesPorUnidade.get(doc)}`);
+          if (DEBUG)
+            console.log(
+              `⚠️  UNIDADE COM STATUS MISTO DETECTADA: ${nomesPorUnidade.get(
+                doc
+              )}`
+            );
         }
       });
-      if (DEBUG) console.log(`🎯 RESULTADO FINAL: ${unidadesMistas.size} unidades com status misto encontradas`);
+      if (DEBUG)
+        console.log(
+          `🎯 RESULTADO FINAL: ${unidadesMistas.size} unidades com status misto encontradas`
+        );
       return { unidadesMistas, detalhes: detalhesCompletos };
     } catch (error) {
-      if (DEBUG) console.error("❌ Erro ao detectar unidades com status misto:", error);
-      try { localStorage.removeItem(STORAGE_KEY_STATUS_MISTO); } catch { /* empty */ }
+      if (DEBUG)
+        console.error("❌ Erro ao detectar unidades com status misto:", error);
+      try {
+        localStorage.removeItem(STORAGE_KEY_STATUS_MISTO);
+      } catch {
+        /* empty */
+      }
       return { unidadesMistas: new Set(), detalhes: {} };
     }
   };
@@ -855,7 +1040,8 @@ export function KanbanCobranca() {
     let intervalId: NodeJS.Timeout | null = null;
 
     if (monitoramentoAtivo) {
-      if (DEBUG) console.log("⏰ Iniciando monitoramento automático a cada 10 segundos");
+      if (DEBUG)
+        console.log("⏰ Iniciando monitoramento automático a cada 10 segundos");
 
       // Executa imediatamente
       monitorarELiberarTravas();
@@ -909,7 +1095,10 @@ export function KanbanCobranca() {
   const getUnitCardsByColuna = (colunaId: string): UnitKanbanCard[] => {
     // Agrupa por cnpj ou cpf
     const filtered = cards.filter((card) => card.status_atual === colunaId);
-    const unitMap: Record<string, UnitKanbanCard & { valor_original?: number; cpf?: string }> = {};
+    const unitMap: Record<
+      string,
+      UnitKanbanCard & { valor_original?: number; cpf?: string }
+    > = {};
     filtered.forEach((card) => {
       const chave = card.cnpj || (card as any).cpf || card.codigo_unidade;
       if (!unitMap[chave]) {
@@ -930,10 +1119,12 @@ export function KanbanCobranca() {
       }
       unitMap[chave].charges.push(card);
       unitMap[chave].valor_total += card.valor_total;
-      unitMap[chave].valor_original = (unitMap[chave].valor_original ?? 0) + (card.valor_original ?? 0);
+      unitMap[chave].valor_original =
+        (unitMap[chave].valor_original ?? 0) + (card.valor_original ?? 0);
       if (
         !unitMap[chave].data_vencimento_antiga ||
-        new Date(card.data_vencimento_antiga) < new Date(unitMap[chave].data_vencimento_antiga)
+        new Date(card.data_vencimento_antiga) <
+          new Date(unitMap[chave].data_vencimento_antiga)
       ) {
         unitMap[chave].data_vencimento_antiga = card.data_vencimento_antiga;
       }
@@ -955,14 +1146,18 @@ export function KanbanCobranca() {
 
     // Busca a unidade pelo draggableId para verificar o CNPJ
     const unidadeCard = getUnitCardsByColuna(result.source.droppableId).find(
-    (u) => (u.cnpj || u.cpf) === result.draggableId.replace(/unit-/, '') // Adaptação se o draggableId tiver prefixo
-    // Se draggableId é o próprio documento, use: (u.cnpj || u.cpf) === result.draggableId
+      (u) => (u.cnpj || u.cpf) === result.draggableId.replace(/unit-/, "") // Adaptação se o draggableId tiver prefixo
+      // Se draggableId é o próprio documento, use: (u.cnpj || u.cpf) === result.draggableId
     );
 
     const documento = unidadeCard?.cnpj || unidadeCard?.cpf;
 
     // Verifica se é uma unidade com status misto no modo agrupado usando CNPJ
-    if ( aba === "unidade" && documento && unidadesComStatusMisto.has(documento)) {
+    if (
+      aba === "unidade" &&
+      documento &&
+      unidadesComStatusMisto.has(documento)
+    ) {
       // Define qual unidade será mostrada no modal de detalhes
       setModalDetalhesStatusMisto(documento ?? null);
       setShowMixedStatusWarning(true);
@@ -997,7 +1192,9 @@ export function KanbanCobranca() {
       }
       const documento = unit.cnpj || unit.cpf;
       if (!documento) {
-          throw new Error(`Unidade ${draggableId} não possui CNPJ ou CPF para movimentação.`);
+        throw new Error(
+          `Unidade ${draggableId} não possui CNPJ ou CPF para movimentação.`
+        );
       }
       // **CORREÇÃO APLICADA AQUI**
       // Simplifica a chamada para mover a unidade inteira de uma vez, passando o CNPJ
@@ -1101,9 +1298,8 @@ export function KanbanCobranca() {
     setProcessando(true);
     try {
       // Determina o ID correto para unidade (CNPJ) ou cobrança individual (UUID)
-      const idParaSalvar = aba === "unidade"
-        ? unitSelecionada?.cnpj
-        : cobrancaSelecionada?.id;
+      const idParaSalvar =
+        aba === "unidade" ? unitSelecionada?.cnpj : cobrancaSelecionada?.id;
 
       if (idParaSalvar) {
         await kanbanService.atualizarObservacao(
@@ -1163,7 +1359,9 @@ export function KanbanCobranca() {
 
 Olá ${nomeFranqueado} 👋,
 
-Identificamos uma cobrança pendente para sua unidade: *${cobranca.nome_unidade}*:
+Identificamos uma cobrança pendente para sua unidade: *${
+        cobranca.nome_unidade
+      }*:
 
 💰 *Valor:* ${formatarMoeda(cobranca.valor_total)}
 📅 *Vencimento:* ${formatarData(cobranca.data_vencimento_antiga)}
@@ -1296,7 +1494,9 @@ _Mensagem Automática do Sistema_
 
 Olá ${nomeFranqueado} 👋,
 
-Identificamos ${cobrancasUnidade.length} cobrança(s) pendente(s) para sua unidade: *${unidade.nome_unidade}*:
+Identificamos ${
+        cobrancasUnidade.length
+      } cobrança(s) pendente(s) para sua unidade: *${unidade.nome_unidade}*:
 
 💰 *Valor Total:* ${formatarMoeda(valorTotalGeral)}
 📅 *Vencimento mais antigo:* ${formatarData(vencimentoMaisAntigo)}
@@ -1458,35 +1658,72 @@ _Mensagem Automática do Sistema_
     };
     return tipoMap[tipo] || tipo.replace(/\b\w/g, (l) => l.toUpperCase());
   };
-  const renderCardUnidade = (unit: UnitKanbanCard & { valor_original?: number }, index: number) => {
+  const renderCardUnidade = (
+    unit: UnitKanbanCard & { valor_original?: number },
+    index: number
+  ) => {
     const documento = unit.cnpj || unit.cpf;
-    const temStatusMisto = typeof documento === "string" && unidadesComStatusMisto.has(documento);
+    const temStatusMisto =
+      typeof documento === "string" && unidadesComStatusMisto.has(documento);
+    // Detecta quando a unidade agrupada representa apenas cobranças parceladas
+    const temParceladoAgrupado =
+      unit.status_atual === "parcelas" || unit.status_atual === "parcelado" ||
+      (Array.isArray(unit.charges) && unit.charges.length > 0 && unit.charges.every((c) => c.status_atual === "parcelas" || c.status_atual === "parcelado"));
+
+    const dragDisabled = temStatusMisto || temParceladoAgrupado;
+
+      // Determina label e contagem adequada para exibição no card da unidade
+      const unidadeDocKey = unit.cnpj || (unit as any).cpf || "";
+      const mapaStatus = contagensPorUnidadePorStatus[unidadeDocKey] || {};
+      const countFromMapa = (status: string) => mapaStatus[status] || 0;
+
+      let counterLabel = "Cobranças:";
+      let counterValue = obterQuantidadeTotalCobrancas(unidadeDocKey);
+
+      if (unit.status_atual === "parcelas") {
+        counterLabel = "Parcelas:";
+        const n = countFromMapa("parcelas");
+        counterValue = n > 0 ? n : obterQuantidadeTotalCobrancas(unidadeDocKey);
+      } else if (unit.status_atual === "parcelado") {
+        counterLabel = "Cobranças:";
+        const n = countFromMapa("parcelado");
+        counterValue = n > 0 ? n : obterQuantidadeTotalCobrancas(unidadeDocKey);
+      }
 
     return (
       <Draggable
         key={unit.codigo_unidade}
         draggableId={unit.codigo_unidade}
         index={index}
-        isDragDisabled={temStatusMisto}
+        isDragDisabled={dragDisabled}
       >
         {(provided, snapshot) => (
           <div
             ref={provided.innerRef}
             {...provided.draggableProps}
             {...provided.dragHandleProps}
-            className={`p-4 mb-3 rounded-lg border-2 cursor-pointer transition-all ${
+            className={`p-4 mb-3 rounded-lg border-2 transition-all ${
               snapshot.isDragging ? "shadow-lg rotate-2" : "hover:shadow-md"
             } ${getCriticidadeColor(
               unit.charges[0]?.criticidade || "normal",
               unit.status_atual
-            )} ${temStatusMisto ? "opacity-60" : ""}`}
+            )} ${dragDisabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
             onClick={() => {
               // Limpa o estado da cobrança individual antes de abrir modal da unidade
               setCobrancaSelecionada(null);
               setUnitSelecionada(unit);
               // Busca todas as cobranças da unidade, não apenas as da coluna atual
               if (typeof documento === "string") {
-                buscarTodasCobrancasUnidade(documento);
+                // Se a coluna atual indica parcelas (parcelas/parcelado), passa o filtro
+                const colunaStatus = unit.status_atual;
+                if (
+                  colunaStatus === "parcelas" ||
+                  colunaStatus === "parcelado"
+                ) {
+                  buscarTodasCobrancasUnidade(documento, colunaStatus);
+                } else {
+                  buscarTodasCobrancasUnidade(documento);
+                }
               }
               setModalAberto("detalhes");
             }}
@@ -1499,7 +1736,7 @@ _Mensagem Automática do Sistema_
                     {unit.nome_unidade}
                   </h4>
                   <p className="text-xs text-gray-600">
-                    {formatarCNPJCPF((documento || ""))}
+                    {formatarCNPJCPF(documento || "")}
                   </p>
                 </div>
               </div>
@@ -1553,10 +1790,8 @@ _Mensagem Automática do Sistema_
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Cobranças:</span>
-                <span className="font-medium">
-              {obterQuantidadeTotalCobrancas(unit.cnpj || (unit as any).cpf || "")}
-                </span>
+                <span className="text-gray-600">{counterLabel}</span>
+                <span className="font-medium">{counterValue}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Vencimento:</span>
@@ -1589,8 +1824,11 @@ _Mensagem Automática do Sistema_
   };
 
   const renderCardIndividual = (card: CardCobranca, index: number) => {
+    const safeId = String(
+      card.id || card.cnpj || (card as any).cpf || `card-${index}`
+    );
     return (
-      <Draggable key={card.id} draggableId={card.id} index={index}>
+      <Draggable key={safeId} draggableId={safeId} index={index}>
         {(provided, snapshot) => (
           <div
             ref={provided.innerRef}
@@ -1607,7 +1845,10 @@ _Mensagem Automática do Sistema_
               setModalAberto("detalhes");
             }}
           >
-            <div className="flex items-center justify-between mb-2">
+            <div
+              className="flex items-center justify-between mb-2"
+              key={safeId + "-header"}
+            >
               <div className="flex items-center">
                 <DollarSign className="w-5 h-5 text-green-600 mr-2" />
                 <div>
@@ -1615,7 +1856,7 @@ _Mensagem Automática do Sistema_
                     {card.nome_unidade}
                   </h4>
                   <p className="text-xs text-gray-600">
-                    {formatarCNPJCPF((card.cnpj || card.cpf || ""))}
+                    {formatarCNPJCPF(card.cnpj || card.cpf || "")}
                   </p>
                 </div>
               </div>
@@ -1669,7 +1910,7 @@ _Mensagem Automática do Sistema_
 
   return (
     <div className="max-w-full mx-auto p-6">
-  {/* Toaster global já está em main.tsx; removido para evitar duplicidade */}
+      {/* Toaster global já está em main.tsx; removido para evitar duplicidade */}
       <div className="bg-white rounded-lg shadow-lg p-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
@@ -1709,7 +1950,11 @@ _Mensagem Automática do Sistema_
             <button
               onClick={handleAtualizarClick}
               disabled={carregando}
-              title={(movimentacaoIndividualFeita || unidadesComStatusMisto.size > 0) ? 'Liberar travas e atualizar' : 'Atualizar dados'}
+              title={
+                movimentacaoIndividualFeita || unidadesComStatusMisto.size > 0
+                  ? "Liberar travas e atualizar"
+                  : "Atualizar dados"
+              }
               className="flex items-center px-4 py-2 bg-[#ff9923] text-white rounded-lg hover:bg-[#c5700e] disabled:opacity-50 transition-colors"
             >
               <RefreshCw
@@ -1740,7 +1985,9 @@ _Mensagem Automática do Sistema_
               <div className="text-2xl font-bold text-purple-700">
                 {estatisticas.inadimplentes_perda}
               </div>
-              <div className="text-sm text-purple-700">Cobranças Inadimplentes/Perda</div>
+              <div className="text-sm text-purple-700">
+                Cobranças Inadimplentes/Perda
+              </div>
             </div>
             <div className="bg-yellow-100 rounded-lg p-4">
               <div className="text-2xl font-bold text-yellow-700">
@@ -1750,11 +1997,11 @@ _Mensagem Automática do Sistema_
             </div>
             <div className="bg-red-50 rounded-lg p-4">
               <div className="text-2xl font-bold text-red-600">
-                {formatarMoeda(
-                  estatisticas.valor_total_original_aberto || 0
-                )}
+                {formatarMoeda(estatisticas.valor_total_original_aberto || 0)}
               </div>
-              <div className="text-sm text-red-800">Valor Total em Aberto (Original)</div>
+              <div className="text-sm text-red-800">
+                Valor Total em Aberto (Original)
+              </div>
             </div>
           </div>
         )}
@@ -1825,7 +2072,9 @@ _Mensagem Automática do Sistema_
                 <AlertTriangle className="w-4 h-4 text-orange-600 mr-2" />
 
                 <span className="text-sm text-orange-800 font-medium">
-                  Modo Individual Ativo - O modo de movimento de cobranças por unidade está desativado até todas as cobranças terem o mesmo status!
+                  Modo Individual Ativo - O modo de movimento de cobranças por
+                  unidade está desativado até todas as cobranças terem o mesmo
+                  status!
                 </span>
               </div>
             )}
@@ -1957,9 +2206,15 @@ _Mensagem Automática do Sistema_
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Todos os Tipos</option>
-                  <option value="Franchising - Royalties">Franchising - Royalties</option>
-                  <option value="Franchising - Tx de Franquia">Franchising - Tx de Franquia</option>
-                  <option value="Franchising - Tx de Propagand">Franchising - Tx de Propagand</option>
+                  <option value="Franchising - Royalties">
+                    Franchising - Royalties
+                  </option>
+                  <option value="Franchising - Tx de Franquia">
+                    Franchising - Tx de Franquia
+                  </option>
+                  <option value="Franchising - Tx de Propagand">
+                    Franchising - Tx de Propagand
+                  </option>
                   <option value="Vendas - Vendas">Vendas - Vendas</option>
                   <option value="- Multa/Infração">Multa/Infração</option>
                 </select>
@@ -2014,11 +2269,11 @@ _Mensagem Automática do Sistema_
                     <div className="space-y-1 max-h-32 overflow-y-auto">
                       {Array.from(unidadesComStatusMisto)
                         .slice(0, 5)
-                        .map((cnpj) => {
+                        .map((cnpj, idx) => {
                           const detalhes = detalhesStatusMisto[cnpj];
                           return (
                             <div
-                              key={cnpj}
+                              key={cnpj || `unidade-${idx}`}
                               className="text-xs text-orange-700 flex items-center justify-between"
                             >
                               <span className="font-medium">
@@ -2075,17 +2330,15 @@ _Mensagem Automática do Sistema_
                       <div
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className={`p-4 min-w-[320px] w-[320px] flex flex-col rounded-lg bg-gray-50 border-2 transition-colors duration-200 ${
-                          snapshot.isDraggingOver
-                        }`}
+                        className={`p-4 min-w-[320px] w-[320px] flex flex-col rounded-lg bg-gray-50 border-2 transition-colors duration-200 ${snapshot.isDraggingOver}`}
                         style={{
                           borderColor: snapshot.isDraggingOver
-                            ? '#18429e'
+                            ? "#18429e"
                             : coluna.cor,
                           backgroundColor: snapshot.isDraggingOver
-                            ? '#18429E1A'
-                            : '',
-                          height: '700px', // altura fixa da coluna
+                            ? "#18429E1A"
+                            : "",
+                          height: "700px", // altura fixa da coluna
                         }}
                       >
                         {/* O Header continua aqui, normalmente */}
@@ -2104,15 +2357,25 @@ _Mensagem Automática do Sistema_
                           {aba === "unidade"
                             ? (() => {
                                 const units = getUnitCardsByColuna(coluna.id);
-                                const limite = cardsVisiveisPorColuna[coluna.id] || 20;
+                                const limite =
+                                  cardsVisiveisPorColuna[coluna.id] || 20;
                                 return (
                                   <>
-                                    {units.slice(0, limite).map((unit, index) => renderCardUnidade(unit, index))}
+                                    {units
+                                      .slice(0, limite)
+                                      .map((unit, index) =>
+                                        renderCardUnidade(unit, index)
+                                      )}
                                     {units.length > limite && (
                                       <div className="flex justify-center my-2">
                                         <button
                                           className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs"
-                                          onClick={() => setCardsVisiveisPorColuna(v => ({ ...v, [coluna.id]: (v[coluna.id] || 20) + 20 }))
+                                          onClick={() =>
+                                            setCardsVisiveisPorColuna((v) => ({
+                                              ...v,
+                                              [coluna.id]:
+                                                (v[coluna.id] || 20) + 20,
+                                            }))
                                           }
                                         >
                                           Carregar mais
@@ -2123,16 +2386,28 @@ _Mensagem Automática do Sistema_
                                 );
                               })()
                             : (() => {
-                                const cardsCol = cards.filter((card) => card.status_atual === coluna.id);
-                                const limite = cardsVisiveisPorColuna[coluna.id] || 20;
+                                const cardsCol = cards.filter(
+                                  (card) => card.status_atual === coluna.id
+                                );
+                                const limite =
+                                  cardsVisiveisPorColuna[coluna.id] || 20;
                                 return (
                                   <>
-                                    {cardsCol.slice(0, limite).map((card, index) => renderCardIndividual(card, index))}
+                                    {cardsCol
+                                      .slice(0, limite)
+                                      .map((card, index) =>
+                                        renderCardIndividual(card, index)
+                                      )}
                                     {cardsCol.length > limite && (
                                       <div className="flex justify-center my-2">
                                         <button
                                           className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs"
-                                          onClick={() => setCardsVisiveisPorColuna(v => ({ ...v, [coluna.id]: (v[coluna.id] || 20) + 20 }))
+                                          onClick={() =>
+                                            setCardsVisiveisPorColuna((v) => ({
+                                              ...v,
+                                              [coluna.id]:
+                                                (v[coluna.id] || 20) + 20,
+                                            }))
                                           }
                                         >
                                           Carregar mais
@@ -2141,8 +2416,7 @@ _Mensagem Automática do Sistema_
                                     )}
                                   </>
                                 );
-                              })()
-                          }
+                              })()}
                           {provided.placeholder}
                         </div>
                       </div>
@@ -2347,7 +2621,11 @@ _Mensagem Automática do Sistema_
                         CNPJ/CPF
                       </label>
                       <p className="text-gray-800">
-                        {formatarCNPJCPF((unitSelecionada.cnpj || (unitSelecionada as any).cpf || ""))}
+                        {formatarCNPJCPF(
+                          unitSelecionada.cnpj ||
+                            (unitSelecionada as any).cpf ||
+                            ""
+                        )}
                       </p>
                     </div>
                     <div>
@@ -2371,74 +2649,143 @@ _Mensagem Automática do Sistema_
                         Quantidade de Cobranças
                       </label>
                       <p className="text-gray-800">
-                        {obterQuantidadeTotalCobrancas(unitSelecionada.cnpj || (unitSelecionada as any).cpf || "")}
+                        {obterQuantidadeTotalCobrancas(
+                          unitSelecionada.cnpj ||
+                            (unitSelecionada as any).cpf ||
+                            ""
+                        )}
                       </p>
                     </div>
                   </div>
                 </div>
                 {/* Observações da Unidade */}
-                {unitSelecionada.observacoes && unitSelecionada.observacoes.trim() !== "" && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-yellow-800 mb-2">
-                      Observações
-                    </h4>
-                    <p className="text-yellow-700 text-sm whitespace-pre-wrap">
-                      {unitSelecionada.observacoes}
-                    </p>
-                  </div>
-                )}
+                {unitSelecionada.observacoes &&
+                  unitSelecionada.observacoes.trim() !== "" && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-yellow-800 mb-2">
+                        Observações
+                      </h4>
+                      <p className="text-yellow-700 text-sm whitespace-pre-wrap">
+                        {unitSelecionada.observacoes}
+                      </p>
+                    </div>
+                  )}
 
                 {/* Lista de Cobranças da Unidade */}
                 {todasCobrancasUnidade.length > 0 && (
                   <div>
                     <h4 className="text-lg font-semibold text-gray-800 mb-4">
-                      Cobranças desta Unidade ({todasCobrancasUnidade.length})
+                      {/**
+                       * Se todas as cobranças retornadas têm status 'parcelas' ou 'parcelado',
+                       * exibimos um título específico e tratamos cada item como parcela individual.
+                       */}
+                      {todasCobrancasUnidade.every(
+                        (c) => c.status_atual === "parcelas"
+                      )
+                        ? `Parcelas desta Unidade (${todasCobrancasUnidade.length})`
+                        : todasCobrancasUnidade.every(
+                            (c) => c.status_atual === "parcelado"
+                          )
+                        ? `Parcelado - Itens (${todasCobrancasUnidade.length})`
+                        : `Cobranças desta Unidade (${todasCobrancasUnidade.length})`}
                     </h4>
                     <div className="space-y-3 max-h-60 overflow-y-auto">
-                      {todasCobrancasUnidade.map((cobranca, index) => (
-                        <div
-                          key={cobranca.id}
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-medium text-gray-800">
-                                #{index + 1} -{" "}
-                                {formatarMoeda(cobranca.valor_total)}
-                                <span className="ml-2 text-blue-600 font-semibold">
-                                  Valor Original: {formatarMoeda(cobranca.valor_original ?? 0)}
+                      {todasCobrancasUnidade.map((cobranca, index) => {
+                        const chaveParcela = String(
+                          cobranca.id ||
+                            `parcela-${index}-${
+                              (cobranca as any).parcela_numero || "na"
+                            }`
+                        );
+                        return (
+                          <div
+                            key={chaveParcela}
+                            data-debug={`parcela:${
+                              (cobranca as any).parcela_numero || "na"
+                            }|orig:${
+                              (cobranca as any).parcelamento_origem || "na"
+                            }`}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-sm font-medium text-gray-800">
+                                  #{index + 1} -{" "}
+                                  {formatarMoeda(cobranca.valor_total)}
+                                  <span className="ml-2 text-blue-600 font-semibold">
+                                    Valor Original:{" "}
+                                    {formatarMoeda(
+                                      cobranca.valor_original ?? 0
+                                    )}
+                                  </span>
                                 </span>
-                              </span>
-                              <span
-                                className={`px-2 py-1 text-xs font-medium rounded-full ${getCriticidadeBadge(
-                                  cobranca.criticidade,
-                                  cobranca.status_atual
-                                )}`}
-                              >
-                                {formatarStatusCobranca(cobranca.status_atual)}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs text-gray-600">
-                              <span>
-                                Venc:{" "}
-                                {formatarData(cobranca.data_vencimento_antiga)}
-                              </span>
-                              <span>
-                                {formatarTipoDebito(cobranca.tipo_debito)}
-                              </span>
+                                <span
+                                  className={`px-2 py-1 text-xs font-medium rounded-full ${getCriticidadeBadge(
+                                    cobranca.criticidade,
+                                    cobranca.status_atual
+                                  )}`}
+                                >
+                                  {formatarStatusCobranca(
+                                    cobranca.status_atual
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between text-xs text-gray-600">
+                                <span>
+                                  Venc:{" "}
+                                  {formatarData(
+                                    cobranca.data_vencimento_antiga
+                                  )}
+                                </span>
+                                <span>
+                                  {formatarTipoDebito(cobranca.tipo_debito)}
+                                </span>
+                              </div>
+                              {/** Detalhes de parcela removidos: ordenação por vencimento mostrará a ordem natural das parcelas (#1, #2...) */}
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
 
                 {/* Botões de Ação */}
                 <div className="bg-white border-t border-gray-200 pt-4">
-                  <h4 className="font-semibold text-gray-800 mb-3">
-                    Ações para Toda a Unidade
-                  </h4>
+                  {/** Determina se a visualização atual deve ser somente leitura por parcelas */}
+                  {todasCobrancasUnidade.length > 0 &&
+                  (todasCobrancasUnidade.every(
+                    (c) => c.status_atual === "parcelas"
+                  ) ||
+                    todasCobrancasUnidade.every(
+                      (c) => c.status_atual === "parcelado"
+                    )) ? (
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-700">
+                        Esta visualização mostra{" "}
+                        {todasCobrancasUnidade.every(
+                          (c) => c.status_atual === "parcelas"
+                        )
+                          ? "apenas parcelas"
+                          : "itens parcelados"}
+                        . A janela é apenas para consulta — não há ações
+                        disponíveis aqui.
+                      </p>
+                    </div>
+                  ) : null}
+                  {!(
+                    todasCobrancasUnidade.length > 0 &&
+                    (todasCobrancasUnidade.every(
+                      (c) => c.status_atual === "parcelas"
+                    ) ||
+                      todasCobrancasUnidade.every(
+                        (c) => c.status_atual === "parcelado"
+                      ))
+                  ) && (
+                    <h4 className="font-semibold text-gray-800 mb-3">
+                      Ações para Toda a Unidade
+                    </h4>
+                  )}
 
                   {unitSelecionada.status_atual === "quitado" ? (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -2458,40 +2805,53 @@ _Mensagem Automática do Sistema_
                       </div>
                     </div>
                   ) : (
-                    <div className="flex space-x-3">
-                      <button
-                        onClick={() => {
-                          setUnidadeParaWhatsApp(unitSelecionada);
-                          setModalConfirmacaoWhatsAppUnidade(true);
-                        }}
-                        disabled={processando}
-                        className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                      >
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        WhatsApp
-                      </button>
-                      <button
-                        onClick={avisarReuniaoIndisponivel}
-                        disabled={processando}
-                        className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
-                      >
-                        <Calendar className="w-4 h-4 mr-2" />
-                        Reunião
-                      </button>
-                      <button
-                        onClick={() => {
-                          setObservacaoEditando(
-                            unitSelecionada.observacoes || ""
-                          );
-                          setModalAberto("observacao");
-                        }}
-                        disabled={processando}
-                        className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
-                      >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Observação
-                      </button>
-                    </div>
+                    <>
+                      {/* Se nenhuma condição de leitura exclusiva por parcelas, mostra os botões */}
+                      {!(
+                        todasCobrancasUnidade.length > 0 &&
+                        (todasCobrancasUnidade.every(
+                          (c) => c.status_atual === "parcelas"
+                        ) ||
+                          todasCobrancasUnidade.every(
+                            (c) => c.status_atual === "parcelado"
+                          ))
+                      ) && (
+                        <div className="flex space-x-3">
+                          <button
+                            onClick={() => {
+                              setUnidadeParaWhatsApp(unitSelecionada);
+                              setModalConfirmacaoWhatsAppUnidade(true);
+                            }}
+                            disabled={processando}
+                            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                          >
+                            <MessageSquare className="w-4 h-4 mr-2" />
+                            WhatsApp
+                          </button>
+                          <button
+                            onClick={avisarReuniaoIndisponivel}
+                            disabled={processando}
+                            className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                          >
+                            <Calendar className="w-4 h-4 mr-2" />
+                            Reunião
+                          </button>
+                          <button
+                            onClick={() => {
+                              setObservacaoEditando(
+                                unitSelecionada.observacoes || ""
+                              );
+                              setModalAberto("observacao");
+                            }}
+                            disabled={processando}
+                            className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Observação
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -2510,39 +2870,62 @@ _Mensagem Automática do Sistema_
                       <label className="text-sm font-medium text-gray-600">
                         Cliente
                       </label>
-                      <p className="text-gray-800">{cobrancaSelecionada.nome_unidade}</p>
+                      <p className="text-gray-800">
+                        {cobrancaSelecionada.nome_unidade}
+                      </p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">
                         CNPJ/CPF
                       </label>
-                      <p className="text-gray-800">{formatarCNPJCPF(cobrancaSelecionada.cnpj || cobrancaSelecionada.cpf || "")}</p>
+                      <p className="text-gray-800">
+                        {formatarCNPJCPF(
+                          cobrancaSelecionada.cnpj ||
+                            cobrancaSelecionada.cpf ||
+                            ""
+                        )}
+                      </p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">
                         Valor Total
                       </label>
-                      <p className="text-red-600 font-semibold">{formatarMoeda(cobrancaSelecionada.valor_total)}</p>
+                      <p className="text-red-600 font-semibold">
+                        {formatarMoeda(cobrancaSelecionada.valor_total)}
+                      </p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">
                         Valor Original
                       </label>
-                      <p className="text-blue-600 font-semibold">{formatarMoeda(cobrancaSelecionada.valor_original ?? 0)}</p>
+                      <p className="text-blue-600 font-semibold">
+                        {formatarMoeda(cobrancaSelecionada.valor_original ?? 0)}
+                      </p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">
                         Vencimento
                       </label>
-                      <p className="text-gray-800">{formatarData(cobrancaSelecionada.data_vencimento_antiga)}</p>
+                      <p className="text-gray-800">
+                        {formatarData(
+                          cobrancaSelecionada.data_vencimento_antiga
+                        )}
+                      </p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">
                         Status
                       </label>
                       <p>
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getCriticidadeBadge(cobrancaSelecionada.criticidade, cobrancaSelecionada.status_atual)}`}>
-                          {formatarStatusCobranca(cobrancaSelecionada.status_atual)}
+                        <span
+                          className={`px-2 py-1 text-xs font-medium rounded-full ${getCriticidadeBadge(
+                            cobrancaSelecionada.criticidade,
+                            cobrancaSelecionada.status_atual
+                          )}`}
+                        >
+                          {formatarStatusCobranca(
+                            cobrancaSelecionada.status_atual
+                          )}
                         </span>
                       </p>
                     </div>
@@ -2550,81 +2933,89 @@ _Mensagem Automática do Sistema_
                       <label className="text-sm font-medium text-gray-600">
                         Tipo
                       </label>
-                      <p className="text-gray-800">{formatarTipoDebito(cobrancaSelecionada.tipo_debito)}</p>
+                      <p className="text-gray-800">
+                        {formatarTipoDebito(cobrancaSelecionada.tipo_debito)}
+                      </p>
                     </div>
                   </div>
                 </div>
                 {/* Observações da Cobrança Individual */}
-                {cobrancaSelecionada.observacoes && cobrancaSelecionada.observacoes.trim() !== "" && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-yellow-800 mb-2">
-                      Observações
-                    </h4>
-                    <p className="text-yellow-700 text-sm whitespace-pre-wrap">
-                      {cobrancaSelecionada.observacoes}
-                    </p>
-                  </div>
-                )}
-
-                {/* Botões de Ação */}
-                <div className="bg-white border-t border-gray-200 pt-4">
-                  <h4 className="font-semibold text-gray-800 mb-3">
-                    Ações para Esta Cobrança
-                  </h4>
-
-                  {cobrancaSelecionada.status_atual === "quitado" ? (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                          <span className="text-green-600 font-bold">✓</span>
-                        </div>
-                        <div>
-                          <p className="text-green-800 font-medium">
-                            Cobrança Quitada
-                          </p>
-                          <p className="text-green-700 text-sm">
-                            Esta cobrança já foi quitada. Não é possível
-                            realizar ações.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex space-x-3">
-                      <button
-                        onClick={() =>
-                          enviarWhatsAppCobranca(cobrancaSelecionada)
-                        }
-                        disabled={processando}
-                        className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                      >
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        WhatsApp
-                      </button>
-                      <button
-                        onClick={avisarReuniaoIndisponivel}
-                        disabled={processando}
-                        className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
-                      >
-                        <Calendar className="w-4 h-4 mr-2" />
-                        Reunião
-                      </button>
-                      <button
-                        onClick={() => {
-                          setObservacaoEditando(
-                            cobrancaSelecionada.observacoes || ""
-                          );
-                          setModalAberto("observacao");
-                        }}
-                        disabled={processando}
-                        className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
-                      >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Observação
-                      </button>
+                {cobrancaSelecionada.observacoes &&
+                  cobrancaSelecionada.observacoes.trim() !== "" && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-yellow-800 mb-2">
+                        Observações
+                      </h4>
+                      <p className="text-yellow-700 text-sm whitespace-pre-wrap">
+                        {cobrancaSelecionada.observacoes}
+                      </p>
                     </div>
                   )}
-                </div>
+
+                {/* Botões de Ação (escondidos para cobranças parceladas ou parcelas) */}
+                {!(
+                  cobrancaSelecionada.status_atual === "parcelas" ||
+                  cobrancaSelecionada.status_atual === "parcelado"
+                ) && (
+                  <div className="bg-white border-t border-gray-200 pt-4">
+                    <h4 className="font-semibold text-gray-800 mb-3">
+                      Ações para Esta Cobrança
+                    </h4>
+
+                    {cobrancaSelecionada.status_atual === "quitado" ? (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                            <span className="text-green-600 font-bold">✓</span>
+                          </div>
+                          <div>
+                            <p className="text-green-800 font-medium">
+                              Cobrança Quitada
+                            </p>
+                            <p className="text-green-700 text-sm">
+                              Esta cobrança já foi quitada. Não é possível
+                              realizar ações.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex space-x-3">
+                        <button
+                          onClick={() =>
+                            enviarWhatsAppCobranca(cobrancaSelecionada)
+                          }
+                          disabled={processando}
+                          className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                        >
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                          WhatsApp
+                        </button>
+                        <button
+                          onClick={avisarReuniaoIndisponivel}
+                          disabled={processando}
+                          className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                        >
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Reunião
+                        </button>
+                        <button
+                          onClick={() => {
+                            setObservacaoEditando(
+                              cobrancaSelecionada.observacoes || ""
+                            );
+                            setModalAberto("observacao");
+                          }}
+                          disabled={processando}
+                          className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Observação
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2698,7 +3089,11 @@ _Mensagem Automática do Sistema_
                   </p>
                   <p>
                     <strong>Quantidade de cobranças:</strong>{" "}
-                    {obterQuantidadeTotalCobrancas(unidadeParaWhatsApp.cnpj || (unidadeParaWhatsApp as any).cpf || "")}
+                    {obterQuantidadeTotalCobrancas(
+                      unidadeParaWhatsApp.cnpj ||
+                        (unidadeParaWhatsApp as any).cpf ||
+                        ""
+                    )}
                   </p>
                   <p>
                     <strong>Valor total aproximado:</strong>{" "}

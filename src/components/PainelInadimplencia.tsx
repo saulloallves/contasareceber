@@ -9,6 +9,7 @@ import {
   Target, Zap, Bell, Eye
 } from 'lucide-react';
 import { DashboardService } from '../services/dashboardService';
+import { toast } from 'react-hot-toast';
 import { DashboardData, FiltrosDashboard, IndicadoresMensais, UnidadeRisco, AlertaAutomatico } from '../types/dashboard';
 import { formatMonetaryResponsive } from '../utils/monetaryUtils';
 
@@ -87,11 +88,12 @@ export function Dashboard() {
 
   const gerarAlertasAutomaticos = async () => {
     try {
-      const novosAlertas = await dashboardService.gerarAlertasAutomaticos();
-      alert(`${novosAlertas} novos alertas gerados!`);
+  const novosAlertas = await dashboardService.gerarAlertasAutomaticos();
+  toast.success(`${novosAlertas} novos alertas gerados!`);
       carregarDados();
     } catch (error) {
       console.error('Erro ao gerar alertas:', error);
+      toast.error('Erro ao gerar alertas');
     }
   };
 

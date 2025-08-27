@@ -1,27 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
-import {
-  Calculator,
-  Search,
-  Plus,
-  Minus,
-  Calendar,
-  DollarSign,
-  FileText,
-  CheckCircle,
-  AlertTriangle,
-  RefreshCw,
-  Building2,
-  CreditCard,
-  ArrowRight,
-  ArrowLeft,
-} from "lucide-react";
+import { Calculator, Search, Plus, Minus, Calendar, DollarSign, FileText, CheckCircle, AlertTriangle, RefreshCw, Building2, CreditCard, ArrowRight, ArrowLeft } from "lucide-react";
 import { SimulacaoParcelamentoService } from "../services/simulacaoParcelamentoService";
-import {
-  formatarCNPJCPF,
-  formatarMoeda,
-  formatarData,
-} from "../utils/formatters";
+import { formatarCNPJCPF, formatarMoeda, formatarData } from "../utils/formatters";
 import { toast } from "react-hot-toast";
 
 export function GerarSimulacaoParcelamento({
@@ -299,7 +281,7 @@ export function GerarSimulacaoParcelamento({
             </button>
             <div>
               <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                Simulação de Parcelamento <span>💳</span>
+                Simulação de Parcelamento
               </h1>
               <p className="text-gray-500 text-sm">
                 {etapaAtual === "busca" &&

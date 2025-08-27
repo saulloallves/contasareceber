@@ -6,6 +6,7 @@ import {
   Send, Upload, Trash2, Calendar, User, Building2
 } from 'lucide-react';
 import { EscalonamentoService } from '../services/escalonamentoService';
+import { toast } from 'react-hot-toast';
 import { MonitoramentoRisco, AcaoPendente, DashboardRiscos, FiltrosEscalonamento } from '../types/escalonamento';
 
 export function GestaoEscalonamentos() {
@@ -50,11 +51,11 @@ export function GestaoEscalonamentos() {
   const executarGatilhosAutomaticos = async () => {
     setProcessando(true);
     try {
-      const gatilhosExecutados = await escalonamentoService.executarGatilhosAutomaticos();
-      alert(`${gatilhosExecutados} gatilhos automáticos executados!`);
+  const gatilhosExecutados = await escalonamentoService.executarGatilhosAutomaticos();
+  toast.success(`${gatilhosExecutados} gatilhos automáticos executados!`);
       carregarDados();
     } catch (error) {
-      alert(`Erro ao executar gatilhos: ${error}`);
+  toast.error(`Erro ao executar gatilhos: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -66,7 +67,7 @@ export function GestaoEscalonamentos() {
       await escalonamentoService.concluirAcao(id, observacoes || undefined);
       carregarDados();
     } catch (error) {
-      alert(`Erro ao concluir ação: ${error}`);
+  toast.error(`Erro ao concluir ação: ${error}`);
     }
   };
 
@@ -83,7 +84,7 @@ export function GestaoEscalonamentos() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      alert('Erro ao exportar dados');
+      toast.error('Erro ao exportar dados');
     }
   };
 

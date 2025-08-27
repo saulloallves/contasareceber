@@ -19,6 +19,7 @@ import {
   ChecklistDocumentos,
 } from "../types/documentos";
 import { supabase } from "../services/databaseService";
+import { toast } from 'react-hot-toast';
 
 interface GeradorDocumentosProps {
   tituloId?: string;
@@ -130,7 +131,7 @@ export function GeradorDocumentos({
 
   const uploadDocumento = async () => {
     if (!arquivo || !tituloId) {
-      alert("Arquivo e cobrança são obrigatórios");
+      toast.error("Arquivo e cobrança são obrigatórios");
       return;
     }
 
@@ -162,6 +163,7 @@ export function GeradorDocumentos({
         codigo_unidade:
           (cobranca as any).unidades_franqueadas?.codigo_unidade || "",
         nome_unidade: cobranca.cliente,
+  nome_arquivo: arquivo.name,
         tipo_documento: formUpload.tipo_documento,
         usuario_responsavel: "usuario_atual", // Em produção, pegar do contexto
         observacoes: formUpload.observacoes,
@@ -170,12 +172,12 @@ export function GeradorDocumentos({
       };
 
       await documentosService.uploadDocumento(arquivo, dadosDocumento);
-      fecharModal();
-      carregarDocumentos();
-      carregarChecklist();
-      alert("Documento enviado com sucesso!");
+  fecharModal();
+  carregarDocumentos();
+  carregarChecklist();
+  toast.success("Documento enviado com sucesso!");
     } catch (error) {
-      alert(`Erro ao enviar documento: ${error}`);
+  toast.error(`Erro ao enviar documento: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -191,7 +193,7 @@ export function GeradorDocumentos({
       carregarDocumentos();
       carregarChecklist();
     } catch (error) {
-      alert(`Erro ao remover documento: ${error}`);
+      toast.error(`Erro ao remover documento: ${error}`);
     }
   };
 

@@ -223,7 +223,7 @@ export function ConfiguracaoAdmin() {
 
   const bloquearIP = async () => {
     if (!novoIP.ip || !novoIP.motivo) {
-      alert("IP e motivo são obrigatórios");
+      mostrarMensagem("erro", "IP e motivo são obrigatórios");
       return;
     }
 

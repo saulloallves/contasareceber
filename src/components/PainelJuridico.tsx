@@ -21,6 +21,7 @@ import {
 import { JuridicoService } from "../services/juridicoService";
 import { FiltrosJuridico, EstatisticasJuridico } from "../types/juridico";
 import { reunioesJuridicoService } from "../services/reunioesJuridicoService";
+import { toast } from 'react-hot-toast';
 import { supabase } from "../services/databaseService";
 
 export function PainelJuridico() {
@@ -177,7 +178,7 @@ export function PainelJuridico() {
 
   const gerarNotificacao = async () => {
     if (!formData.cnpj_unidade || !formData.tipo_notificacao) {
-      alert("CNPJ e tipo de notificação são obrigatórios");
+      toast.error("CNPJ e tipo de notificação são obrigatórios");
       return;
     }
 
@@ -189,11 +190,11 @@ export function PainelJuridico() {
         formData.observacoes,
         "usuario_atual"
       );
-      fecharModal();
-      carregarDados();
-      alert("Notificação extrajudicial gerada com sucesso!");
+  fecharModal();
+  carregarDados();
+  toast.success("Notificação extrajudicial gerada com sucesso!");
     } catch (error) {
-      alert(`Erro ao gerar notificação: ${error}`);
+  toast.error(`Erro ao gerar notificação: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -201,7 +202,7 @@ export function PainelJuridico() {
 
   const gerarTermo = async () => {
     if (!formData.cnpj_unidade || !formData.valor_acordado) {
-      alert("CNPJ e valor acordado são obrigatórios");
+      toast.error("CNPJ e valor acordado são obrigatórios");
       return;
     }
 
@@ -212,11 +213,11 @@ export function PainelJuridico() {
         formData,
         "usuario_atual"
       );
-      fecharModal();
-      carregarDados();
-      alert("Termo de acordo gerado com sucesso!");
+  fecharModal();
+  carregarDados();
+  toast.success("Termo de acordo gerado com sucesso!");
     } catch (error) {
-      alert(`Erro ao gerar termo: ${error}`);
+  toast.error(`Erro ao gerar termo: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -224,7 +225,7 @@ export function PainelJuridico() {
 
   const atualizarStatus = async () => {
     if (!formData.status) {
-      alert("Status é obrigatório");
+      toast.error("Status é obrigatório");
       return;
     }
 
@@ -239,7 +240,7 @@ export function PainelJuridico() {
       fecharModal();
       carregarDados();
     } catch (error) {
-      alert(`Erro ao atualizar status: ${error}`);
+  toast.error(`Erro ao atualizar status: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -247,7 +248,7 @@ export function PainelJuridico() {
 
   const marcarRespondida = async () => {
     if (!formData.observacoes_resposta) {
-      alert("Observações da resposta são obrigatórias");
+      toast.error("Observações da resposta são obrigatórias");
       return;
     }
 
@@ -261,7 +262,7 @@ export function PainelJuridico() {
       fecharModal();
       carregarDados();
     } catch (error) {
-      alert(`Erro ao marcar resposta: ${error}`);
+  toast.error(`Erro ao marcar resposta: ${error}`);
     } finally {
       setProcessando(false);
     }
@@ -279,10 +280,10 @@ export function PainelJuridico() {
         observacoes,
         "usuario_atual"
       );
-      alert("Unidade encaminhada para ação judicial!");
+  toast.success("Unidade encaminhada para ação judicial!");
       carregarDados();
     } catch (error) {
-      alert(`Erro ao encaminhar: ${error}`);
+  toast.error(`Erro ao encaminhar: ${error}`);
     }
   };
 
@@ -298,7 +299,7 @@ export function PainelJuridico() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      alert("Erro ao baixar PDF");
+      toast.error("Erro ao baixar PDF");
     }
   };
 
@@ -308,13 +309,13 @@ export function PainelJuridico() {
         notificacao.id
       );
       if (sucesso) {
-        alert("Notificação enviada com sucesso!");
+        toast.success("Notificação enviada com sucesso!");
         carregarDados();
       } else {
-        alert("Erro ao enviar notificação");
+        toast.error("Erro ao enviar notificação");
       }
     } catch (error) {
-      alert("Erro ao enviar notificação");
+      toast.error("Erro ao enviar notificação");
     }
   };
 
@@ -333,7 +334,7 @@ export function PainelJuridico() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      alert("Erro ao exportar dados");
+      toast.error("Erro ao exportar dados");
     }
   };
 
@@ -393,7 +394,7 @@ export function PainelJuridico() {
   // Função para salvar presença/tratativa
   async function salvarPresencaTratativa(id: string) {
     if (presencaTemp === null) {
-      alert("Selecione presença ou ausência.");
+      toast.error("Selecione presença ou ausência.");
       return;
     }
     setProcessando(true);
@@ -410,7 +411,7 @@ export function PainelJuridico() {
       const dados = await reunioesJuridicoService.listarReunioesJuridico();
       setReunioesJuridico(dados);
     } catch (e) {
-      alert("Erro ao salvar presença/tratativa");
+      toast.error("Erro ao salvar presença/tratativa");
     } finally {
       setProcessando(false);
     }
@@ -445,10 +446,10 @@ export function PainelJuridico() {
         referencia: notificacao.id,
         cnpj: notificacao.cnpj_unidade,
       });
-      alert("WhatsApp enviado com sucesso!");
+  toast.success("WhatsApp enviado com sucesso!");
       carregarDados();
     } catch (error) {
-      alert("Erro ao enviar WhatsApp: " + error);
+  toast.error("Erro ao enviar WhatsApp: " + error);
     } finally {
       setProcessando(false);
     }

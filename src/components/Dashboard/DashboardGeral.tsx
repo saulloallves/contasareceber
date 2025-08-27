@@ -13,6 +13,7 @@ import { DashboardService } from "../../services/dashboardService";
 import { formatMonetaryResponsive } from "../../utils/monetaryUtils";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "react-hot-toast";
+import logo from '../../assets/logo cresci-header.png';
 
 type DashboardGeralProps = {
   onNavigate?: (tab: string) => void;
@@ -275,19 +276,95 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Dashboard Geral</h1>
+          <h1 className="text-3xl font-bold text-gray-800">Dashboard Geral</h1>
           <p className="text-gray-600">Visão geral da inadimplência da rede</p>
         </div>
-        <div className="flex space-x-3">
+          <img
+            src={logo}
+            alt="Logo Cresci e Perdi"
+            className="h-10"
+            ></img>
+      </div>
+
+      
+
+      {/* Acesso Rápido */}
+      <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300">
+        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+          <div className="p-2 bg-gray-50 rounded-lg mr-3 border border-gray-100">
+            <Zap className="w-6 h-6 text-cyan-600" />
+          </div>
+          Acesso Rápido
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+          <button
+            onClick={() => onNavigate?.("cobrancas")}
+            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-gray-50 transition-all duration-200"
+            aria-label="Kanban Cobranças"
+          >
+            <CircleDollarSign className="w-5 h-5 text-blue-600" />
+            <span className="text-gray-700 font-medium">Kanban Cobranças</span>
+          </button>
+          <button
+            onClick={() => onNavigate?.("cobrancas-lista")}
+            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-emerald-300 hover:bg-gray-50 transition-all duration-200"
+            aria-label="Gestão Cobranças"
+          >
+            <Receipt className="w-5 h-5 text-emerald-600" />
+            <span className="text-gray-700 font-medium">
+              Gestão Cobranças
+            </span>
+          </button>
+          <button
+            onClick={() => onNavigate?.("simulacao-parcelamento")}
+            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-indigo-300 hover:bg-gray-50 transition-all duration-200"
+            aria-label="Simulação de Parcelamento"
+          >
+            <Calculator className="w-5 h-5 text-indigo-600" />
+            <span className="text-gray-700 font-medium">Parcelamento</span>
+          </button>
+          <button
+            onClick={() => onNavigate?.("unidades")}
+            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-orange-300 hover:bg-gray-50 transition-all duration-200"
+            aria-label="Unidades"
+          >
+            <Building2 className="w-5 h-5 text-orange-600" />
+            <span className="text-gray-700 font-medium">Unidades</span>
+          </button>
+          <button
+            onClick={() => onNavigate?.("franqueados")}
+            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-pink-300 hover:bg-gray-50 transition-all duration-200"
+            aria-label="Franqueados"
+          >
+            <Users className="w-5 h-5 text-pink-600" />
+            <span className="text-gray-700 font-medium">Franqueados</span>
+          </button>
           <button
             onClick={() => {
-              carregarDados();
-              carregarUltimasMensagens();
+              toast(
+                () => (
+                  <div className="text-sm">
+                    <p className="font-medium text-white">
+                      Reuniões — não implementado
+                    </p>
+                    <p className="text-white/90">
+                      Esta funcionalidade ainda não foi implementada no sistema.
+                    </p>
+                  </div>
+                ),
+                {
+                  icon: "🛠️",
+                  duration: 6000,
+                  style: { background: "#7c3aed", color: "#fff" },
+                }
+              );
+              // onNavigate?.('reunioes'); // pronto para quando implementarmos
             }}
-            className="flex items-center px-4 py-2 bg-[#ff9923] text-white rounded-lg hover:bg-[#522c0a] transition-colors duration-300"
+            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-purple-300 hover:bg-gray-50 transition-all duration-200"
+            aria-label="Reuniões"
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Atualizar Dados
+            <Calendar className="w-5 h-5 text-purple-600" />
+            <span className="text-gray-700 font-medium">Reuniões</span>
           </button>
         </div>
       </div>
@@ -396,87 +473,6 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Acesso Rápido */}
-      <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300">
-        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-          <div className="p-2 bg-gray-50 rounded-lg mr-3 border border-gray-100">
-            <Zap className="w-6 h-6 text-cyan-600" />
-          </div>
-          Acesso Rápido
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-          <button
-            onClick={() => onNavigate?.("cobrancas")}
-            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-gray-50 transition-all duration-200"
-            aria-label="Kanban Cobranças"
-          >
-            <CircleDollarSign className="w-5 h-5 text-blue-600" />
-            <span className="text-gray-700 font-medium">Kanban Cobranças</span>
-          </button>
-          <button
-            onClick={() => onNavigate?.("cobrancas-lista")}
-            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-emerald-300 hover:bg-gray-50 transition-all duration-200"
-            aria-label="Gestão Cobranças"
-          >
-            <Receipt className="w-5 h-5 text-emerald-600" />
-            <span className="text-gray-700 font-medium">
-              Gestão Cobranças
-            </span>
-          </button>
-          <button
-            onClick={() => onNavigate?.("simulacao-parcelamento")}
-            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-indigo-300 hover:bg-gray-50 transition-all duration-200"
-            aria-label="Simulação de Parcelamento"
-          >
-            <Calculator className="w-5 h-5 text-indigo-600" />
-            <span className="text-gray-700 font-medium">Parcelamento</span>
-          </button>
-          <button
-            onClick={() => onNavigate?.("unidades")}
-            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-orange-300 hover:bg-gray-50 transition-all duration-200"
-            aria-label="Unidades"
-          >
-            <Building2 className="w-5 h-5 text-orange-600" />
-            <span className="text-gray-700 font-medium">Unidades</span>
-          </button>
-          <button
-            onClick={() => onNavigate?.("franqueados")}
-            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-pink-300 hover:bg-gray-50 transition-all duration-200"
-            aria-label="Franqueados"
-          >
-            <Users className="w-5 h-5 text-pink-600" />
-            <span className="text-gray-700 font-medium">Franqueados</span>
-          </button>
-          <button
-            onClick={() => {
-              toast(
-                () => (
-                  <div className="text-sm">
-                    <p className="font-medium text-white">
-                      Reuniões — não implementado
-                    </p>
-                    <p className="text-white/90">
-                      Esta funcionalidade ainda não foi implementada no sistema.
-                    </p>
-                  </div>
-                ),
-                {
-                  icon: "🛠️",
-                  duration: 6000,
-                  style: { background: "#7c3aed", color: "#fff" },
-                }
-              );
-              // onNavigate?.('reunioes'); // pronto para quando implementarmos
-            }}
-            className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:border-purple-300 hover:bg-gray-50 transition-all duration-200"
-            aria-label="Reuniões"
-          >
-            <Calendar className="w-5 h-5 text-purple-600" />
-            <span className="text-gray-700 font-medium">Reuniões</span>
-          </button>
         </div>
       </div>
 
