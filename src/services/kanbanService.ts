@@ -23,7 +23,7 @@ export class KanbanService {
   async buscarColunas(): Promise<ColunaKanban[]> {
     try {
       // Colunas do Kanban na ordem e nomes definidos pelo cliente
-      return [
+      const colunas = [
         {
           id: "em_aberto",
           nome: "📥 Atrasadas",
@@ -89,6 +89,13 @@ export class KanbanService {
           ativa: true,
         },
       ];
+      
+      // Ordena as colunas alfabeticamente pelo nome (removendo emojis para ordenação)
+      return colunas.sort((a, b) => {
+        const nomeA = a.nome.replace(/[^\w\s]/gi, '').trim();
+        const nomeB = b.nome.replace(/[^\w\s]/gi, '').trim();
+        return nomeA.localeCompare(nomeB, 'pt-BR');
+      });
     } catch (error) {
       console.error("Erro ao buscar colunas:", error);
       return [];
@@ -519,7 +526,15 @@ export class KanbanService {
       return finalCard;
     });
 
-    return cards.filter((card) => this.aplicarFiltrosCard(card, filtros));
+    // Ordena os cards alfabeticamente pelo nome da unidade
+    const cardsFiltrados = cards.filter((card) => this.aplicarFiltrosCard(card, filtros));
+    return cardsFiltrados.sort((a, b) => {
+      return a.nome_unidade.localeCompare(b.nome_unidade, 'pt-BR');
+    });
+    const cardsFiltrados = cards.filter((card) => this.aplicarFiltrosCard(card, filtros));
+    return cardsFiltrados.sort((a, b) => {
+      return a.nome_unidade.localeCompare(b.nome_unidade, 'pt-BR');
+    });
   }
 
   /**
