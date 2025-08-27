@@ -391,6 +391,7 @@ export function CadastroUnidades() {
             <p className="text-gray-600">
               Gerencie todas as unidades do sistema
             </p>
+          </div>
         </div>
         {/* Abas */}
         <div className="mt-4 flex items-center gap-2 border-b border-gray-200">
