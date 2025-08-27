@@ -320,7 +320,7 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
           <h1 className="text-3xl font-bold text-gray-800">
             {obterSaudacao()}, {obterNomeUsuario()}!
           </h1>
-          <p className="text-gray-600">Visão geral da inadimplência da rede</p>
+          <p className="text-gray-600">Bem vindo ao Sistema de Cobrança da CP</p>
         </div>
         <img src={logo} alt="Logo Cresci e Perdi" className="h-10"></img>
       </div>
