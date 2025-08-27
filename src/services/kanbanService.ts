@@ -254,15 +254,13 @@ export class KanbanService {
       // Logs de depuração (sanitizados) para entender dataset retornado em tempo de execução
       try {
         const sampleMap = (arr: any[]) =>
-          (arr || [])
-            .slice(0, 6)
-            .map((c) => ({
-              id: c.id,
-              status: c.status,
-              is_parcela: !!c.is_parcela,
-              cnpj_tail: c.cnpj ? String(c.cnpj).slice(-4) : null,
-              unidade_id_fk: c.unidade_id_fk || null,
-            }));
+          (arr || []).slice(0, 6).map((c) => ({
+            id: c.id,
+            status: c.status,
+            is_parcela: !!c.is_parcela,
+            cnpj_tail: c.cnpj ? String(c.cnpj).slice(-4) : null,
+            unidade_id_fk: c.unidade_id_fk || null,
+          }));
 
         console.debug("[kanbanService] buscarCards: counts ->", {
           todas: (todas || []).length,
@@ -279,7 +277,7 @@ export class KanbanService {
         );
       } catch (e) {
         // não falha a execução por logs
-        console.warn('[kanbanService] erro ao gerar logs de depuração', e);
+        console.warn("[kanbanService] erro ao gerar logs de depuração", e);
       }
 
       if (
@@ -349,7 +347,11 @@ export class KanbanService {
           return null;
         };
 
-        const generatedId = `gen-${(cobranca.cnpj || cobranca.cliente || 'card')}-${cobranca.data_vencimento || ''}-${Math.floor(Math.random()*1000000)}`;
+        const generatedId = `gen-${
+          cobranca.cnpj || cobranca.cliente || "card"
+        }-${cobranca.data_vencimento || ""}-${Math.floor(
+          Math.random() * 1000000
+        )}`;
         const card: CardCobranca = {
           id: cobranca.id || generatedId, // UUID direto do banco ou gerado como fallback
           codigo_unidade: unidade?.codigo_unidade || cobranca.cnpj,
