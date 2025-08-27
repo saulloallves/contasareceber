@@ -323,7 +323,14 @@ export class KanbanService {
     cobrancas: any[],
     filtros: FiltrosKanban
   ): CardCobranca[] {
-    return cobrancas
+    // Ordena as cobranças alfabeticamente pelo nome da unidade antes de criar os cards
+    const cobrancasOrdenadas = cobrancas.sort((a, b) => {
+      const nomeA = a.unidades_franqueadas?.nome_unidade || a.cliente || '';
+      const nomeB = b.unidades_franqueadas?.nome_unidade || b.cliente || '';
+      return nomeA.localeCompare(nomeB, 'pt-BR', { sensitivity: 'base' });
+    });
+
+    return cobrancasOrdenadas
       .map((cobranca) => {
         const unidade = cobranca.unidades_franqueadas;
         const valorAtual = cobranca.valor_atualizado || cobranca.valor_original;
@@ -519,7 +526,14 @@ export class KanbanService {
       return finalCard;
     });
 
-    return cards.filter((card) => this.aplicarFiltrosCard(card, filtros));
+    // Ordena os cards agrupados alfabeticamente pelo nome da unidade
+    const cardsOrdenados = cards
+      .filter((card) => this.aplicarFiltrosCard(card, filtros))
+      .sort((a, b) => {
+        return a.nome_unidade.localeCompare(b.nome_unidade, 'pt-BR', { sensitivity: 'base' });
+      });
+
+    return cardsOrdenados;
   }
 
   /**
