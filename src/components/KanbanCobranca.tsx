@@ -2536,7 +2536,7 @@ _Mensagem Automática do Sistema_
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                     <p className="text-yellow-800 text-sm">
                       ⚠️ <strong>Exemplo:</strong> Se uma unidade tem uma
-                      cobrança "quitada" e outra "em aberto", elas não podem ser
+                      cobrança "quitada\" e outra "em aberto", elas não podem ser
                       movidas juntas pois estão em situações diferentes.
                     </p>
                   </div>
