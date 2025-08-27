@@ -1018,6 +1018,16 @@ export class KanbanService {
       return false;
     if (filtros.criticidade && card.criticidade !== filtros.criticidade)
       return false;
+    if (filtros.data_vencimento_inicio) {
+      const dataVencimentoCard = new Date(card.data_vencimento_antiga);
+      const dataInicio = new Date(filtros.data_vencimento_inicio);
+      if (dataVencimentoCard < dataInicio) return false;
+    }
+    if (filtros.data_vencimento_fim) {
+      const dataVencimentoCard = new Date(card.data_vencimento_antiga);
+      const dataFim = new Date(filtros.data_vencimento_fim);
+      if (dataVencimentoCard > dataFim) return false;
+    }
     return true;
   }
 

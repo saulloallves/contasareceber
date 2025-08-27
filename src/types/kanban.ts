@@ -61,6 +61,8 @@ export interface FiltrosKanban {
   valor_min?: number;
   valor_max?: number;
   dias_parado_min?: number;
+  data_vencimento_inicio?: string;
+  data_vencimento_fim?: string;
 }
 
 export interface EstatisticasKanban {
