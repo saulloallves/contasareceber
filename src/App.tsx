@@ -100,7 +100,7 @@ function AppContent() {
   const renderContent = () => {
     switch (activeTab) {
       case "dashboard":
-        return <DashboardGeral onNavigate={setActiveTab} />;
+        return <DashboardGeral onNavigate={setActiveTab} user={mappedUser} />;
       case "cobrancas":
         return <KanbanCobranca />;
       case "cobrancas-lista":

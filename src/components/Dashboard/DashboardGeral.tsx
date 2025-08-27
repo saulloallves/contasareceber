@@ -17,9 +17,16 @@ import logo from '../../assets/logo cresci-header.png';
 
 type DashboardGeralProps = {
   onNavigate?: (tab: string) => void;
+  user?: {
+    name: string;
+    email: string;
+    role: string;
+    id: string;
+    avatar_url?: string;
+  };
 };
 
-export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
+export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
   const [indicadores, setIndicadores] = useState<any>(null);
   const [carregando, setCarregando] = useState(true);
   // Filtros removidos por não terem efeito funcional no Dashboard
@@ -230,6 +237,25 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
     }
   };
 
+  const obterSaudacao = () => {
+    const agora = new Date();
+    const hora = agora.getHours();
+    
+    if (hora >= 0 && hora <= 12) {
+      return "Bom dia";
+    } else if (hora > 12 && hora <= 18) {
+      return "Boa tarde";
+    } else {
+      return "Boa noite";
+    }
+  };
+
+  const obterNomeUsuario = () => {
+    // Busca o nome do usuário do contexto de autenticação
+    // Prioriza nome completo do perfil, depois metadados do auth, por fim o email
+    return user?.name || "Usuário";
+  };
+
   const renderMonetaryValue = (value: number, colorClass: string = "") => {
     const { formatted, className, shouldTruncate } = formatMonetaryResponsive(
       value,
@@ -276,7 +302,7 @@ export function DashboardGeral({ onNavigate }: DashboardGeralProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Dashboard Geral</h1>
+          <h1 className="text-3xl font-bold text-gray-800">{obterSaudacao()}, {obterNomeUsuario()}!</h1>
           <p className="text-gray-600">Visão geral da inadimplência da rede</p>
         </div>
           <img
