@@ -1763,7 +1763,7 @@ _Mensagem Automática do Sistema_
               unit.charges[0]?.criticidade || "normal",
               unit.status_atual
             )} ${
-              dragDisabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+              dragDisabled ? "opacity-60 cursor-pointer" : "cursor-pointer"
             }`}
             onClick={() => {
               // Limpa o estado da cobrança individual antes de abrir modal da unidade
