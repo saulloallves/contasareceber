@@ -5,7 +5,7 @@ import {
   XCircle, Clock, Filter, RefreshCw, FileText,
   ArrowUp, ArrowDown, AlertTriangle, MessageSquare,
   Handshake, CreditCard, Split, Scale, 
-  TrendingDown, CircleDollarSign
+  TrendingDown, CircleDollarSign, ShieldCheck
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { CobrancaFranqueado } from "../../types/cobranca";
@@ -99,6 +99,7 @@ export function GestaoCobrancas() {
   const [modalHistoricoAberto, setModalHistoricoAberto] = useState(false);
   const [historicoEnvios, setHistoricoEnvios] = useState<any[]>([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+  const [carregandoAcao, setCarregandoAcao] = useState(false);
   const [viewMode, setViewMode] = useState<"cards" | "lista">("cards");
 
   // Serviços auxiliares (instâncias)
@@ -1257,6 +1258,119 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
   };
 
   /**
+   * Função para isentar juros e multa de uma cobrança
+   * Remove juros e multa zerando os dias em atraso
+   */
+  const isentarJurosMulta = async (cobranca: CobrancaFranqueado) => {
+    // Verificar se há juros/multa para isentar
+    if (!cobranca.valor_atualizado || cobranca.valor_atualizado <= cobranca.valor_original) {
+      mostrarMensagem("info", "Esta cobrança não possui juros ou multa para isentar.");
+      return;
+    }
+
+    const valorJurosMulta = cobranca.valor_atualizado - cobranca.valor_original;
+    const valorJurosMultaFormatado = new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(valorJurosMulta);
+
+    // Confirmar a ação
+    const confirmar = window.confirm(
+      `Deseja realmente isentar os juros e multa desta cobrança?\n\n` +
+      `Valor dos juros/multa: ${valorJurosMultaFormatado}\n\n` +
+      `Após a isenção, o valor da cobrança voltará ao valor original.`
+    );
+
+    if (!confirmar) {
+      return;
+    }
+
+    setCarregandoAcao(true);
+    
+    try {
+      // Atualizar a cobrança zerando os dias em atraso E o valor atualizado
+      // Fazemos ambos para garantir que funcione independentemente da trigger
+      const { error } = await supabase
+        .from('cobrancas_franqueados')
+        .update({ 
+          dias_em_atraso: 0,
+          valor_atualizado: cobranca.valor_original, // Volta para o valor original
+          data_ultima_atualizacao: new Date().toISOString()
+        })
+        .eq('id', cobranca.id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Log simples da ação
+      console.log('Isenção de juros/multa aplicada:', {
+        cobrancaId: cobranca.id,
+        cliente: cobranca.cliente,
+        valorOriginal: cobranca.valor_original,
+        valorAnterior: cobranca.valor_atualizado,
+        valorJurosMultaIsentado: valorJurosMulta,
+        usuario: usuario,
+        timestamp: new Date().toISOString()
+      });
+
+      mostrarMensagem("sucesso", `Juros e multa isentados com sucesso! Valor liberado: ${valorJurosMultaFormatado}`);
+      
+      // Atualiza o estado local imediatamente para reflexo visual instantâneo
+      setCobrancas(cobrancasAtuais => 
+        cobrancasAtuais.map(c => 
+          c.id === cobranca.id 
+            ? { 
+                ...c, 
+                dias_em_atraso: 0, 
+                valor_atualizado: cobranca.valor_original,
+                data_ultima_atualizacao: new Date().toISOString()
+              }
+            : c
+        )
+      );
+
+      // Atualiza também a cobrança selecionada se estiver no modal
+      if (cobrancaSelecionada?.id === cobranca.id) {
+        setCobrancaSelecionada({
+          ...cobrancaSelecionada,
+          dias_em_atraso: 0,
+          valor_atualizado: cobranca.valor_original,
+          data_ultima_atualizacao: new Date().toISOString()
+        } as CobrancaFranqueado);
+      }
+
+      // Recarrega os dados do servidor para garantir sincronização
+      setTimeout(() => {
+        carregarCobrancas();
+      }, 500);
+      
+    } catch (error) {
+      console.error("Erro ao isentar juros e multa:", error);
+      mostrarMensagem("erro", `Erro ao isentar juros e multa: ${error}`);
+    } finally {
+      setCarregandoAcao(false);
+    }
+  };
+
+  /**
+   * Função para verificar se uma cobrança teve juros e multa isentados
+   * Uma cobrança é considerada isentada quando:
+   * - dias_em_atraso = 0 
+   * - valor_atualizado = valor_original
+   * - status é "em_aberto" ou "em_negociacao" (não foi quitada)
+   */
+  const isCobrancaIsentada = (cobranca: CobrancaFranqueado): boolean => {
+    return (
+      cobranca.dias_em_atraso === 0 &&
+      cobranca.valor_atualizado === cobranca.valor_original &&
+      (cobranca.status === "em_aberto" || cobranca.status === "em_negociacao") &&
+      // Verificação adicional: data de vencimento já passou (estava em atraso)
+      new Date(cobranca.data_vencimento) < new Date()
+    );
+  };
+
+  /**
    * Função para obter o ícone de status, conforme o status da cobrança
    * Ícones alinhados com o contexto de cada status
    */
@@ -1598,7 +1712,11 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="text-xs text-gray-500">Valor</div>
-                      <div className="text-sm font-semibold text-red-600">
+                      <div className={`text-sm font-semibold ${
+                        isCobrancaIsentada(c) 
+                          ? 'text-blue-600' 
+                          : 'text-red-600'
+                      }`}>
                         {formatarMoeda(c.valor_atualizado || c.valor_original)}
                       </div>
                     </div>
@@ -1617,7 +1735,11 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                     >
                       {getStatusDisplayText(c.status)}
                     </span>
-                    {c.dias_em_atraso === 0 ? (
+                    {isCobrancaIsentada(c) ? (
+                      <span className="text-[10px] text-blue-600 font-medium">
+                        Isentado Juros/Multa
+                      </span>
+                    ) : c.dias_em_atraso === 0 ? (
                       <span className="text-[10px] text-green-600 font-medium">
                         Em Dia
                       </span>
@@ -1755,12 +1877,20 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                         {formatarMoeda(cobranca.valor_original)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-bold text-red-600">
+                        <div className={`text-sm font-bold ${
+                          isCobrancaIsentada(cobranca) 
+                            ? 'text-blue-600' 
+                            : 'text-red-600'
+                        }`}>
                           {formatarMoeda(
                             cobranca.valor_atualizado || cobranca.valor_original
                           )}
                         </div>
-                        {cobranca.dias_em_atraso === 0 ? (
+                        {isCobrancaIsentada(cobranca) ? (
+                          <div className="text-xs text-blue-600 font-medium">
+                            Isentado Juros/Multa
+                          </div>
+                        ) : cobranca.dias_em_atraso === 0 ? (
                           <div className="text-xs text-green-600 font-medium">
                             Em Dia
                           </div>
@@ -2559,6 +2689,22 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                           detalhada
                         </button>
                       )}
+                      {(cobrancaSelecionada.status === "em_aberto" || cobrancaSelecionada.status === "em_negociacao") && 
+                       cobrancaSelecionada.valor_atualizado && 
+                       cobrancaSelecionada.valor_atualizado > cobrancaSelecionada.valor_original && (
+                        <button
+                          onClick={() => isentarJurosMulta(cobrancaSelecionada)}
+                          disabled={carregandoAcao}
+                          className="flex items-center justify-center gap-2 px-4 py-3 border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {carregandoAcao ? (
+                            <RefreshCw className="w-4 h-4 animate-spin text-orange-600" />
+                          ) : (
+                            <ShieldCheck className="w-4 h-4 text-orange-600" />
+                          )}
+                          Isentar juros/multa
+                        </button>
+                      )}
                       <button
                         onClick={() => abrirModalStatus(cobrancaSelecionada)}
                         className="flex items-center justify-center gap-2 px-4 py-3 border rounded-lg hover:bg-gray-50"
@@ -2741,19 +2887,35 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                         <label className="block text-sm font-medium text-gray-700">
                           Valor Atualizado
                         </label>
-                        <p className="mt-1 text-sm text-red-600 font-medium">
+                        <p className={`mt-1 text-sm font-medium ${
+                          isCobrancaIsentada(cobrancaSelecionada) 
+                            ? 'text-blue-600' 
+                            : 'text-red-600'
+                        }`}>
                           {formatarMoeda(
                             cobrancaSelecionada.valor_atualizado ||
                               cobrancaSelecionada.valor_original
                           )}
                         </p>
+                        {isCobrancaIsentada(cobrancaSelecionada) && (
+                          <p className="mt-1 text-xs text-blue-600 font-medium">
+                            ✓ Juros e multa isentados
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
                           Juros/Multa
                         </label>
-                        <p className="mt-1 text-sm text-orange-600">
-                          {formatarMoeda(calcularJuros(cobrancaSelecionada))}
+                        <p className={`mt-1 text-sm ${
+                          isCobrancaIsentada(cobrancaSelecionada) 
+                            ? 'text-blue-600' 
+                            : 'text-orange-600'
+                        }`}>
+                          {isCobrancaIsentada(cobrancaSelecionada) 
+                            ? 'R$ 0,00 (isentado)' 
+                            : formatarMoeda(calcularJuros(cobrancaSelecionada))
+                          }
                         </p>
                       </div>
                     </div>
@@ -2771,10 +2933,19 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                       <label className="block text-sm font-medium text-gray-700">
                         Dias em Atraso
                       </label>
-                      <p className={`mt-1 text-sm ${(cobrancaSelecionada.dias_em_atraso || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {(cobrancaSelecionada.dias_em_atraso || 0) > 0 
-                          ? `${cobrancaSelecionada.dias_em_atraso} dias` 
-                          : 'Em Dia'}
+                      <p className={`mt-1 text-sm ${
+                        isCobrancaIsentada(cobrancaSelecionada) 
+                          ? 'text-blue-600' 
+                          : (cobrancaSelecionada.dias_em_atraso || 0) > 0 
+                            ? 'text-red-600' 
+                            : 'text-green-600'
+                      }`}>
+                        {isCobrancaIsentada(cobrancaSelecionada) 
+                          ? 'Isentado (Juros/Multa)'
+                          : (cobrancaSelecionada.dias_em_atraso || 0) > 0 
+                            ? `${cobrancaSelecionada.dias_em_atraso} dias` 
+                            : 'Em Dia'
+                        }
                       </p>
                     </div>
                   </div>
