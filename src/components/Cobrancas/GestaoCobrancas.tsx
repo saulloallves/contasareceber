@@ -3,20 +3,63 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Plus, Edit, Eye, Upload, Receipt, CheckCircle,
   XCircle, Clock, Filter, RefreshCw, FileText,
-  ArrowUp, ArrowDown, AlertTriangle, Calculator, MessageSquare,
-  //Scale, MessageCircle, Mail,
+  ArrowUp, ArrowDown, AlertTriangle, MessageSquare,
+  Handshake, CreditCard, Split, Scale, 
+  TrendingDown, CircleDollarSign
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { CobrancaFranqueado } from "../../types/cobranca";
 import { cobrancaService } from "../../services/cobrancaService";
 import { n8nService, N8nService } from "../../services/n8nService";
 import { formatarCNPJCPF, formatarMoeda, formatarData, } from "../../utils/formatters";
-import { SimulacaoParcelamentoService } from "../../services/simulacaoParcelamentoService";
 import { UnidadesService } from "../../services/unidadesService";
 import type { UnidadeFranqueada } from "../../types/unidades";
 import { emailService } from "../../services/emailService";
 import { supabase } from "../../services/databaseService";
 import { ImportacaoWatcher } from "../../services/importacaoWatcher";
+
+/**
+ * Função para aplicar ordenação customizada considerando parcelas
+ * Parcelas são ordenadas numericamente (1/18, 2/18, etc.)
+ * Outras cobranças são ordenadas alfabeticamente
+ */
+const aplicarOrdenacaoCustomizada = (
+  cobrancas: CobrancaFranqueado[], 
+  direcaoOrdenacao: "asc" | "desc"
+) => {
+  
+  // Separa parcelas de outras cobranças
+  const parcelas = cobrancas.filter(c => c.status.toLowerCase() === "parcelas");
+  const outrasCobranças = cobrancas.filter(c => c.status.toLowerCase() !== "parcelas");
+  
+  // Ordena parcelas numericamente
+  const parcelasOrdenadas = parcelas.sort((a, b) => {
+    const extrairNumeroParcela = (cliente: string) => {
+      const match = cliente.match(/Parcela (\d+)\/\d+/);
+      return match ? parseInt(match[1], 10) : 0;
+    };
+    
+    const numeroA = extrairNumeroParcela(a.cliente);
+    const numeroB = extrairNumeroParcela(b.cliente);
+    
+    // Para parcelas, sempre ordem crescente independente da direção
+    return numeroA - numeroB;
+  });
+  
+  // Ordena outras cobranças alfabeticamente
+  const outrasCobrançasOrdenadas = outrasCobranças.sort((a, b) => {
+    const nomeA = (a.unidades_franqueadas?.nome_unidade || a.cliente || "").toLowerCase();
+    const nomeB = (b.unidades_franqueadas?.nome_unidade || b.cliente || "").toLowerCase();
+    
+    if (direcaoOrdenacao === "asc") {
+      return nomeA.localeCompare(nomeB);
+    } else {
+      return nomeB.localeCompare(nomeA);
+    }
+  });  
+  // Retorna outras cobranças primeiro, depois parcelas
+  return [...outrasCobrançasOrdenadas, ...parcelasOrdenadas];
+};
 
 export function GestaoCobrancas() {
   const [cobrancas, setCobrancas] = useState<CobrancaFranqueado[]>([]);
@@ -46,8 +89,8 @@ export function GestaoCobrancas() {
     dataInicio: "",
     dataFim: "",
   });
-  const [colunaOrdenacao, setColunaOrdenacao] = useState("data_vencimento"); // Coluna padrão
-  const [direcaoOrdenacao, setDirecaoOrdenacao] = useState("desc"); // Ordenação 'asc' ou 'desc'
+  const [colunaOrdenacao, setColunaOrdenacao] = useState("cliente"); // Coluna padrão alterada para ativar ordenação customizada
+  const [direcaoOrdenacao, setDirecaoOrdenacao] = useState<"asc" | "desc">("asc"); // Ordenação crescente para funcionar com a ordenação customizada
   //const [mostrarApenasInadimplentes, setMostrarApenasInadimplentes] = useState(false); // Controlar a exibição de inadimplentes
   const [errosImportacao, setErrosImportacao] = useState<string[]>([]);
   const [modalErrosAberto, setModalErrosAberto] = useState(false);
@@ -59,7 +102,6 @@ export function GestaoCobrancas() {
   const [viewMode, setViewMode] = useState<"cards" | "lista">("cards");
 
   // Serviços auxiliares (instâncias)
-  const simulacaoService = new SimulacaoParcelamentoService();
   const unidadesService = React.useMemo(() => new UnidadesService(), []);
   const [unidadesPorCnpj, setUnidadesPorCnpj] = useState<Record<string, UnidadeFranqueada>>({});
   const cnpjKey = useCallback((cnpj: string) => (cnpj || "").replace(/\D/g, ""), []);
@@ -121,16 +163,6 @@ export function GestaoCobrancas() {
   const [unidadeSelecionada, setUnidadeSelecionada] = useState<any | null>(
     null
   );
-  const [simulacaoAtual, setSimulacaoAtual] = useState<any>(null);
-  const [formSimulacao, setFormSimulacao] = useState({
-    quantidade_parcelas: 3,
-    data_primeira_parcela: "",
-    valor_entrada: 0,
-  });
-  const [formProposta, setFormProposta] = useState({
-    canais_envio: ["whatsapp"] as ("whatsapp" | "email")[],
-    observacoes: "",
-  });
   const [formMensagem, setFormMensagem] = useState({
     template: "padrao",
     mensagem_personalizada: "",
@@ -280,7 +312,16 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
         );
       }
 
-      setCobrancas(cobrancasFiltradas);
+      // Aplica ordenação customizada apenas para coluna "cliente" que contém parcelas
+      let cobrancasOrdenadas = cobrancasFiltradas;
+      
+      if (colunaOrdenacao === "cliente") {
+        cobrancasOrdenadas = aplicarOrdenacaoCustomizada(cobrancasFiltradas, direcaoOrdenacao);
+      } else {
+        console.log("❌ Não aplicando ordenação customizada - coluna diferente de cliente");
+      }
+      
+      setCobrancas(cobrancasOrdenadas);
 
       // Precarrega nomes/códigos das unidades em lote
       try {
@@ -307,7 +348,6 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
     filtrosAvancados,
     colunaOrdenacao,
     direcaoOrdenacao,
-    //mostrarApenasInadimplentes,
     unidadesService,
     cnpjKey,
   ]);
@@ -399,13 +439,6 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
   const abrirModalAcoes = async (cobranca: CobrancaFranqueado) => {
     setCobrancaSelecionada(cobranca);
     setAbaAcoes(cobranca.status === "quitado" ? "detalhes" : "acoes_rapidas");
-    setSimulacaoAtual(null);
-    setFormSimulacao({
-      quantidade_parcelas: 3,
-      data_primeira_parcela: "",
-      valor_entrada: 0,
-    });
-    setFormProposta({ canais_envio: ["whatsapp"], observacoes: "" });
     setFormMensagem({
       template: "padrao",
       mensagem_personalizada: "",
@@ -480,7 +513,6 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
     setCobrancaSelecionada(null);
     setFormData({});
     setUnidadeSelecionada(null);
-    setSimulacaoAtual(null);
   };
 
   /**
@@ -649,76 +681,6 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
     return valorAtualizado - valorOriginal;
   };
 
-  const podeSimularParcelamento = (c: CobrancaFranqueado) => {
-    const valorAtualizado = c.valor_atualizado || c.valor_original;
-    return c.status !== "quitado" && valorAtualizado >= 500;
-  };
-
-  // const podeAcionarJuridico = (c: CobrancaFranqueado) => {
-  //   const valorAtualizado = c.valor_atualizado || c.valor_original;
-  //   const diasAtraso = c.dias_em_atraso || 0;
-  //   return (
-  //     c.status === "em_aberto" && valorAtualizado > 5000 && diasAtraso >= 91
-  //   );
-  // };
-
-  // const acionarJuridico = async (cobranca: CobrancaFranqueado) => {
-  //   const valorAtualizado =
-  //     cobranca.valor_atualizado || cobranca.valor_original;
-
-  //   if (
-  //     !confirm(
-  //       `🚨 ACIONAMENTO JURÍDICO - ${
-  //         cobranca.cliente
-  //       }\n\nCRITÉRIOS VALIDADOS:\n✓ Valor: ${formatarMoeda(
-  //         valorAtualizado
-  //       )} (superior a R$ 5.000,00)\n✓ Status: Em aberto há ${
-  //         cobranca.dias_em_atraso || 0
-  //       } dias (≥91 dias)  \n✓ Aviso de débito enviado: Sim\n✓ Sem resposta do cliente\n\nCRITÉRIOS QUE SERÃO VALIDADOS NO SISTEMA:\n• Score de risco deve ser igual a zero\n• 3+ cobranças ignoradas nos últimos 15 dias  \n• Acordo descumprido OU reincidência nos últimos 6 meses\n\n⚠️ Esta ação enviará notificação extrajudicial via e-mail e WhatsApp.\n\nConfirma o acionamento jurídico?`
-  //     )
-  //   ) {
-  //     return;
-  //   }
-
-  //   setProcessando(true);
-  //   try {
-  //     const response = await fetch(
-  //       "https://uveugjjntywsfbcjrpgu.supabase.co/functions/v1/acionar-juridico-cobranca",
-  //       {
-  //         method: "POST",
-  //         headers: {
-  //           "Content-Type": "application/json",
-  //           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-  //         },
-  //         body: JSON.stringify({ cobrancaId: cobranca.id }),
-  //       }
-  //     );
-
-  //     const resultado = await response.json();
-
-  //     if (resultado.sucesso) {
-  //       mostrarMensagem(
-  //         "sucesso",
-  //         "Cobrança acionada no jurídico com sucesso! Notificações enviadas."
-  //       );
-  //       await carregarCobrancas();
-  //     } else {
-  //       mostrarMensagem(
-  //         "erro",
-  //         `Erro ao acionar jurídico: ${resultado.mensagem}`
-  //       );
-  //     }
-  //   } catch (error) {
-  //     console.error("Erro ao acionar jurídico:", error);
-  //     mostrarMensagem(
-  //       "erro",
-  //       "Erro ao comunicar com o servidor. Tente novamente."
-  //     );
-  //   } finally {
-  //     setProcessando(false);
-  //   }
-  // };
-
   const aplicarVariaveis = async (template: string) => {
     if (!cobrancaSelecionada) return template;
 
@@ -870,69 +832,6 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
       setModalAberto(null);
     } catch (error) {
       mostrarMensagem("erro", `Erro ao enviar mensagem: ${error}`);
-    } finally {
-      setProcessando(false);
-    }
-  };
-
-  const simularParcelamento = async () => {
-    if (!cobrancaSelecionada || !formSimulacao.data_primeira_parcela) {
-      toast.error("Data da primeira parcela é obrigatória", {
-        style: { background: "#b91c1c", color: "#fff" },
-      });
-      return;
-    }
-    setProcessando(true);
-    try {
-      const simulacao = await simulacaoService.simularParcelamento(
-        cobrancaSelecionada.id!,
-        formSimulacao.quantidade_parcelas,
-        formSimulacao.data_primeira_parcela,
-        formSimulacao.valor_entrada || undefined
-      );
-      setSimulacaoAtual(simulacao);
-      mostrarMensagem("sucesso", "Simulação realizada com sucesso.");
-    } catch (error) {
-      toast.error(`Erro na simulação: ${error}`, {
-        style: { background: "#b91c1c", color: "#fff" },
-      });
-    } finally {
-      setProcessando(false);
-    }
-  };
-
-  const gerarProposta = async () => {
-    if (!simulacaoAtual) return;
-    setProcessando(true);
-    try {
-      const simulacaoId = await simulacaoService.salvarSimulacao(
-        simulacaoAtual
-      );
-      const proposta = await simulacaoService.gerarProposta(
-        simulacaoId,
-        formProposta.canais_envio,
-        "usuario_atual"
-      );
-
-      const resultados: string[] = [];
-      if (formProposta.canais_envio.includes("whatsapp")) {
-        const ok = await simulacaoService.enviarPropostaWhatsApp(proposta.id!);
-        resultados.push(`WhatsApp: ${ok ? "Enviado" : "Falha"}`);
-      }
-      if (formProposta.canais_envio.includes("email")) {
-        const ok = await simulacaoService.enviarPropostaEmail(proposta.id!);
-        resultados.push(`Email: ${ok ? "Enviado" : "Falha"}`);
-      }
-
-      toast.success(`Proposta gerada e enviada!\n${resultados.join("\n")}`, {
-        style: { background: "#047857", color: "#fff" },
-      });
-      fecharModal();
-      carregarCobrancas();
-    } catch (error) {
-      toast.error(`Erro ao gerar proposta: ${error}`, {
-        style: { background: "#b91c1c", color: "#fff" },
-      });
     } finally {
       setProcessando(false);
     }
@@ -1291,14 +1190,7 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
    */
   const marcarQuitadoRapido = async (cobranca: CobrancaFranqueado) => {
     try {
-      const resultado = await cobrancaService.quitarCobranca({
-        cobrancaId: cobranca.id!,
-        valorPago: cobranca.valor_atualizado || cobranca.valor_original,
-        formaPagamento: "Não informado",
-        dataRecebimento: new Date().toISOString().split("T")[0],
-        observacoes: "Quitação rápida via interface",
-        usuario,
-      });
+      const resultado = await cobrancaService.quitarRapido(cobranca.id!, usuario);
 
       if (resultado.sucesso) {
         mostrarMensagem("sucesso", resultado.mensagem);
@@ -1366,33 +1258,85 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
 
   /**
    * Função para obter o ícone de status, conforme o status da cobrança
+   * Ícones alinhados com o contexto de cada status
    */
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "quitado":
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
+        return <CheckCircle className="w-5 h-5 text-[#2EBF11]" />;
+      case "em_negociacao":
       case "negociando":
-        return <Clock className="w-5 h-5 text-yellow-600" />;
+        return <Handshake className="w-5 h-5 text-[#F59E0B]" />;
+      case "parcelado":
+        return <CreditCard className="w-5 h-5 text-[#7031AF]" />;
+      case "parcelas":
+        return <Split className="w-5 h-5 text-[#8B5CF6]" />;
+      case "juridico":
+        return <Scale className="w-5 h-5 text-[#31A3FB]" />;
+      case "inadimplencia":
+        return <AlertTriangle className="w-5 h-5 text-[#8d4925]" />;
       case "em_aberto":
-        return <XCircle className="w-5 h-5 text-red-600" />;
+        return <XCircle className="w-5 h-5 text-[#6B7280]" />;
+      case "perda":
+        return <TrendingDown className="w-5 h-5 text-[#FF0A0E]" />;
       default:
-        return <Clock className="w-5 h-5 text-gray-600" />;
+        return <CircleDollarSign className="w-5 h-5 text-gray-600" />;
     }
   };
 
   /**
    * Função para obter a cor de status, conforme o status da cobrança
+   * Cores alinhadas com as colunas do Kanban para consistência visual
    */
   const getStatusColor = (status: string) => {
     switch (status) {
       case "quitado":
-        return "bg-green-100 text-green-800";
+        return "bg-[#2EBF1120] text-[#2EBF11]";
+      case "em_negociacao":
       case "negociando":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-[#f59f0b20] text-[#F59E0B]";
+      case "parcelado":
+        return "bg-[#7031af20] text-[#7031AF]";
+      case "parcelas":
+        return "bg-[#8B5CF620] text-[#8B5CF6]";
+      case "juridico":
+        return "bg-[#31A3FB20] text-[#31A3FB]";
+      case "inadimplencia":
+        return "bg-[#8d492520] text-[#8d4925]";
       case "em_aberto":
-        return "bg-red-100 text-red-800";
+        return "bg-[#6B728020] text-[#6B7280]";
+      case "perda":
+        return "bg-[#FF0A0E20] text-[#FF0A0E]";
       default:
         return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  /**
+   * Função para mapear o status do banco para o texto de exibição no front-end
+   * Permite personalizar a exibição sem alterar os valores no banco de dados
+   */
+  const getStatusDisplayText = (status: string) => {
+    switch (status) {
+      case "quitado":
+        return "QUITADO";
+      case "em_negociacao":
+      case "negociando":
+        return "EM NEGOCIAÇÃO";
+      case "parcelado":
+        return "PARCELADO";
+      case "parcelas":
+        return "PARCELAS";
+      case "juridico":
+        return "JURÍDICO";
+      case "inadimplencia":
+        return "INADIMPLÊNCIA";
+      case "em_aberto":
+        return "ATRASADAS";
+      case "perda":
+        return "PERDA";
+      default:
+        return status.toUpperCase();
     }
   };
 
@@ -1474,19 +1418,14 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todos os Status</option>
-              <option value="em_aberto">Em Aberto</option>
-              <option value="notificado">Notificado</option>
+              <option value="em_aberto">Atrasadas</option>
               <option value="em_negociacao">Em Negociação</option>
-              <option value="proposta_enviada">Proposta Enviada</option>
-              <option value="aguardando_pagamento">Aguardando Pagamento</option>
-              <option value="pagamento_parcial">Pagamento Parcial</option>
+              <option value="parcelado">Parcelado</option>
+              <option value="parcelas">Parcelas</option>
+              <option value="juridico">Jurídico</option>
+              <option value="inadimplencia">Inadimplência</option>
+              <option value="perda">Perda</option>
               <option value="quitado">Quitado</option>
-              <option value="ignorado">Ignorado</option>
-              <option value="notificacao_formal">Notificação Formal</option>
-              <option value="escalado_juridico">Escalado Jurídico</option>
-              <option value="inadimplencia_critica">
-                Inadimplência Crítica
-              </option>
             </select>
             <select
               value={filtrosAvancados.tipoDocumento}
@@ -1676,13 +1615,17 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                         c.status
                       )}`}
                     >
-                      {c.status.replace("_", " ").toUpperCase()}
+                      {getStatusDisplayText(c.status)}
                     </span>
-                    {c.dias_em_atraso && c.dias_em_atraso > 0 && (
+                    {c.dias_em_atraso === 0 ? (
+                      <span className="text-[10px] text-green-600 font-medium">
+                        Em Dia
+                      </span>
+                    ) : c.dias_em_atraso && c.dias_em_atraso > 0 ? (
                       <span className="text-[10px] text-red-600 font-medium">
                         {c.dias_em_atraso}d atraso
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               ))
@@ -1817,12 +1760,15 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                             cobranca.valor_atualizado || cobranca.valor_original
                           )}
                         </div>
-                        {cobranca.dias_em_atraso &&
-                          cobranca.dias_em_atraso > 0 && (
-                            <div className="text-xs text-red-500 font-medium">
-                              {cobranca.dias_em_atraso} dias de atraso
-                            </div>
-                          )}
+                        {cobranca.dias_em_atraso === 0 ? (
+                          <div className="text-xs text-green-600 font-medium">
+                            Em Dia
+                          </div>
+                        ) : cobranca.dias_em_atraso && cobranca.dias_em_atraso > 0 ? (
+                          <div className="text-xs text-red-500 font-medium">
+                            {cobranca.dias_em_atraso} dias de atraso
+                          </div>
+                        ) : null}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatarData(cobranca.data_vencimento)}
@@ -1835,7 +1781,7 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                               cobranca.status
                             )}`}
                           >
-                            {cobranca.status.replace("_", " ").toUpperCase()}
+                            {getStatusDisplayText(cobranca.status)}
                           </span>
                         </div>
                       </td>
@@ -1996,7 +1942,7 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="em_aberto">Em Aberto</option>
+                      <option value="em_aberto">Atrasadas</option>
                       <option value="negociando">Negociando</option>
                       <option value="quitado">Quitado</option>
                       <option value="cancelado">Cancelado</option>
@@ -2108,7 +2054,7 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="em_aberto">Em Aberto</option>
+                  <option value="em_aberto">Atrasadas</option>
                   <option value="negociando">Negociando</option>
                   <option value="quitado">Quitado</option>
                   <option value="cancelado">Cancelado</option>
@@ -2536,8 +2482,6 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                     </div>
                     <p className="text-sm text-green-700">
                       Esta cobrança está quitada. Ações estão desabilitadas.
-                      Para realizar novas ações, altere o status para "Em
-                      Aberto".
                     </p>
                   </div>
                 </div>
@@ -2550,7 +2494,6 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                 ? ([{ k: "detalhes", label: "Detalhes" }] as const)
                 : ([
                     { k: "acoes_rapidas", label: "Ações rápidas" },
-                    { k: "simulacao", label: "Simular parcelamento" },
                     { k: "mensagem", label: "Enviar mensagem" },
                     { k: "detalhes", label: "Detalhes" },
                   ] as const)
@@ -2632,253 +2575,7 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                         <Eye className="w-4 h-4 text-gray-700" /> Ver histórico
                         de envios
                       </button>
-                      {podeSimularParcelamento(cobrancaSelecionada) && (
-                        <button
-                          onClick={() => setAbaAcoes("simulacao")}
-                          className="flex items-center justify-center gap-2 px-4 py-3 border rounded-lg hover:bg-gray-50"
-                        >
-                          <Calculator className="w-4 h-4 text-emerald-600" />{" "}
-                          Simular parcelamento
-                        </button>
-                      )}
-                      {/* {podeAcionarJuridico(cobrancaSelecionada) && (
-                      <button
-                        onClick={() => acionarJuridico(cobrancaSelecionada)}
-                        className="flex items-center justify-center gap-2 px-4 py-3 border rounded-lg hover:bg-gray-50"
-                      >
-                        <Scale className="w-4 h-4 text-red-600" /> Acionar
-                        jurídico
-                      </button>
-                    )} */}
                     </div>
-                  </div>
-                )}
-
-              {/* Simulação de parcelamento */}
-              {abaAcoes === "simulacao" &&
-                cobrancaSelecionada.status !== "quitado" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-gray-800">
-                        Configurar Parcelamento
-                      </h4>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Quantidade de Parcelas
-                        </label>
-                        <select
-                          value={formSimulacao.quantidade_parcelas}
-                          onChange={(e) =>
-                            setFormSimulacao({
-                              ...formSimulacao,
-                              quantidade_parcelas: parseInt(e.target.value),
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                        >
-                          {[2, 3, 4, 5, 6].map((n) => (
-                            <option key={n} value={n}>
-                              {n}x
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Data da Primeira Parcela *
-                        </label>
-                        <input
-                          type="date"
-                          value={formSimulacao.data_primeira_parcela}
-                          onChange={(e) =>
-                            setFormSimulacao({
-                              ...formSimulacao,
-                              data_primeira_parcela: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Valor de Entrada (opcional)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={formSimulacao.valor_entrada}
-                          onChange={(e) =>
-                            setFormSimulacao({
-                              ...formSimulacao,
-                              valor_entrada: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                          placeholder="0,00"
-                        />
-                      </div>
-                      <button
-                        onClick={simularParcelamento}
-                        disabled={
-                          processando || !formSimulacao.data_primeira_parcela
-                        }
-                        className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                      >
-                        {processando ? "Simulando..." : "Simular Parcelamento"}
-                      </button>
-                    </div>
-
-                    {simulacaoAtual && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <h4 className="font-medium text-green-800 mb-4">
-                          Resultado da Simulação
-                        </h4>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span>Valor Original:</span>
-                            <span className="font-medium">
-                              {formatarMoeda(simulacaoAtual.valor_original)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Valor Atualizado:</span>
-                            <span className="font-medium text-red-600">
-                              {formatarMoeda(simulacaoAtual.valor_atualizado)}
-                            </span>
-                          </div>
-                          {simulacaoAtual.valor_entrada ? (
-                            <div className="flex justify-between">
-                              <span>Entrada:</span>
-                              <span className="font-medium text-green-600">
-                                {formatarMoeda(simulacaoAtual.valor_entrada)}
-                              </span>
-                            </div>
-                          ) : null}
-                          <div className="flex justify-between">
-                            <span>Parcelas:</span>
-                            <span className="font-medium">
-                              {simulacaoAtual.quantidade_parcelas}x{" "}
-                              {formatarMoeda(simulacaoAtual.parcelas[0].valor)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Multa:</span>
-                            <span className="font-medium">
-                              10% (
-                              {formatarMoeda(simulacaoAtual.parcelas[0].multa)})
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Juros Mora:</span>
-                            <span className="font-medium">
-                              1.5% (
-                              {formatarMoeda(
-                                simulacaoAtual.parcelas[0].juros_mora
-                              )}
-                              )
-                            </span>
-                          </div>
-                          <div className="flex justify-between border-t pt-2">
-                            <span className="font-semibold">Total:</span>
-                            <span className="font-bold text-blue-600">
-                              {formatarMoeda(
-                                simulacaoAtual.valor_total_parcelamento
-                              )}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="bg-white rounded-lg p-3 mb-4 mt-3">
-                          <h5 className="font-medium mb-2">Cronograma:</h5>
-                          <div className="space-y-1 text-sm">
-                            {simulacaoAtual.parcelas.map(
-                              (parcela: any, index: number) => (
-                                <div
-                                  key={index}
-                                  className="flex justify-between"
-                                >
-                                  <span>
-                                    Parcela {parcela.numero} (
-                                    {formatarData(parcela.data_vencimento)}):
-                                  </span>
-                                  <span className="font-medium">
-                                    {formatarMoeda(parcela.valor)}
-                                  </span>
-                                </div>
-                              )
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Canais de envio */}
-                        <div className="space-y-2 mb-3">
-                          <div className="text-sm font-medium text-gray-800">
-                            Canais de envio
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <label className="inline-flex items-center gap-2 text-sm">
-                              <input
-                                type="checkbox"
-                                checked={formProposta.canais_envio.includes(
-                                  "whatsapp"
-                                )}
-                                onChange={(e) => {
-                                  setFormProposta((prev) => ({
-                                    ...prev,
-                                    canais_envio: e.target.checked
-                                      ? Array.from(
-                                          new Set([
-                                            ...prev.canais_envio,
-                                            "whatsapp",
-                                          ])
-                                        )
-                                      : prev.canais_envio.filter(
-                                          (c) => c !== "whatsapp"
-                                        ),
-                                  }));
-                                }}
-                              />
-                              WhatsApp
-                            </label>
-                            <label className="inline-flex items-center gap-2 text-sm">
-                              <input
-                                type="checkbox"
-                                checked={formProposta.canais_envio.includes(
-                                  "email"
-                                )}
-                                onChange={(e) => {
-                                  setFormProposta((prev) => ({
-                                    ...prev,
-                                    canais_envio: e.target.checked
-                                      ? Array.from(
-                                          new Set([
-                                            ...prev.canais_envio,
-                                            "email",
-                                          ])
-                                        )
-                                      : prev.canais_envio.filter(
-                                          (c) => c !== "email"
-                                        ),
-                                  }));
-                                }}
-                              />
-                              Email
-                            </label>
-                          </div>
-                        </div>
-                        <button
-                          onClick={gerarProposta}
-                          disabled={
-                            processando ||
-                            formProposta.canais_envio.length === 0
-                          }
-                          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {processando
-                            ? "Gerando..."
-                            : "Gerar e Enviar Proposta"}
-                        </button>
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -3074,8 +2771,10 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                       <label className="block text-sm font-medium text-gray-700">
                         Dias em Atraso
                       </label>
-                      <p className="mt-1 text-sm text-red-600">
-                        {cobrancaSelecionada.dias_em_atraso || 0} dias
+                      <p className={`mt-1 text-sm ${(cobrancaSelecionada.dias_em_atraso || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {(cobrancaSelecionada.dias_em_atraso || 0) > 0 
+                          ? `${cobrancaSelecionada.dias_em_atraso} dias` 
+                          : 'Em Dia'}
                       </p>
                     </div>
                   </div>

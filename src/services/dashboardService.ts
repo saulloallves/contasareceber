@@ -21,14 +21,21 @@ type Cobranca = {
 export class DashboardService {
   async buscarIndicadoresMensais(): Promise<IndicadoresMensais> {
     try {
-      // Buscar dados de cobranças
+      // Buscar dados de cobranças em aberto (tabela principal)
       const { data: cobrancas, error: cobrancasError } = await supabase
         .from("cobrancas_franqueados")
         .select("*");
 
       if (cobrancasError) throw cobrancasError;
 
-      // Calcular indicadores
+      // Buscar dados de cobranças quitadas (tabela separada)
+      const { data: cobrancasQuitadas, error: quitadasError } = await supabase
+        .from("cobrancas_quitadas")
+        .select("*");
+
+      if (quitadasError) throw quitadasError;
+
+      // Calcular indicadores das cobranças em aberto
       const totalEmAbertoOriginal = (cobrancas as Cobranca[] | null)
         ?.filter((c) => !["quitado", "perda", "parcelas"].includes(c.status))
         .reduce((sum, c) => sum + (Number(c.valor_original) || 0), 0);
@@ -44,9 +51,9 @@ export class DashboardService {
       // Mantém campo legado (totalEmAberto) como ATUALIZADO para compatibilidade visual anterior
       const totalEmAberto = totalEmAbertoAtualizado;
 
+      // Calcular total quitado da tabela separada
       const totalQuitado =
-        (cobrancas as Cobranca[] | null)
-          ?.filter((c) => c.status === "quitado")
+        (cobrancasQuitadas as Cobranca[] | null)
           ?.reduce(
             (sum, c) =>
               sum + (Number(c.valor_recebido) || Number(c.valor_original) || 0),
@@ -56,6 +63,26 @@ export class DashboardService {
       const totalNegociando =
         (cobrancas as Cobranca[] | null)
           ?.filter((c) => ["negociando", "em_negociacao"].includes(c.status))
+          ?.reduce(
+            (sum, c) =>
+              sum +
+              (Number(c.valor_atualizado) || Number(c.valor_original) || 0),
+            0
+          ) || 0;
+
+      const totalJuridico =
+        (cobrancas as Cobranca[] | null)
+          ?.filter((c) => ["juridico", "em_tratativa_juridica", "processo_juridico", "cobranca_juridica"].includes(c.status))
+          ?.reduce(
+            (sum, c) =>
+              sum +
+              (Number(c.valor_atualizado) || Number(c.valor_original) || 0),
+            0
+          ) || 0;
+
+      const totalPerda =
+        (cobrancas as Cobranca[] | null)
+          ?.filter((c) => ["perda", "perda_definitiva", "cancelado"].includes(c.status))
           ?.reduce(
             (sum, c) =>
               sum +
@@ -102,15 +129,23 @@ export class DashboardService {
         "em_aberto",
         "em_atraso",
         "negociando",
-        "cobrado",
+        "juridico",
         "em_tratativa_juridica",
-        "em_tratativa_critica",
       ];
       const NEGOTIATING_STATUSES = [
         "negociando",
         "em_negociacao",
+      ];
+      const JURIDICO_STATUSES = [
+        "juridico",
         "em_tratativa_juridica",
-        "em_tratativa_critica",
+        "processo_juridico",
+        "cobranca_juridica"
+      ];
+      const PERDA_STATUSES = [
+        "perda",
+        "perda_definitiva",
+        "cancelado"
       ];
 
       const currByVenc =
@@ -135,21 +170,33 @@ export class DashboardService {
         (c) => Number(c.valor_atualizado ?? c.valor_original) || 0
       );
 
+      // Em aberto (original) por mês de vencimento - para variação do valor original
+      const currEmAbertoOriginal = sum(
+        currByVenc.filter((c) => OPEN_STATUSES.includes(c.status)),
+        (c) => Number(c.valor_original) || 0
+      );
+      const prevEmAbertoOriginal = sum(
+        prevByVenc.filter((c) => OPEN_STATUSES.includes(c.status)),
+        (c) => Number(c.valor_original) || 0
+      );
+
       // Quitado por "data da quitação" aproximada (data_ultima_atualizacao || created_at)
+      // Agora buscando da tabela cobrancas_quitadas
       const getQuitDate = (c: Cobranca) =>
         parseDate(c.data_ultima_atualizacao || c.created_at || null);
+      
       const currQuitados =
-        (cobrancas as Cobranca[] | null)?.filter(
+        (cobrancasQuitadas as Cobranca[] | null)?.filter(
           (c) =>
-            c.status === "quitado" &&
             inRange(getQuitDate(c), currStart, nextStart)
         ) || [];
+      
       const prevQuitados =
-        (cobrancas as Cobranca[] | null)?.filter(
+        (cobrancasQuitadas as Cobranca[] | null)?.filter(
           (c) =>
-            c.status === "quitado" &&
             inRange(getQuitDate(c), prevStart, currStart)
         ) || [];
+      
       const currQuitadoVal = sum(
         currQuitados,
         (c) => Number(c.valor_recebido) || Number(c.valor_original) || 0
@@ -166,6 +213,26 @@ export class DashboardService {
       );
       const prevNegociando = sum(
         prevByVenc.filter((c) => NEGOTIATING_STATUSES.includes(c.status)),
+        (c) => Number(c.valor_atualizado) || Number(c.valor_original) || 0
+      );
+
+      // Jurídico por mês de vencimento
+      const currJuridico = sum(
+        currByVenc.filter((c) => JURIDICO_STATUSES.includes(c.status)),
+        (c) => Number(c.valor_atualizado) || Number(c.valor_original) || 0
+      );
+      const prevJuridico = sum(
+        prevByVenc.filter((c) => JURIDICO_STATUSES.includes(c.status)),
+        (c) => Number(c.valor_atualizado) || Number(c.valor_original) || 0
+      );
+
+      // Perda por mês de vencimento
+      const currPerda = sum(
+        currByVenc.filter((c) => PERDA_STATUSES.includes(c.status)),
+        (c) => Number(c.valor_atualizado) || Number(c.valor_original) || 0
+      );
+      const prevPerda = sum(
+        prevByVenc.filter((c) => PERDA_STATUSES.includes(c.status)),
         (c) => Number(c.valor_atualizado) || Number(c.valor_original) || 0
       );
 
@@ -202,9 +269,12 @@ export class DashboardService {
       };
 
       const variacaoEmAberto = pctChange(currEmAberto, prevEmAberto);
+      const variacaoEmAbertoOriginal = pctChange(currEmAbertoOriginal, prevEmAbertoOriginal);
       const variacaoQuitado = pctChange(currQuitadoVal, prevQuitadoVal);
       // Para negociação, usar o total atual vs total anterior baseado em status atual
       const variacaoNegociando = pctChange(totalNegociando, prevNegociando);
+      const variacaoJuridico = pctChange(totalJuridico, prevJuridico);
+      const variacaoPerda = pctChange(totalPerda, prevPerda);
       const variacaoUnidades = pctChange(currUnidades, prevUnidades);
 
       console.log("Debug variação negociando final:", {
@@ -214,11 +284,13 @@ export class DashboardService {
       });
 
       return {
-        total_em_aberto_mes: totalEmAberto,
-        total_em_aberto_original_mes: totalEmAbertoOriginal,
-        total_em_aberto_atualizado_mes: totalEmAbertoAtualizado,
+        total_em_aberto_mes: totalEmAberto || 0,
+        total_em_aberto_original_mes: totalEmAbertoOriginal || 0,
+        total_em_aberto_atualizado_mes: totalEmAbertoAtualizado || 0,
         total_pago_mes: totalQuitado,
         total_negociando_mes: totalNegociando,
+        total_juridico_mes: totalJuridico,
+        total_perda_mes: totalPerda,
         percentual_inadimplencia: percentualInadimplencia,
         unidades_inadimplentes: unidadesInadimplentes,
         ticket_medio_dividas: ticketMedio,
@@ -226,8 +298,12 @@ export class DashboardService {
         variacao_unidades: variacaoUnidades,
         comparativo_mes_anterior: {
           variacao_em_aberto: variacaoEmAberto,
+          variacao_em_aberto_original: variacaoEmAbertoOriginal,
           variacao_pago: variacaoQuitado,
           variacao_negociando: variacaoNegociando,
+          variacao_juridico: variacaoJuridico,
+          variacao_perda: variacaoPerda,
+          variacao_inadimplencia: 0, // Pode calcular se necessário
         },
       };
     } catch (error) {
@@ -278,14 +354,16 @@ export class DashboardService {
   async buscarDadosDashboard(filtros: any) {
     try {
       let query = supabase.from("cobrancas_franqueados").select("*");
+      let queryQuitadas = supabase.from("cobrancas_quitadas").select("*");
 
-      // Aplicar filtros
-      if (filtros.status) {
+      // Aplicar filtros na tabela principal
+      if (filtros.status && filtros.status !== "quitado") {
         query = query.eq("status", filtros.status);
       }
 
       if (filtros.tipo) {
         query = query.eq("tipo_cobranca", filtros.tipo);
+        queryQuitadas = queryQuitadas.eq("tipo_cobranca", filtros.tipo);
       }
 
       // Filtro de período
@@ -294,15 +372,27 @@ export class DashboardService {
         const dataLimite = new Date();
         dataLimite.setDate(dataLimite.getDate() - diasAtras);
         query = query.gte("created_at", dataLimite.toISOString());
+        queryQuitadas = queryQuitadas.gte("created_at", dataLimite.toISOString());
       }
 
-      const { data, error } = await query;
+      // Buscar dados das duas tabelas
+      const { data: cobrancasEmAberto, error: errorEmAberto } = await query;
+      if (errorEmAberto) throw errorEmAberto;
 
-      if (error) throw error;
+      // Só busca quitadas se não há filtro específico de status não-quitado
+      let cobrancasQuitadas: Cobranca[] = [];
+      if (!filtros.status || filtros.status === "quitado") {
+        const { data: quitadas, error: errorQuitadas } = await queryQuitadas;
+        if (errorQuitadas) throw errorQuitadas;
+        cobrancasQuitadas = (quitadas || []) as Cobranca[];
+      }
+
+      // Combinar dados para cálculos
+      const todasCobrancas = [...(cobrancasEmAberto || []), ...cobrancasQuitadas];
 
       const result = {
-        cobrancas: data,
-        visaoGeral: this.calcularVisaoGeral((data || []) as Cobranca[]),
+        cobrancas: todasCobrancas,
+        visaoGeral: this.calcularVisaoGeral(cobrancasEmAberto as Cobranca[], cobrancasQuitadas),
       };
       // Completa campos mínimos esperados pelo componente com estruturas vazias
       const dashboardData = {
@@ -324,9 +414,9 @@ export class DashboardService {
     }
   }
 
-  private calcularVisaoGeral(cobrancas: Cobranca[]) {
+  private calcularVisaoGeral(cobrancasEmAberto: Cobranca[], cobrancasQuitadas: Cobranca[] = []) {
     return {
-      totalEmAberto: cobrancas
+      totalEmAberto: cobrancasEmAberto
         .filter((c) => ["em_aberto", "em_atraso"].includes(c.status))
         .reduce(
           (sum, c) =>
@@ -334,15 +424,14 @@ export class DashboardService {
           0
         ),
 
-      totalQuitado: cobrancas
-        .filter((c) => c.status === "quitado")
+      totalQuitado: cobrancasQuitadas
         .reduce(
           (sum, c) =>
             sum + (Number(c.valor_recebido) || Number(c.valor_original) || 0),
           0
         ),
 
-      totalNegociando: cobrancas
+      totalNegociando: cobrancasEmAberto
         .filter((c) =>
           [
             "negociando",

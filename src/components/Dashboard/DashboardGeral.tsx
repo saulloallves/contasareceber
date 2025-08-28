@@ -16,6 +16,8 @@ import {
   Zap,
   CircleDollarSign,
   Receipt,
+  Scale,
+  XCircle,
 } from "lucide-react";
 import { DashboardService } from "../../services/dashboardService";
 
@@ -89,12 +91,27 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
         data?.total_negociando_mes,
         data?.total_pago_mes // fallback adicional se necessário
       ),
+      totalJuridico: pickNum(
+        data?.totalJuridico,
+        data?.total_juridico,
+        data?.total_juridico_mes
+      ),
+      totalPerda: pickNum(
+        data?.totalPerda,
+        data?.total_perda,
+        data?.total_perda_mes
+      ),
 
       // Variações (aceita camelCase, snake_case e mapeia do comparativo_mes_anterior)
       variacaoEmAberto: pickNum(
         data?.variacaoEmAberto,
         data?.variacao_em_aberto,
         data?.comparativo_mes_anterior?.variacao_em_aberto
+      ),
+      variacaoEmAbertoOriginal: pickNum(
+        data?.variacaoEmAbertoOriginal,
+        data?.variacao_em_aberto_original,
+        data?.comparativo_mes_anterior?.variacao_em_aberto_original
       ),
       variacaoQuitado: pickNum(
         data?.variacaoQuitado,
@@ -105,6 +122,16 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
         data?.variacaoNegociando,
         data?.variacao_negociando,
         data?.comparativo_mes_anterior?.variacao_negociando
+      ),
+      variacaoJuridico: pickNum(
+        data?.variacaoJuridico,
+        data?.variacao_juridico,
+        data?.comparativo_mes_anterior?.variacao_juridico
+      ),
+      variacaoPerda: pickNum(
+        data?.variacaoPerda,
+        data?.variacao_perda,
+        data?.comparativo_mes_anterior?.variacao_perda
       ),
       variacaoUnidades: pickNum(
         data?.variacaoUnidades,
@@ -320,7 +347,9 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
           <h1 className="text-3xl font-bold text-gray-800">
             {obterSaudacao()}, {obterNomeUsuario()}!
           </h1>
-          <p className="text-gray-600">Bem vindo ao Sistema de Cobrança da CP</p>
+          <p className="text-gray-600">
+            Bem vindo ao Sistema de Cobrança da CP
+          </p>
         </div>
         <img src={logo} alt="Logo Cresci e Perdi" className="h-10"></img>
       </div>
@@ -408,10 +437,10 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
       <div className="space-y-6">
         {/* Linha Superior - 2 Cards em Destaque */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-red-400 hover:shadow-xl transition-all duration-300">
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-[#6B7280] hover:shadow-xl transition-all duration-300">
             <div className="flex items-start space-x-4 min-h-[80px]">
-              <div className="p-2 bg-red-50 rounded-lg flex-shrink-0 border border-red-100">
-                <TrendingUp className="w-6 h-6 text-red-500" />
+              <div className="p-2 bg-[#6B728020] rounded-lg flex-shrink-0 border border-[#6B728050]">
+                <TrendingUp className="w-6 h-6 text-[#6B7280]" />
               </div>
               <div className="monetary-container">
                 <p className="text-sm font-medium text-gray-700">
@@ -424,13 +453,17 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
                 )}
                 <div className="mt-2 flex items-center text-sm">
                   <span
-                    className={`font-semibold ${getVariacaoColor(
+                    className={`font-semibold flex items-center ${getVariacaoColor(
                       indicadores.variacaoEmAberto,
                       false // aumento de em aberto é ruim (vermelho)
                     )}`}
                   >
                     {getVariacaoIcon(indicadores.variacaoEmAberto)}
-                    {formatarPercentual(Math.abs(indicadores.variacaoEmAberto))}
+                    <span className="ml-1">
+                      {formatarPercentual(
+                        Math.abs(indicadores.variacaoEmAberto)
+                      )}
+                    </span>
                   </span>
                   <span className="text-gray-400 ml-2">vs. mês anterior</span>
                 </div>
@@ -438,23 +471,35 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-red-400 hover:shadow-xl transition-all duration-300">
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-[#6B7280] hover:shadow-xl transition-all duration-300">
             <div className="flex items-start space-x-4 min-h-[80px]">
-              <div className="p-2 bg-red-50 rounded-lg flex-shrink-0 border border-red-100">
-                <TrendingUp className="w-6 h-6 text-red-500" />
+              <div className="p-2 bg-[#6B728020] rounded-lg flex-shrink-0 border border-[#6B728050]">
+                <TrendingUp className="w-6 h-6 text-[#6B7280]" />
               </div>
               <div className="monetary-container">
                 <p className="text-sm font-medium text-gray-700">
-                  Valor Original (Sem Juros/Multa)
+                  Valor Original
                 </p>
                 {renderMonetaryValue(
                   indicadores.totalEmAbertoOriginal ??
                     indicadores.totalEmAberto,
                   "text-gray-900"
                 )}
-                <div className="mt-2 text-sm text-gray-500">
-                  Soma dos valores originais das cobranças em aberto e
-                  negociando
+                <div className="mt-2 flex items-center text-sm">
+                  <span
+                    className={`font-semibold flex items-center ${getVariacaoColor(
+                      indicadores.variacaoEmAbertoOriginal,
+                      false // aumento de em aberto é ruim (vermelho)
+                    )}`}
+                  >
+                    {getVariacaoIcon(indicadores.variacaoEmAbertoOriginal)}
+                    <span className="ml-1">
+                      {formatarPercentual(
+                        Math.abs(indicadores.variacaoEmAbertoOriginal)
+                      )}
+                    </span>
+                  </span>
+                  <span className="text-gray-400 ml-2">vs. mês anterior</span>
                 </div>
               </div>
             </div>
@@ -463,24 +508,26 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
 
         {/* Linha Inferior - 3 Cards Distribuídos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-400 flex-1 hover:shadow-xl transition-all duration-300">
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-[#2EBF11] flex-1 hover:shadow-xl transition-all duration-300">
             <div className="flex items-start space-x-4 min-h-[80px]">
-              <div className="p-2 bg-green-50 rounded-lg flex-shrink-0 border border-green-100">
-                <CheckCircle className="w-6 h-6 text-green-500" />
+              <div className="p-2 bg-[#2EBF1120] rounded-lg flex-shrink-0 border border-[#2EBF1150]">
+                <CheckCircle className="w-6 h-6 text-[#2EBF11]" />
               </div>
               <div className="monetary-container">
-                <p className="text-sm font-medium text-gray-700">
-                  Valor Recuperado
-                </p>
+                <p className="text-sm font-medium text-gray-700">Quitado</p>
                 {renderMonetaryValue(indicadores.totalQuitado, "text-gray-900")}
                 <div className="mt-2 flex items-center text-sm">
                   <span
-                    className={`font-semibold ${getVariacaoColor(
+                    className={`font-semibold flex items-center ${getVariacaoColor(
                       indicadores.variacaoQuitado
                     )}`}
                   >
                     {getVariacaoIcon(indicadores.variacaoQuitado)}
-                    {formatarPercentual(Math.abs(indicadores.variacaoQuitado))}
+                    <span className="ml-1">
+                      {formatarPercentual(
+                        Math.abs(indicadores.variacaoQuitado)
+                      )}
+                    </span>
                   </span>
                   <span className="text-gray-400 ml-2">vs. mês anterior</span>
                 </div>
@@ -488,10 +535,10 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-yellow-400 flex-1 hover:shadow-xl transition-all duration-300">
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-[#F59E0B] flex-1 hover:shadow-xl transition-all duration-300">
             <div className="flex items-start space-x-4 min-h-[80px]">
-              <div className="p-2 bg-yellow-50 rounded-lg flex-shrink-0 border border-yellow-100">
-                <Clock className="w-6 h-6 text-yellow-500" />
+              <div className="p-2 bg-[#F59E0B20] rounded-lg flex-shrink-0 border border-[#F59E0B50]">
+                <Clock className="w-6 h-6 text-[#F59E0B]" />
               </div>
               <div className="monetary-container">
                 <p className="text-sm font-medium text-gray-700">
@@ -503,17 +550,74 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
                 )}
                 <div className="mt-2 flex items-center text-sm">
                   <span
-                    className={`font-semibold ${getVariacaoColor(
+                    className={`font-semibold flex items-center ${getVariacaoColor(
                       indicadores.variacaoNegociando
                     )}`}
                   >
                     {getVariacaoIcon(indicadores.variacaoNegociando)}
-                    {formatarPercentual(
-                      Math.abs(indicadores.variacaoNegociando)
-                    )}
+                    <span className="ml-1">
+                      {formatarPercentual(
+                        Math.abs(indicadores.variacaoNegociando)
+                      )}
+                    </span>
                   </span>
                   <span className="text-gray-400 ml-2">vs. mês anterior</span>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Nova Linha - Cards Jurídico e Perda */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-[#31A3FB] flex-1 hover:shadow-xl transition-all duration-300">
+          <div className="flex items-start space-x-4 min-h-[80px]">
+            <div className="p-2 bg-[#31A3FB20] rounded-lg flex-shrink-0 border border-[#31A3FB50]">
+              <Scale className="w-6 h-6 text-[#31A3FB]" />
+            </div>
+            <div className="monetary-container">
+              <p className="text-sm font-medium text-gray-700">Jurídico</p>
+              {renderMonetaryValue(indicadores.totalJuridico, "text-gray-900")}
+              <div className="mt-2 flex items-center text-sm">
+                <span
+                  className={`font-semibold flex items-center ${getVariacaoColor(
+                    indicadores.variacaoJuridico,
+                    false // aumento de jurídico é neutro/ruim
+                  )}`}
+                >
+                  {getVariacaoIcon(indicadores.variacaoJuridico)}
+                  <span className="ml-1">
+                    {formatarPercentual(Math.abs(indicadores.variacaoJuridico))}
+                  </span>
+                </span>
+                <span className="text-gray-400 ml-2">vs. mês anterior</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-[#FF0A0E] flex-1 hover:shadow-xl transition-all duration-300">
+          <div className="flex items-start space-x-4 min-h-[80px]">
+            <div className="p-2 bg-[#FF0A0E20] rounded-lg flex-shrink-0 border border-[#FF0A0E50]">
+              <XCircle className="w-6 h-6 text-[#FF0A0E]" />
+            </div>
+            <div className="monetary-container">
+              <p className="text-sm font-medium text-gray-700">Perda</p>
+              {renderMonetaryValue(indicadores.totalPerda, "text-gray-900")}
+              <div className="mt-2 flex items-center text-sm">
+                <span
+                  className={`font-semibold flex items-center ${getVariacaoColor(
+                    indicadores.variacaoPerda,
+                    false // aumento de perda é ruim
+                  )}`}
+                >
+                  {getVariacaoIcon(indicadores.variacaoPerda)}
+                  <span className="ml-1">
+                    {formatarPercentual(Math.abs(indicadores.variacaoPerda))}
+                  </span>
+                </span>
+                <span className="text-gray-400 ml-2">vs. mês anterior</span>
               </div>
             </div>
           </div>

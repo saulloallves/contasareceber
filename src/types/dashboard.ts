@@ -46,6 +46,8 @@ export interface IndicadoresMensais {
   total_em_aberto_atualizado_mes?: number;
   total_pago_mes: number;
   total_negociando_mes: number;
+  total_juridico_mes: number;
+  total_perda_mes: number;
   percentual_inadimplencia: number;
   unidades_inadimplentes: number;
   ticket_medio_dividas: number;
@@ -54,7 +56,11 @@ export interface IndicadoresMensais {
   variacao_unidades?: number;
   comparativo_mes_anterior: {
     variacao_em_aberto: number;
+    variacao_em_aberto_original: number;
     variacao_pago: number;
+    variacao_negociando: number;
+    variacao_juridico: number;
+    variacao_perda: number;
     variacao_inadimplencia: number;
   };
 }

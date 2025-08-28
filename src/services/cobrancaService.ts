@@ -93,106 +93,49 @@ export class CobrancaService {
   async buscarCobrancas(
     filtros: Record<string, unknown> = {}
   ): Promise<CobrancaFranqueado[]> {
-  // Observação: joins embutidos removidos para evitar ambiguidade de relacionamentos no PostgREST
-  // Caso precise de dados de unidade/franqueado, a UI resolve via serviços dedicados após o fetch.
-      let query = supabase.from("cobrancas_franqueados").select("*");
+    // Observação: joins embutidos removidos para evitar ambiguidade de relacionamentos no PostgREST
+    // Caso precise de dados de unidade/franqueado, a UI resolve via serviços dedicados após o fetch.
+    
+    // Determina quais tabelas consultar baseado no filtro de status
+    const statusFiltro = filtros.status as string;
+    const buscarApenasQuitadas = statusFiltro === "quitado";
+    const buscarApenasEmAberto = statusFiltro && statusFiltro !== "quitado";
+    
+    const resultadosFinais: any[] = [];
 
-      // Filtro para incluir/excluir parcelas
-      if (filtros.incluirParcelas === false) {
-        query = query.eq("is_parcela", false);
-      } else if (filtros.apenasParcelas) {
-        query = query.eq("is_parcela", true);
-      }
-
-      // Filtros básicos
-      if (filtros.status) {
-        query = query.eq("status", filtros.status);
-      }
-
-      if (filtros.dataInicio) {
-        query = query.gte("data_vencimento", filtros.dataInicio);
-      }
-
-      if (filtros.dataFim) {
-        query = query.lte("data_vencimento", filtros.dataFim);
-      }
-
-      if (filtros.cnpj) {
-        const cnpjFiltro = String(filtros.cnpj);
-        const cnpjNumerico = cnpjFiltro.replace(/\D/g, "");
-        // Aplica filtro exato apenas quando CNPJ completo (14 dígitos)
-        if (cnpjNumerico.length === 14) {
-          query = query.eq("cnpj", cnpjNumerico);
-        }
-        // Para valores parciais, não filtra no banco (o front aplica includes em dígitos)
-      }
-      if ((filtros as any).cpf) {
-        const cpfFiltro = String((filtros as any).cpf);
-        const cpfNumerico = cpfFiltro.replace(/\D/g, "");
-        // Aplica filtro exato apenas quando CPF completo (11 dígitos)
-        if (cpfNumerico.length === 11) {
-          query = query.eq("cpf", cpfNumerico);
-        }
-        // Para valores parciais, não filtra no banco (o front aplica includes em dígitos)
-      }
-
-      // Filtro por tipo de documento (cpf/cnpj)
-      if ((filtros as any).tipoDocumento === "cpf") {
-        // CPF válido: coluna 'cpf' NÃO nula e NÃO vazia
-        query = query.not("cpf", "is", null).neq("cpf", "");
-      } else if ((filtros as any).tipoDocumento === "cnpj") {
-        // CNPJ: registros onde 'cpf' é nulo OU vazio (dados antigos podem ter "")
-        query = query.or("cpf.is.null,cpf.eq.");
-      }
-
-      // Filtros de valor
-      if (filtros.valorMin) {
-        const valorMin = typeof filtros.valorMin === 'string' 
-          ? parseFloat(filtros.valorMin) 
-          : filtros.valorMin;
-        if (!isNaN(valorMin as number)) {
-          query = query.gte("valor_atualizado", valorMin);
-        }
-      }
-
-      if (filtros.valorMax) {
-        const valorMax = typeof filtros.valorMax === 'string' 
-          ? parseFloat(filtros.valorMax) 
-          : filtros.valorMax;
-        if (!isNaN(valorMax as number)) {
-          query = query.lte("valor_atualizado", valorMax);
-        }
-      }
-
-      // Filtro por tipo de cobrança
-      if (filtros.tipoCobranca || filtros.tipo_debito) {
-        const tipo = filtros.tipoCobranca || filtros.tipo_debito;
-        query = query.eq("tipo_cobranca", tipo);
-      }
-
-      // Filtro apenas inadimplentes
-      if (filtros.apenasInadimplentes) {
-        query = query.not("status", "in", "(quitado,parcelado)");
-      }
-
-      // Ordenação
-      const colunaOrdenacao = filtros.colunaOrdenacao as string || "data_vencimento";
-      const direcaoOrdenacao = filtros.direcaoOrdenacao as string || "desc";
+    // Se não há filtro de status específico ou se busca por quitadas, consulta cobrancas_quitadas
+    if (!buscarApenasEmAberto) {
+      let queryQuitadas = supabase.from("cobrancas_quitadas").select("*");
       
-      query = query.order(colunaOrdenacao, { ascending: direcaoOrdenacao === "asc" });
-
-    const { data, error } = await query;
-
-    if (error) {
-      throw new Error(`Erro ao buscar cobranças: ${error.message}`);
+      // Aplica filtros comuns na tabela de quitadas
+      queryQuitadas = this.aplicarFiltrosBasicos(queryQuitadas, filtros);
+      
+      const { data: quitadas, error: errorQuitadas } = await queryQuitadas;
+      if (!errorQuitadas && quitadas) {
+        resultadosFinais.push(...quitadas);
+      }
     }
 
-    if (!data) {
-      return [];
+    // Se não há filtro de status específico ou se busca por não-quitadas, consulta cobrancas_franqueados
+    if (!buscarApenasQuitadas) {
+      let query = supabase.from("cobrancas_franqueados").select("*");
+      
+      // Aplica filtros comuns na tabela principal
+      query = this.aplicarFiltrosBasicos(query, filtros);
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw new Error(`Erro ao buscar cobranças: ${error.message}`);
+      }
+
+      if (data) {
+        resultadosFinais.push(...data);
+      }
     }
 
     // Aplica filtros locais que não podem ser feitos no banco
-    let resultados = data;
+    let resultados = resultadosFinais;
 
     // Filtro por busca (nome da unidade, código, CNPJ)
     if (filtros.busca) {
@@ -214,6 +157,94 @@ export class CobrancaService {
     return resultados;
   }
 
+  /**
+   * Aplica filtros básicos que são comuns às duas tabelas
+   */
+  private aplicarFiltrosBasicos(query: any, filtros: Record<string, unknown>) {
+    // Filtro para incluir/excluir parcelas
+    if (filtros.incluirParcelas === false) {
+      query = query.eq("is_parcela", false);
+    } else if (filtros.apenasParcelas) {
+      query = query.eq("is_parcela", true);
+    }
+
+    // Filtros básicos - exceto status que é tratado na função principal
+    if (filtros.dataInicio) {
+      query = query.gte("data_vencimento", filtros.dataInicio);
+    }
+
+    if (filtros.dataFim) {
+      query = query.lte("data_vencimento", filtros.dataFim);
+    }
+
+    if (filtros.cnpj) {
+      const cnpjFiltro = String(filtros.cnpj);
+      const cnpjNumerico = cnpjFiltro.replace(/\D/g, "");
+      // Aplica filtro exato apenas quando CNPJ completo (14 dígitos)
+      if (cnpjNumerico.length === 14) {
+        query = query.eq("cnpj", cnpjNumerico);
+      }
+      // Para valores parciais, não filtra no banco (o front aplica includes em dígitos)
+    }
+    
+    if ((filtros as any).cpf) {
+      const cpfFiltro = String((filtros as any).cpf);
+      const cpfNumerico = cpfFiltro.replace(/\D/g, "");
+      // Aplica filtro exato apenas quando CPF completo (11 dígitos)
+      if (cpfNumerico.length === 11) {
+        query = query.eq("cpf", cpfNumerico);
+      }
+      // Para valores parciais, não filtra no banco (o front aplica includes em dígitos)
+    }
+
+    // Filtro por tipo de documento (cpf/cnpj)
+    if ((filtros as any).tipoDocumento === "cpf") {
+      // CPF válido: coluna 'cpf' NÃO nula e NÃO vazia
+      query = query.not("cpf", "is", null).neq("cpf", "");
+    } else if ((filtros as any).tipoDocumento === "cnpj") {
+      // CNPJ: registros onde 'cpf' é nulo OU vazio (dados antigos podem ter "")
+      query = query.or("cpf.is.null,cpf.eq.");
+    }
+
+    // Filtros de valor
+    if (filtros.valorMin) {
+      const valorMin = typeof filtros.valorMin === 'string' 
+        ? parseFloat(filtros.valorMin) 
+        : filtros.valorMin;
+      if (!isNaN(valorMin as number)) {
+        query = query.gte("valor_atualizado", valorMin);
+      }
+    }
+
+    if (filtros.valorMax) {
+      const valorMax = typeof filtros.valorMax === 'string' 
+        ? parseFloat(filtros.valorMax) 
+        : filtros.valorMax;
+      if (!isNaN(valorMax as number)) {
+        query = query.lte("valor_atualizado", valorMax);
+      }
+    }
+
+    // Filtro por tipo de cobrança
+    if (filtros.tipoCobranca || filtros.tipo_debito) {
+      const tipo = filtros.tipoCobranca || filtros.tipo_debito;
+      query = query.eq("tipo_cobranca", tipo);
+    }
+
+    // Filtro apenas inadimplentes
+    if (filtros.apenasInadimplentes) {
+      query = query.not("status", "in", "(quitado,parcelado)");
+    }
+
+    // Ordenação
+    const colunaOrdenacao = filtros.colunaOrdenacao as string || "data_vencimento";
+    const direcaoOrdenacao = filtros.direcaoOrdenacao as string || "desc";
+    
+    query = query.order(colunaOrdenacao, { ascending: direcaoOrdenacao === "asc" });
+
+    return query;
+  }
+
   async quitarCobranca(dados: QuitacaoCobranca): Promise<ResultadoQuitacao> {
     const {
       cobrancaId,
@@ -223,6 +254,7 @@ export class CobrancaService {
       usuario,
     } = dados;
 
+    // Busca a cobrança na tabela principal
     const { data: cobranca, error: cobrancaError } = await supabase
       .from("cobrancas_franqueados")
       .select("*")
@@ -241,18 +273,56 @@ export class CobrancaService {
     const novaObservacao = `\n[${new Date().toLocaleString("pt-BR")}] Pagamento registrado: ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valorPago)} via ${formaPagamento}${observacoes ? ` - ${observacoes}` : ""}. Usuário: ${usuario}`;
     observacoesConsolidadas += novaObservacao;
 
-    const { error: updateError } = await supabase
-      .from("cobrancas_franqueados")
-      .update({
+    // Se for quitação total, move para a tabela de quitadas
+    if (novoStatus === "quitado") {
+      // Prepara dados para inserir na tabela de quitadas
+      const dadosQuitacao = {
+        ...cobranca,
         valor_recebido: (cobranca.valor_recebido || 0) + valorPago,
-        status: novoStatus,
+        status: "quitado",
         data_ultima_atualizacao: new Date().toISOString(),
         observacoes: observacoesConsolidadas,
-      })
-      .eq("id", cobrancaId);
+        data_quitacao: new Date().toISOString(),
+        usuario_quitacao: usuario,
+        forma_pagamento: formaPagamento
+      };
 
-    if (updateError) {
-      throw new Error(`Erro ao atualizar cobrança: ${updateError.message}`);
+      // Remove o ID para evitar conflitos na inserção
+      delete dadosQuitacao.id;
+
+      // Insere na tabela de quitadas
+      const { error: insertError } = await supabase
+        .from("cobrancas_quitadas")
+        .insert(dadosQuitacao);
+
+      if (insertError) {
+        throw new Error(`Erro ao mover cobrança para tabela de quitadas: ${insertError.message}`);
+      }
+
+      // Remove da tabela principal
+      const { error: deleteError } = await supabase
+        .from("cobrancas_franqueados")
+        .delete()
+        .eq("id", cobrancaId);
+
+      if (deleteError) {
+        throw new Error(`Erro ao remover cobrança da tabela principal: ${deleteError.message}`);
+      }
+    } else {
+      // Se for pagamento parcial, apenas atualiza na tabela principal
+      const { error: updateError } = await supabase
+        .from("cobrancas_franqueados")
+        .update({
+          valor_recebido: (cobranca.valor_recebido || 0) + valorPago,
+          status: novoStatus,
+          data_ultima_atualizacao: new Date().toISOString(),
+          observacoes: observacoesConsolidadas,
+        })
+        .eq("id", cobrancaId);
+
+      if (updateError) {
+        throw new Error(`Erro ao atualizar cobrança: ${updateError.message}`);
+      }
     }
 
     // Log da operação para auditoria
@@ -352,25 +422,71 @@ export class CobrancaService {
 
   /**
    * Atualiza uma cobrança específica
+   * Busca automaticamente em qual tabela a cobrança está
    */
   async atualizarCobranca(
     id: string,
     dados: Partial<CobrancaFranqueado>
   ): Promise<void> {
     const payload = this.sanitizeUpdatePayload(dados);
-    const { error } = await supabase
+    
+    // Se está tentando quitar via update direto, usa a função específica
+    if (dados.status === "quitado") {
+      throw new Error("Para quitar uma cobrança, use a função quitarCobranca()");
+    }
+    
+    // Primeiro tenta atualizar na tabela principal
+    const { error: errorPrincipal } = await supabase
       .from("cobrancas_franqueados")
       .update({ ...payload, data_ultima_atualizacao: new Date().toISOString() })
       .eq("id", id);
 
-    if (error) {
-      throw new Error(`Erro ao atualizar cobrança: ${error.message}`);
+    // Se não encontrou na tabela principal, tenta na tabela de quitadas
+    if (errorPrincipal) {
+      const { error: errorQuitadas } = await supabase
+        .from("cobrancas_quitadas")
+        .update({ ...payload, data_ultima_atualizacao: new Date().toISOString() })
+        .eq("id", id);
+
+      if (errorQuitadas) {
+        throw new Error(`Erro ao atualizar cobrança: ${errorQuitadas.message}`);
+      }
     }
+  }
+
+  /**
+   * Quitação rápida - marca como quitado com valor total
+   */
+  async quitarRapido(
+    cobrancaId: string,
+    usuario: string
+  ): Promise<ResultadoQuitacao> {
+    // Busca a cobrança para obter o valor total
+    const { data: cobranca, error } = await supabase
+      .from("cobrancas_franqueados")
+      .select("*")
+      .eq("id", cobrancaId)
+      .single();
+
+    if (error || !cobranca) {
+      throw new Error(`Erro ao buscar cobrança: ${error?.message}`);
+    }
+
+    // Usa a função de quitação detalhada com valor total
+    return this.quitarCobranca({
+      cobrancaId,
+      valorPago: cobranca.valor_atualizado || cobranca.valor_original,
+      formaPagamento: "Não informado",
+      observacoes: "Quitação rápida",
+      usuario,
+      dataRecebimento: new Date().toISOString().split("T")[0]
+    });
   }
 
   /**
    * Busca histórico de envios (WhatsApp/Email) vinculados a uma cobrança
    * Utiliza o campo cobranca_id nas tabelas de logs para vincular mensagens
+   * Agora considera ambas as tabelas: cobrancas_franqueados e cobrancas_quitadas
    */
   async buscarHistoricoEnvios(cobrancaId: string): Promise<HistoricoEnvio[]> {
     const historico: HistoricoEnvio[] = [];
@@ -404,6 +520,9 @@ export class CobrancaService {
     } catch (error) {
       console.warn("Erro ao buscar logs de WhatsApp:", error);
     }
+
+    // 2) Busca logs de email se houver implementação futura
+    // TODO: Implementar busca de logs de email quando necessário
 
     return historico.sort((a, b) => new Date(b.data_envio).getTime() - new Date(a.data_envio).getTime());
   }
