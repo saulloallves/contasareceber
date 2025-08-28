@@ -353,7 +353,7 @@ export function KanbanCobranca() {
           false
         );
         const quantidadesPorUnidade: Record<string, number> = {};
-  const mapStatusPorUnidade: Record<string, Record<string, number>> = {};
+        const mapStatusPorUnidade: Record<string, Record<string, number>> = {};
 
         todasCobrancasSemFiltro.forEach((card) => {
           const key = card.cnpj || (card as any).cpf;
@@ -361,7 +361,8 @@ export function KanbanCobranca() {
 
           if (!mapStatusPorUnidade[key]) mapStatusPorUnidade[key] = {};
           const st = card.status_atual || "outros";
-          mapStatusPorUnidade[key][st] = (mapStatusPorUnidade[key][st] || 0) + 1;
+          mapStatusPorUnidade[key][st] =
+            (mapStatusPorUnidade[key][st] || 0) + 1;
         });
 
         setQuantidadesTotaisPorUnidade(quantidadesPorUnidade);
@@ -807,12 +808,10 @@ export function KanbanCobranca() {
         requestedDoc: doc,
         statusFilter,
         totalFound: ordenadas.length,
-        sample: (ordenadas || [])
-          .slice(0, 6)
-          .map((c) => ({
-            id: c.id || null,
-            venc: c.data_vencimento_antiga || null,
-          })),
+        sample: (ordenadas || []).slice(0, 6).map((c) => ({
+          id: c.id || null,
+          venc: c.data_vencimento_antiga || null,
+        })),
       });
       setTodasCobrancasUnidade(ordenadas);
       setQuantidadesTotaisPorUnidade((prev) => ({
@@ -1137,29 +1136,45 @@ export function KanbanCobranca() {
 
   // Handler para drag-and-drop agrupado por unidade
   const onDragEndUnidade = (result: DropResult) => {
+    const { source, destination, draggableId } = result;
+
+    if (!destination) return;
+
+    const destinationColumnId = destination.droppableId;
+
+    // Impede que cards sejam arrastados para as colunas "Parcelado" ou "Parcelas"
     if (
-      !result.destination ||
-      result.source.droppableId === result.destination.droppableId
+      destinationColumnId === "parcelado" ||
+      destinationColumnId === "parcelas"
     ) {
-      return;
+      toast(
+        "O parcelamento deve ser feito pela tela de Central de Parcelamento.",
+        { icon: "⚠️" }
+      );
+      return; // Cancela a movimentação
     }
 
-    // Busca a unidade pelo draggableId para verificar o CNPJ
-    const unidadeCard = getUnitCardsByColuna(result.source.droppableId).find(
-      (u) => (u.cnpj || u.cpf) === result.draggableId.replace(/unit-/, "") // Adaptação se o draggableId tiver prefixo
-      // Se draggableId é o próprio documento, use: (u.cnpj || u.cpf) === result.draggableId
-    );
+    // Impede que cards das colunas "Parcelado" e "Parcelas" sejam movidos para outras colunas
+    const sourceColumnId = source.droppableId;
+    if (sourceColumnId === "parcelado" || sourceColumnId === "parcelas") {
+      toast(
+        'Não é possível mover cards de "Parcelado" ou "Parcelas" para outras colunas.',
+        { icon: "🚫" }
+      );
+      return; // Cancela a movimentação
+    }
 
-    const documento = unidadeCard?.cnpj || unidadeCard?.cpf;
+    // Impede que cards com status "perda" sejam movidos para "quitado"
+    if (sourceColumnId === "perda" && destinationColumnId === "quitado") {
+      toast("Não é possível quitar cobranças em perda.", { icon: "🚫" });
+      return; // Cancela a movimentação
+    }
 
-    // Verifica se é uma unidade com status misto no modo agrupado usando CNPJ
-    if (
-      aba === "unidade" &&
-      documento &&
-      unidadesComStatusMisto.has(documento)
-    ) {
+    // Se a unidade tiver status misto, impede a movimentação
+    const docUnidade = draggableId;
+    if (unidadesComStatusMisto.has(docUnidade)) {
       // Define qual unidade será mostrada no modal de detalhes
-      setModalDetalhesStatusMisto(documento ?? null);
+      setModalDetalhesStatusMisto(docUnidade ?? null);
       setShowMixedStatusWarning(true);
       return;
     }
@@ -1231,9 +1246,44 @@ export function KanbanCobranca() {
 
   // Handler para drag-and-drop individual
   const onDragEndIndividual = async (result: DropResult) => {
-    if (!result.destination) return;
     const { source, destination, draggableId } = result;
-    if (source.droppableId === destination.droppableId) return;
+
+    if (!destination) return;
+
+    const destinationColumnId = destination.droppableId;
+
+    // Impede que cards sejam arrastados para as colunas "Parcelado" ou "Parcelas"
+    if (
+      destinationColumnId === "parcelado" ||
+      destinationColumnId === "parcelas"
+    ) {
+      toast(
+        "O parcelamento deve ser feito pela tela de Central de Parcelamento.",
+        { icon: "⚠️" }
+      );
+      return; // Cancela a movimentação
+    }
+
+    // Impede que cards das colunas "Parcelado" e "Parcelas" sejam movidos para outras colunas
+    const sourceColumnId = source.droppableId;
+    if (sourceColumnId === "parcelado" || sourceColumnId === "parcelas") {
+      toast(
+        'Não é possível mover cards de "Parcelado" ou "Parcelas" para outras colunas.',
+        { icon: "🚫" }
+      );
+      return; // Cancela a movimentação
+    }
+
+    // Impede que cards com status "perda" sejam movidos para "quitado"
+    if (sourceColumnId === "perda" && destinationColumnId === "quitado") {
+      toast("Não é possível quitar cobranças em perda.", { icon: "🚫" });
+      return; // Cancela a movimentação
+    }
+
+    // Se o card foi movido para a mesma posição, não faz nada
+    if (source.droppableId === destination.droppableId) {
+      return;
+    }
 
     console.log(
       `Movendo card individual: ${draggableId} de ${source.droppableId} para ${destination.droppableId}`
@@ -1667,28 +1717,33 @@ _Mensagem Automática do Sistema_
       typeof documento === "string" && unidadesComStatusMisto.has(documento);
     // Detecta quando a unidade agrupada representa apenas cobranças parceladas
     const temParceladoAgrupado =
-      unit.status_atual === "parcelas" || unit.status_atual === "parcelado" ||
-      (Array.isArray(unit.charges) && unit.charges.length > 0 && unit.charges.every((c) => c.status_atual === "parcelas" || c.status_atual === "parcelado"));
+      unit.status_atual === "parcelas" ||
+      unit.status_atual === "parcelado" ||
+      (Array.isArray(unit.charges) &&
+        unit.charges.length > 0 &&
+        unit.charges.every(
+          (c) => c.status_atual === "parcelas" || c.status_atual === "parcelado"
+        ));
 
     const dragDisabled = temStatusMisto || temParceladoAgrupado;
 
-      // Determina label e contagem adequada para exibição no card da unidade
-      const unidadeDocKey = unit.cnpj || (unit as any).cpf || "";
-      const mapaStatus = contagensPorUnidadePorStatus[unidadeDocKey] || {};
-      const countFromMapa = (status: string) => mapaStatus[status] || 0;
+    // Determina label e contagem adequada para exibição no card da unidade
+    const unidadeDocKey = unit.cnpj || (unit as any).cpf || "";
+    const mapaStatus = contagensPorUnidadePorStatus[unidadeDocKey] || {};
+    const countFromMapa = (status: string) => mapaStatus[status] || 0;
 
-      let counterLabel = "Cobranças:";
-      let counterValue = obterQuantidadeTotalCobrancas(unidadeDocKey);
+    let counterLabel = "Cobranças:";
+    let counterValue = obterQuantidadeTotalCobrancas(unidadeDocKey);
 
-      if (unit.status_atual === "parcelas") {
-        counterLabel = "Parcelas:";
-        const n = countFromMapa("parcelas");
-        counterValue = n > 0 ? n : obterQuantidadeTotalCobrancas(unidadeDocKey);
-      } else if (unit.status_atual === "parcelado") {
-        counterLabel = "Cobranças:";
-        const n = countFromMapa("parcelado");
-        counterValue = n > 0 ? n : obterQuantidadeTotalCobrancas(unidadeDocKey);
-      }
+    if (unit.status_atual === "parcelas") {
+      counterLabel = "Parcelas:";
+      const n = countFromMapa("parcelas");
+      counterValue = n > 0 ? n : obterQuantidadeTotalCobrancas(unidadeDocKey);
+    } else if (unit.status_atual === "parcelado") {
+      counterLabel = "Cobranças:";
+      const n = countFromMapa("parcelado");
+      counterValue = n > 0 ? n : obterQuantidadeTotalCobrancas(unidadeDocKey);
+    }
 
     return (
       <Draggable
@@ -1707,7 +1762,9 @@ _Mensagem Automática do Sistema_
             } ${getCriticidadeColor(
               unit.charges[0]?.criticidade || "normal",
               unit.status_atual
-            )} ${dragDisabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+            )} ${
+              dragDisabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+            }`}
             onClick={() => {
               // Limpa o estado da cobrança individual antes de abrir modal da unidade
               setCobrancaSelecionada(null);
@@ -1931,10 +1988,6 @@ _Mensagem Automática do Sistema_
                     </span>
                   </span>
                 )}
-              </p>
-              <p className="text-gray-500 text-xs mt-1">
-                💡 Dica: Use Ctrl+Shift+K para limpar cache • Sistema monitora
-                travas automaticamente
               </p>
             </div>
           </div>
@@ -3103,7 +3156,7 @@ _Mensagem Automática do Sistema_
               </div>
 
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                <p className="text-yellow-800 text-sm font-medium">
+                <p className="text-yellow-800 text-sm font-medium mb-2">
                   ⚠️ A mensagem incluirá o detalhamento de todas as cobranças
                   pendentes da unidade.
                 </p>

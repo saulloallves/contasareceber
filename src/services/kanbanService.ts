@@ -8,13 +8,10 @@ import {
   EstatisticasKanban,
   LogMovimentacao,
 } from "../types/kanban";
-import { TrativativasService } from "./tratativasService";
 
 export class KanbanService {
-  private tratativasService: TrativativasService;
 
   constructor() {
-    this.tratativasService = new TrativativasService();
   }
 
   /**
@@ -247,6 +244,77 @@ export class KanbanService {
       // Combina os resultados das duas consultas em um único array
       const todas = [...(naoQuitadasData || []), ...quitadasComUnidade];
 
+      // --- BUSCA INFORMAÇÕES DAS PARCELAS ---
+      // Para cobranças que são parcelas, buscar informações adicionais
+      const cobrancasParcelas = todas.filter((c) => c.is_parcela === true);
+      if (cobrancasParcelas.length > 0) {
+        const cobrancasIds = cobrancasParcelas.map((c) => c.id);
+        
+        // Buscar informações das parcelas
+        const { data: parcelasData, error: parcelasError } = await supabase
+          .from("parcelas_acordo")
+          .select(`
+            cobranca_id,
+            numero_parcela,
+            acordo_id,
+            acordos_parcelamento (
+              quantidade_parcelas
+            )
+          `)
+          .in("cobranca_id", cobrancasIds);
+
+        if (!parcelasError && parcelasData) {
+          // Criar mapa das informações das parcelas
+          const parcelasMap = new Map();
+          parcelasData.forEach((parcela) => {
+            // Acessar o primeiro elemento do array acordos_parcelamento
+            const acordo = Array.isArray(parcela.acordos_parcelamento) 
+              ? parcela.acordos_parcelamento[0] 
+              : parcela.acordos_parcelamento;
+            const quantidadeParcelas = acordo?.quantidade_parcelas;
+            
+            parcelasMap.set(parcela.cobranca_id, {
+              numero_parcela: parcela.numero_parcela,
+              quantidade_parcelas: quantidadeParcelas
+            });
+          });
+
+          console.debug('[kanbanService] Informações das parcelas carregadas:', {
+            totalParcelas: parcelasData.length,
+            primeirasParcelas: parcelasData.slice(0, 3).map(p => {
+              const acordo = Array.isArray(p.acordos_parcelamento) 
+                ? p.acordos_parcelamento[0] 
+                : p.acordos_parcelamento;
+              return {
+                cobranca_id: p.cobranca_id,
+                numero_parcela: p.numero_parcela,
+                quantidade_parcelas: acordo?.quantidade_parcelas,
+                acordo_completo: acordo
+              };
+            })
+          });
+
+          // Adicionar informações das parcelas às cobranças
+          todas.forEach((cobranca) => {
+            if (cobranca.is_parcela && parcelasMap.has(cobranca.id)) {
+              const parcelaInfo = parcelasMap.get(cobranca.id);
+              cobranca.numero_parcela = parcelaInfo.numero_parcela;
+              cobranca.quantidade_parcelas = parcelaInfo.quantidade_parcelas;
+              
+              // Log específico para debug
+              console.debug('[kanbanService] Parcela processada:', {
+                id: cobranca.id,
+                numero_parcela: parcelaInfo.numero_parcela,
+                quantidade_parcelas: parcelaInfo.quantidade_parcelas
+              });
+            }
+          });
+        } else if (parcelasError) {
+          console.error('[kanbanService] Erro ao buscar informações das parcelas:', parcelasError);
+        }
+      }
+      // --- FIM DA BUSCA DE INFORMAÇÕES DAS PARCELAS ---
+
       // Separa parcelas das cobranças normais
       const parcelas = todas.filter((c) => c.is_parcela === true);
       const naoParcelas = todas.filter((c) => !c.is_parcela);
@@ -298,15 +366,18 @@ export class KanbanService {
         } else {
           resultadoNaoParcelas = this.criarCardsIndividuais(
             naoParcelas,
-            filtros
+            filtros,
+            false
           );
         }
       }
 
-      // Em seguida, cria cards individuais para as parcelas e os anexa, garantindo visibilidade
+      // Em seguida, trata as parcelas (agrupadas ou individuais conforme o modo)
       const cartasParcelas =
         parcelas.length > 0
-          ? this.criarCardsIndividuais(parcelas, filtros)
+          ? agruparPorUnidade 
+            ? this.agruparParcelasPorUnidade(parcelas, filtros)
+            : this.criarCardsIndividuais(parcelas, filtros, false)
           : [];
 
       return [...resultadoNaoParcelas, ...cartasParcelas];
@@ -321,10 +392,33 @@ export class KanbanService {
    */
   private criarCardsIndividuais(
     cobrancas: any[],
-    filtros: FiltrosKanban
+    filtros: FiltrosKanban,
+    modoAgrupado: boolean = false
   ): CardCobranca[] {
-    // Ordena as cobranças alfabeticamente pelo nome da unidade antes de criar os cards
+    // Ordenação específica: parcelas por número, cobranças normais por nome da unidade
     const cobrancasOrdenadas = cobrancas.sort((a, b) => {
+      // Se ambos são parcelas, ordena pelo número da parcela
+      if (a.is_parcela && b.is_parcela) {
+        const parcelaA = a.numero_parcela || 0;
+        const parcelaB = b.numero_parcela || 0;
+        
+        // Debug para verificar ordenação das parcelas
+        if (cobrancas.filter(c => c.is_parcela).length <= 5) {
+          console.debug('[kanbanService] Ordenando parcelas:', {
+            parcelaA: { id: a.id, numero: parcelaA },
+            parcelaB: { id: b.id, numero: parcelaB },
+            resultado: parcelaA - parcelaB
+          });
+        }
+        
+        return parcelaA - parcelaB;
+      }
+      
+      // Se apenas um é parcela, parcelas vêm primeiro
+      if (a.is_parcela && !b.is_parcela) return -1;
+      if (!a.is_parcela && b.is_parcela) return 1;
+      
+      // Se ambos são cobranças normais, ordena por nome da unidade
       const nomeA = a.unidades_franqueadas?.nome_unidade || a.cliente || '';
       const nomeB = b.unidades_franqueadas?.nome_unidade || b.cliente || '';
       return nomeA.localeCompare(nomeB, 'pt-BR', { sensitivity: 'base' });
@@ -335,17 +429,6 @@ export class KanbanService {
         const unidade = cobranca.unidades_franqueadas;
         const valorAtual = cobranca.valor_atualizado || cobranca.valor_original;
 
-        // Para parcelas, ajustar o nome para mostrar informações da parcela
-        let nomeUnidade = unidade?.nome_unidade || cobranca.cliente;
-        let descricaoCobranca = cobranca.descricao;
-
-        if (cobranca.is_parcela) {
-          nomeUnidade = `${nomeUnidade} - ${cobranca.cliente}`;
-          descricaoCobranca = `Parcela de parcelamento - ${
-            cobranca.descricao || ""
-          }`;
-        }
-
         // Helper local para procurar valores de metadados com nomes alternativos
         const getFirst = (obj: any, keys: string[]) => {
           for (const k of keys) {
@@ -353,6 +436,35 @@ export class KanbanService {
           }
           return null;
         };
+
+        // Para parcelas, ajustar o nome para mostrar informações da parcela
+        let nomeUnidade = unidade?.nome_unidade || cobranca.cliente;
+        let descricaoCobranca = cobranca.descricao;
+
+        if (cobranca.is_parcela) {
+          // Usar as informações já buscadas e adicionadas à cobrança
+          const parcelaNum = cobranca.numero_parcela || 1;
+          const totalParcelas = cobranca.quantidade_parcelas;
+
+          // Log para debug
+          console.debug('[kanbanService] Criando card para parcela:', {
+            id: cobranca.id,
+            numero_parcela: parcelaNum,
+            quantidade_parcelas: totalParcelas,
+            modoAgrupado
+          });
+
+          if (modoAgrupado) {
+            // Para modo agrupado: apenas "Parcelamento"
+            nomeUnidade = "Parcelamento";
+          } else {
+            // Para modo individual: "Parcela X/Y - Parcelamento"
+            // Se não temos o total, fallback para 1
+            const total = totalParcelas || 1;
+            nomeUnidade = `Parcela ${parcelaNum}/${total} - Parcelamento`;
+          }
+          descricaoCobranca = `Parcela de parcelamento - ${unidade?.nome_unidade || cobranca.cliente}`;
+        }
 
         const generatedId = `gen-${
           cobranca.cnpj || cobranca.cliente || "card"
@@ -411,6 +523,110 @@ export class KanbanService {
         return card;
       })
       .filter((card) => this.aplicarFiltrosCard(card, filtros));
+  }
+
+  /**
+   * Agrupa parcelas por unidade (CNPJ ou CPF) - mostra "Parcelamento - Nome da Unidade"
+   */
+  private agruparParcelasPorUnidade(
+    parcelas: any[],
+    filtros: FiltrosKanban
+  ): CardCobranca[] {
+    const cardsMap = new Map<
+      string,
+      CardCobranca & { _parcelasNumeros?: number[]; _observacoesList?: string[] }
+    >();
+
+    parcelas.forEach((parcela) => {
+      // A chave de agrupamento é o CNPJ ou, se não houver, o CPF.
+      const chaveUnidade = parcela.cnpj || parcela.cpf;
+      if (!chaveUnidade) return; // Ignora parcelas sem um documento
+
+      if (!cardsMap.has(chaveUnidade)) {
+        const unidade = parcela.unidades_franqueadas;
+        cardsMap.set(chaveUnidade, {
+          id: `parcelamento-${chaveUnidade}`, // ID único para o agrupamento de parcelas
+          codigo_unidade: unidade?.codigo_unidade || chaveUnidade,
+          nome_unidade: "Parcelamento",
+          cnpj: parcela.cnpj || "",
+          cpf: parcela.cpf || "",
+          tipo_debito: "Parcelamento",
+          valor_total: 0,
+          valor_original: 0,
+          data_vencimento_antiga: parcela.data_vencimento,
+          data_vencimento_recente: parcela.data_vencimento,
+          status_atual: this.determinarStatusKanban(parcela.status),
+          ultima_acao: "Parcelas agrupadas",
+          data_ultima_acao: parcela.created_at || new Date().toISOString(),
+          responsavel_atual: "Equipe Cobrança",
+          dias_parado: 0,
+          criticidade: "normal",
+          data_entrada_etapa: parcela.created_at || new Date().toISOString(),
+          quantidade_titulos: 0,
+          _parcelasNumeros: [],
+          _observacoesList: [],
+          observacoes: "",
+          descricao_cobranca: `Agrupamento de parcelas - ${unidade?.nome_unidade || parcela.cliente}`,
+          valor_recebido: 0,
+          is_parcela: true,
+        } as any);
+      }
+
+      const card = cardsMap.get(chaveUnidade)!;
+      const valorAtual = parcela.valor_atualizado || parcela.valor_original;
+      card.valor_total += valorAtual;
+      card.valor_original = (card.valor_original || 0) + (parcela.valor_original || 0);
+      card.quantidade_titulos = (card.quantidade_titulos || 0) + 1;
+      card._parcelasNumeros!.push(parcela.numero_parcela || 0);
+
+      if (new Date(parcela.data_vencimento) < new Date(card.data_vencimento_antiga)) {
+        card.data_vencimento_antiga = parcela.data_vencimento;
+      }
+      if (new Date(parcela.data_vencimento) > new Date(card.data_vencimento_recente)) {
+        card.data_vencimento_recente = parcela.data_vencimento;
+      }
+
+      if (parcela.observacoes) {
+        card._observacoesList!.push(parcela.observacoes);
+      }
+
+      if (new Date(parcela.created_at) > new Date(card.data_ultima_acao)) {
+        card.data_ultima_acao = parcela.created_at;
+        card.ultima_acao = "Parcela atualizada";
+      }
+    });
+
+    const cards = Array.from(cardsMap.values()).map((card) => {
+      const observacaoFinal = card._observacoesList?.find((obs) => obs && obs.trim() !== "") || "";
+      const parcelasOrdenadas = card._parcelasNumeros!.sort((a, b) => a - b);
+      
+      // Criar descrição das parcelas agrupadas
+      const descricaoParcelas = parcelasOrdenadas.length > 0 
+        ? `Parcelas ${parcelasOrdenadas[0]} a ${parcelasOrdenadas[parcelasOrdenadas.length - 1]}`
+        : "Parcelas agrupadas";
+
+      const finalCard: CardCobranca = {
+        ...card,
+        criticidade: this.determinarCriticidade(card),
+        observacoes: observacaoFinal,
+        ultima_acao: `${descricaoParcelas} - ${card.ultima_acao}`,
+      };
+
+      // Remove propriedades temporárias
+      delete (finalCard as any)._parcelasNumeros;
+      delete (finalCard as any)._observacoesList;
+
+      return finalCard;
+    });
+
+    // Ordena os cards agrupados alfabeticamente pelo nome da unidade
+    const cardsOrdenados = cards
+      .filter((card) => this.aplicarFiltrosCard(card, filtros))
+      .sort((a, b) => {
+        return a.nome_unidade.localeCompare(b.nome_unidade, 'pt-BR', { sensitivity: 'base' });
+      });
+
+    return cardsOrdenados;
   }
 
   /**
@@ -808,7 +1024,7 @@ export class KanbanService {
         .range(0, 5000);
       // Considera apenas cobranças realmente em aberto
       const abertas = (brutas || []).filter(
-        (c: any) => c.status !== "quitado" && c.status !== "perda"
+        (c: any) => c.status !== "quitado" && c.status !== "perda" && c.status !== "parcelas"
       );
       const totalOriginalAberto = abertas.reduce(
         (sum: number, c: any) => sum + (Number(c.valor_original) || 0),

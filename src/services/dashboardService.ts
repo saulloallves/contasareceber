@@ -1,5 +1,10 @@
-import { supabase } from './databaseService';
-import { IndicadoresMensais, UnidadeRisco, AlertaAutomatico, DashboardData } from '../types/dashboard';
+import { supabase } from "./databaseService";
+import {
+  IndicadoresMensais,
+  UnidadeRisco,
+  AlertaAutomatico,
+  DashboardData,
+} from "../types/dashboard";
 
 type Cobranca = {
   status: string;
@@ -18,43 +23,62 @@ export class DashboardService {
     try {
       // Buscar dados de cobranças
       const { data: cobrancas, error: cobrancasError } = await supabase
-        .from('cobrancas_franqueados')
-        .select('*');
+        .from("cobrancas_franqueados")
+        .select("*");
 
       if (cobrancasError) throw cobrancasError;
 
       // Calcular indicadores
-      const abertas = (cobrancas as Cobranca[] | null)
-        ?.filter(c => !['quitado', 'perda'].includes(c.status)) || [];
-
       const totalEmAbertoOriginal = (cobrancas as Cobranca[] | null)
-        ?.filter(c => !['quitado', 'perda'].includes(c.status))
+        ?.filter((c) => !["quitado", "perda", "parcelas"].includes(c.status))
         .reduce((sum, c) => sum + (Number(c.valor_original) || 0), 0);
 
       const totalEmAbertoAtualizado = (cobrancas as Cobranca[] | null)
-        ?.filter(c => !['quitado', 'perda'].includes(c.status))
-        .reduce((sum, c) => sum + (Number(c.valor_atualizado ?? c.valor_original) || 0), 0);
+        ?.filter((c) => !["quitado", "perda", "parcelas"].includes(c.status))
+        .reduce(
+          (sum, c) =>
+            sum + (Number(c.valor_atualizado ?? c.valor_original) || 0),
+          0
+        );
 
       // Mantém campo legado (totalEmAberto) como ATUALIZADO para compatibilidade visual anterior
       const totalEmAberto = totalEmAbertoAtualizado;
 
-      const totalQuitado = (cobrancas as Cobranca[] | null)
-        ?.filter(c => c.status === 'quitado')
-        ?.reduce((sum, c) => sum + (Number(c.valor_recebido) || Number(c.valor_original) || 0), 0) || 0;
+      const totalQuitado =
+        (cobrancas as Cobranca[] | null)
+          ?.filter((c) => c.status === "quitado")
+          ?.reduce(
+            (sum, c) =>
+              sum + (Number(c.valor_recebido) || Number(c.valor_original) || 0),
+            0
+          ) || 0;
 
-      const totalNegociando = (cobrancas as Cobranca[] | null)
-        ?.filter(c => ['negociando', 'cobrado', 'em_tratativa_juridica', 'em_tratativa_critica', 'em_negociacao'].includes(c.status))
-        ?.reduce((sum, c) => sum + (Number(c.valor_atualizado) || Number(c.valor_original) || 0), 0) || 0;
+      const totalNegociando =
+        (cobrancas as Cobranca[] | null)
+          ?.filter((c) => ["negociando", "em_negociacao"].includes(c.status))
+          ?.reduce(
+            (sum, c) =>
+              sum +
+              (Number(c.valor_atualizado) || Number(c.valor_original) || 0),
+            0
+          ) || 0;
 
       const unidadesInadimplentes = new Set(
-        (cobrancas as Cobranca[] | null)?.filter(c => !['quitado', 'perda'].includes(c.status))?.map(c => c.cnpj || '')
+        (cobrancas as Cobranca[] | null)
+          ?.filter((c) => !["quitado", "perda"].includes(c.status))
+          ?.map((c) => c.cnpj || "")
       ).size;
 
-      const ticketMedio = unidadesInadimplentes > 0 ? totalEmAberto / unidadesInadimplentes : 0;
+      const ticketMedio =
+        unidadesInadimplentes > 0
+          ? (totalEmAberto ?? 0) / unidadesInadimplentes
+          : 0;
 
-      const totalBase = totalEmAberto + totalQuitado + totalNegociando;
-      const percentualInadimplencia = totalBase > 0 ? (totalEmAberto / totalBase) * 100 : 0;
-      const percentualRecuperacao = totalBase > 0 ? (totalQuitado / totalBase) * 100 : 0;
+      const totalBase = totalEmAberto ?? 0 + totalQuitado + totalNegociando;
+      const percentualInadimplencia =
+        totalBase > 0 ? (totalEmAberto ?? 0 / totalBase) * 100 : 0;
+      const percentualRecuperacao =
+        totalBase > 0 ? (totalQuitado / totalBase) * 100 : 0;
 
       // ===== Cálculo real de variações mês a mês =====
       // Definição de mês por data_vencimento; para quitados usamos data_ultima_atualizacao ou created_at como aproximação.
@@ -74,41 +98,101 @@ export class DashboardService {
         return d >= start && d < end;
       };
 
-      const OPEN_STATUSES = ['em_aberto', 'em_atraso', 'negociando', 'cobrado', 'em_tratativa_juridica', 'em_tratativa_critica'];
-      const NEGOTIATING_STATUSES = ['negociando', 'cobrado', 'em_tratativa_juridica', 'em_tratativa_critica'];
+      const OPEN_STATUSES = [
+        "em_aberto",
+        "em_atraso",
+        "negociando",
+        "cobrado",
+        "em_tratativa_juridica",
+        "em_tratativa_critica",
+      ];
+      const NEGOTIATING_STATUSES = [
+        "negociando",
+        "em_negociacao",
+        "em_tratativa_juridica",
+        "em_tratativa_critica",
+      ];
 
-      const currByVenc = (cobrancas as Cobranca[] | null)?.filter(c => inRange(parseDate(c.data_vencimento || null), currStart, nextStart)) || [];
-      const prevByVenc = (cobrancas as Cobranca[] | null)?.filter(c => inRange(parseDate(c.data_vencimento || null), prevStart, currStart)) || [];
+      const currByVenc =
+        (cobrancas as Cobranca[] | null)?.filter((c) =>
+          inRange(parseDate(c.data_vencimento || null), currStart, nextStart)
+        ) || [];
+      const prevByVenc =
+        (cobrancas as Cobranca[] | null)?.filter((c) =>
+          inRange(parseDate(c.data_vencimento || null), prevStart, currStart)
+        ) || [];
 
-      const sum = (arr: Cobranca[], pick: (c: Cobranca) => number) => arr.reduce((acc, c) => acc + pick(c), 0);
+      const sum = (arr: Cobranca[], pick: (c: Cobranca) => number) =>
+        arr.reduce((acc, c) => acc + pick(c), 0);
 
       // Em aberto (atualizado) por mês de vencimento
-      const currEmAberto = sum(currByVenc.filter(c => OPEN_STATUSES.includes(c.status)), c => Number(c.valor_atualizado ?? c.valor_original) || 0);
-      const prevEmAberto = sum(prevByVenc.filter(c => OPEN_STATUSES.includes(c.status)), c => Number(c.valor_atualizado ?? c.valor_original) || 0);
+      const currEmAberto = sum(
+        currByVenc.filter((c) => OPEN_STATUSES.includes(c.status)),
+        (c) => Number(c.valor_atualizado ?? c.valor_original) || 0
+      );
+      const prevEmAberto = sum(
+        prevByVenc.filter((c) => OPEN_STATUSES.includes(c.status)),
+        (c) => Number(c.valor_atualizado ?? c.valor_original) || 0
+      );
 
       // Quitado por "data da quitação" aproximada (data_ultima_atualizacao || created_at)
-      const getQuitDate = (c: Cobranca) => parseDate(c.data_ultima_atualizacao || c.created_at || null);
-      const currQuitados = (cobrancas as Cobranca[] | null)?.filter(c => c.status === 'quitado' && inRange(getQuitDate(c), currStart, nextStart)) || [];
-      const prevQuitados = (cobrancas as Cobranca[] | null)?.filter(c => c.status === 'quitado' && inRange(getQuitDate(c), prevStart, currStart)) || [];
-      const currQuitadoVal = sum(currQuitados, c => Number(c.valor_recebido) || Number(c.valor_original) || 0);
-      const prevQuitadoVal = sum(prevQuitados, c => Number(c.valor_recebido) || Number(c.valor_original) || 0);
+      const getQuitDate = (c: Cobranca) =>
+        parseDate(c.data_ultima_atualizacao || c.created_at || null);
+      const currQuitados =
+        (cobrancas as Cobranca[] | null)?.filter(
+          (c) =>
+            c.status === "quitado" &&
+            inRange(getQuitDate(c), currStart, nextStart)
+        ) || [];
+      const prevQuitados =
+        (cobrancas as Cobranca[] | null)?.filter(
+          (c) =>
+            c.status === "quitado" &&
+            inRange(getQuitDate(c), prevStart, currStart)
+        ) || [];
+      const currQuitadoVal = sum(
+        currQuitados,
+        (c) => Number(c.valor_recebido) || Number(c.valor_original) || 0
+      );
+      const prevQuitadoVal = sum(
+        prevQuitados,
+        (c) => Number(c.valor_recebido) || Number(c.valor_original) || 0
+      );
 
       // Negociando por mês de vencimento
-      const currNegociando = sum(currByVenc.filter(c => NEGOTIATING_STATUSES.includes(c.status)), c => Number(c.valor_atualizado) || Number(c.valor_original) || 0);
-      const prevNegociando = sum(prevByVenc.filter(c => NEGOTIATING_STATUSES.includes(c.status)), c => Number(c.valor_atualizado) || Number(c.valor_original) || 0);
+      const currNegociando = sum(
+        currByVenc.filter((c) => NEGOTIATING_STATUSES.includes(c.status)),
+        (c) => Number(c.valor_atualizado) || Number(c.valor_original) || 0
+      );
+      const prevNegociando = sum(
+        prevByVenc.filter((c) => NEGOTIATING_STATUSES.includes(c.status)),
+        (c) => Number(c.valor_atualizado) || Number(c.valor_original) || 0
+      );
 
       // Debug para verificar valores de negociação
-      console.log('Debug negociando:', {
+      console.log("Debug negociando:", {
         currNegociando,
         prevNegociando,
         totalNegociando,
-        currByVenc: currByVenc.filter(c => NEGOTIATING_STATUSES.includes(c.status)).length,
-        prevByVenc: prevByVenc.filter(c => NEGOTIATING_STATUSES.includes(c.status)).length
+        currByVenc: currByVenc.filter((c) =>
+          NEGOTIATING_STATUSES.includes(c.status)
+        ).length,
+        prevByVenc: prevByVenc.filter((c) =>
+          NEGOTIATING_STATUSES.includes(c.status)
+        ).length,
       });
 
       // Unidades inadimplentes por mês (distintas por CNPJ) usando mês de vencimento para status em aberto
-      const currUnidades = new Set(currByVenc.filter(c => OPEN_STATUSES.includes(c.status)).map(c => c.cnpj || '')).size;
-      const prevUnidades = new Set(prevByVenc.filter(c => OPEN_STATUSES.includes(c.status)).map(c => c.cnpj || '')).size;
+      const currUnidades = new Set(
+        currByVenc
+          .filter((c) => OPEN_STATUSES.includes(c.status))
+          .map((c) => c.cnpj || "")
+      ).size;
+      const prevUnidades = new Set(
+        prevByVenc
+          .filter((c) => OPEN_STATUSES.includes(c.status))
+          .map((c) => c.cnpj || "")
+      ).size;
 
       const pctChange = (curr: number, prev: number) => {
         if (!prev && !curr) return 0;
@@ -123,10 +207,10 @@ export class DashboardService {
       const variacaoNegociando = pctChange(totalNegociando, prevNegociando);
       const variacaoUnidades = pctChange(currUnidades, prevUnidades);
 
-      console.log('Debug variação negociando final:', {
+      console.log("Debug variação negociando final:", {
         totalNegociando,
         prevNegociando,
-        variacaoNegociando
+        variacaoNegociando,
       });
 
       return {
@@ -138,16 +222,16 @@ export class DashboardService {
         percentual_inadimplencia: percentualInadimplencia,
         unidades_inadimplentes: unidadesInadimplentes,
         ticket_medio_dividas: ticketMedio,
-  percentual_recuperacao: percentualRecuperacao,
-  variacao_unidades: variacaoUnidades,
+        percentual_recuperacao: percentualRecuperacao,
+        variacao_unidades: variacaoUnidades,
         comparativo_mes_anterior: {
           variacao_em_aberto: variacaoEmAberto,
           variacao_pago: variacaoQuitado,
-          variacao_negociando: variacaoNegociando
-        }
+          variacao_negociando: variacaoNegociando,
+        },
       };
     } catch (error) {
-      console.error('Erro ao buscar indicadores mensais:', error);
+      console.error("Erro ao buscar indicadores mensais:", error);
       throw error;
     }
   }
@@ -167,12 +251,12 @@ export class DashboardService {
   async exportarParaExcel(dados: DashboardData): Promise<Blob> {
     // Gera um CSV simples com alguns campos principais
     const linhas: string[] = [];
-    linhas.push('Metricas,Valor');
+    linhas.push("Metricas,Valor");
     linhas.push(`Total Em Aberto,${dados.visaoGeral.totalEmAberto}`);
     linhas.push(`Total Quitado,${dados.visaoGeral.totalQuitado}`);
     linhas.push(`Total Negociando,${dados.visaoGeral.totalNegociando}`);
-    const conteudo = linhas.join('\n');
-    return new Blob([conteudo], { type: 'text/csv;charset=utf-8;' });
+    const conteudo = linhas.join("\n");
+    return new Blob([conteudo], { type: "text/csv;charset=utf-8;" });
   }
 
   async gerarAlertasAutomaticos(): Promise<number> {
@@ -180,8 +264,12 @@ export class DashboardService {
     return 0;
   }
 
-  async resolverAlerta(_alertaId: string, _observacoes?: string): Promise<void> {
-    void _alertaId; void _observacoes;
+  async resolverAlerta(
+    _alertaId: string,
+    _observacoes?: string
+  ): Promise<void> {
+    void _alertaId;
+    void _observacoes;
     // TODO: implementar resolução real; por ora é no-op
     return;
   }
@@ -189,17 +277,15 @@ export class DashboardService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async buscarDadosDashboard(filtros: any) {
     try {
-      let query = supabase
-        .from('cobrancas_franqueados')
-        .select('*');
+      let query = supabase.from("cobrancas_franqueados").select("*");
 
       // Aplicar filtros
       if (filtros.status) {
-        query = query.eq('status', filtros.status);
+        query = query.eq("status", filtros.status);
       }
 
       if (filtros.tipo) {
-        query = query.eq('tipo_cobranca', filtros.tipo);
+        query = query.eq("tipo_cobranca", filtros.tipo);
       }
 
       // Filtro de período
@@ -207,7 +293,7 @@ export class DashboardService {
         const diasAtras = parseInt(filtros.periodo);
         const dataLimite = new Date();
         dataLimite.setDate(dataLimite.getDate() - diasAtras);
-        query = query.gte('created_at', dataLimite.toISOString());
+        query = query.gte("created_at", dataLimite.toISOString());
       }
 
       const { data, error } = await query;
@@ -216,7 +302,7 @@ export class DashboardService {
 
       const result = {
         cobrancas: data,
-  visaoGeral: this.calcularVisaoGeral((data || []) as Cobranca[])
+        visaoGeral: this.calcularVisaoGeral((data || []) as Cobranca[]),
       };
       // Completa campos mínimos esperados pelo componente com estruturas vazias
       const dashboardData = {
@@ -228,12 +314,12 @@ export class DashboardService {
           totalAgendamentos: 0,
           conversaoAgendamento: 0,
           tempoMedioResolucao: 0,
-          taxaConversao: 0
-        }
+          taxaConversao: 0,
+        },
       } as unknown as DashboardData;
       return dashboardData;
     } catch (error) {
-      console.error('Erro ao buscar dados do dashboard:', error);
+      console.error("Erro ao buscar dados do dashboard:", error);
       throw error;
     }
   }
@@ -241,16 +327,35 @@ export class DashboardService {
   private calcularVisaoGeral(cobrancas: Cobranca[]) {
     return {
       totalEmAberto: cobrancas
-        .filter(c => ['em_aberto', 'em_atraso'].includes(c.status))
-        .reduce((sum, c) => sum + (Number(c.valor_atualizado) || Number(c.valor_original) || 0), 0),
-      
+        .filter((c) => ["em_aberto", "em_atraso"].includes(c.status))
+        .reduce(
+          (sum, c) =>
+            sum + (Number(c.valor_atualizado) || Number(c.valor_original) || 0),
+          0
+        ),
+
       totalQuitado: cobrancas
-        .filter(c => c.status === 'quitado')
-        .reduce((sum, c) => sum + (Number(c.valor_recebido) || Number(c.valor_original) || 0), 0),
-      
+        .filter((c) => c.status === "quitado")
+        .reduce(
+          (sum, c) =>
+            sum + (Number(c.valor_recebido) || Number(c.valor_original) || 0),
+          0
+        ),
+
       totalNegociando: cobrancas
-        .filter(c => ['negociando', 'cobrado', 'em_tratativa_juridica', 'em_tratativa_critica'].includes(c.status))
-        .reduce((sum, c) => sum + (Number(c.valor_atualizado) || Number(c.valor_original) || 0), 0)
+        .filter((c) =>
+          [
+            "negociando",
+            "cobrado",
+            "em_tratativa_juridica",
+            "em_tratativa_critica",
+          ].includes(c.status)
+        )
+        .reduce(
+          (sum, c) =>
+            sum + (Number(c.valor_atualizado) || Number(c.valor_original) || 0),
+          0
+        ),
     };
   }
 
