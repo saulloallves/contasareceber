@@ -4,11 +4,40 @@ import { useState, useEffect } from "react";
 import {
   Building2, Settings, Phone, Mail,
   Instagram, MapPin, Calendar, Clock, Info,
+  Users, User, CheckCircle, XCircle,
 } from "lucide-react";
 import { supabase } from "../services/databaseService";
 import { toast } from 'react-hot-toast';
 import { formatarCNPJCPF } from "../utils/formatters";
-import { connectionService } from "../services/connectionService";
+
+// Hook para obter informações do usuário logado
+const useUsuarioLogado = () => {
+  const [usuario, setUsuario] = useState<any>(null);
+  const [carregandoUsuario, setCarregandoUsuario] = useState(true);
+
+  useEffect(() => {
+    const carregarUsuario = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: usuarioSistema } = await supabase
+            .from('usuarios_sistema')
+            .select('*')
+            .eq('email', user.email)
+            .single();
+          setUsuario(usuarioSistema);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar usuário:', error);
+      } finally {
+        setCarregandoUsuario(false);
+      }
+    };
+    carregarUsuario();
+  }, []);
+
+  return { usuario, carregandoUsuario };
+};
 
 // ====== Utilitário (escopo de módulo, hoisted) ======
 function soDigitos(s: string): string {
@@ -42,7 +71,33 @@ function truncateText(text: string, max: number) {
   return text.length > max ? text.slice(0, max - 3) + "..." : text;
 }
 
+function getTipoBadge(tipo: string | undefined) {
+  if (!tipo) {
+    return {
+      label: "Sem Tipo",
+      className: "bg-gray-100 text-gray-500 border border-gray-300",
+    };
+  }
+  if (tipo === "principal") {
+    return {
+      label: "PRINCIPAL",
+      className: "bg-green-100 text-green-700 border border-green-300",
+    };
+  }
+  if (tipo === "socio") {
+    return {
+      label: "SÓCIO",
+      className: "bg-yellow-100 text-yellow-700 border border-yellow-300",
+    };
+  }
+  return {
+    label: tipo.toUpperCase(),
+    className: "bg-gray-100 text-gray-500 border border-gray-300",
+  };
+}
+
 export function CadastroUnidades() {
+  const { usuario } = useUsuarioLogado();
   const [unidades, setUnidades] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
@@ -56,6 +111,81 @@ export function CadastroUnidades() {
   // Mescla manual
   const [destinoManualId, setDestinoManualId] = useState<string>("");
   const [mesclandoManual, setMesclandoManual] = useState(false);
+  
+  // Modal de visualização do franqueado
+  const [modalFranqueadoAberto, setModalFranqueadoAberto] = useState(false);
+  const [franqueadoVisualizacao, setFranqueadoVisualizacao] = useState<any>(null);
+  
+  // Estado para controlar a geração do código
+  const [gerandoCodigo, setGerandoCodigo] = useState(false);
+
+  // Função para verificar se o usuário é admin master
+  const isAdminMaster = () => {
+    return usuario?.nivel_permissao === 'admin_master';
+  };
+
+  // Função para verificar se pode editar CNPJ
+  const podeEditarCNPJ = () => {
+    if (isAdminMaster()) return true; // Admin master pode editar sempre
+    return soDigitos(formData.codigo_interno || "").length !== 14; // Outros usuários só se não tiver CNPJ
+  };
+
+  // Função para verificar se pode editar código da unidade
+  const podeEditarCodigoUnidade = () => {
+    return isAdminMaster(); // Apenas admin master pode editar código
+  };
+
+  // Funções para modal de visualização do franqueado
+  const abrirModalFranqueado = (franqueado: any) => {
+    setFranqueadoVisualizacao(franqueado);
+    setModalFranqueadoAberto(true);
+  };
+
+  const fecharModalFranqueado = () => {
+    setModalFranqueadoAberto(false);
+    setFranqueadoVisualizacao(null);
+  };
+
+  // Função para gerar código único de 4 dígitos
+  const gerarCodigoUnico = async (): Promise<string> => {
+    const gerarCodigoAleatorio = (): string => {
+      return Math.floor(1000 + Math.random() * 9000).toString();
+    };
+
+    let codigoGerado = gerarCodigoAleatorio();
+    let tentativas = 0;
+    const maxTentativas = 100; // Evitar loop infinito
+
+    while (tentativas < maxTentativas) {
+      // Verificar se o código já existe
+      const { error } = await supabase
+        .from("unidades_franqueadas")
+        .select("codigo_unidade")
+        .eq("codigo_unidade", codigoGerado)
+        .single();
+
+      if (error && error.code === 'PGRST116') {
+        // Código PGRST116 significa que não encontrou nenhum registro (código é único)
+        console.log(`Código único gerado: ${codigoGerado} após ${tentativas + 1} tentativas`);
+        return codigoGerado;
+      }
+
+      if (error && error.code !== 'PGRST116') {
+        // Erro diferente, relançar
+        console.error('Erro ao verificar código:', error);
+        throw error;
+      }
+
+      // Se chegou aqui, o código já existe, gerar outro
+      codigoGerado = gerarCodigoAleatorio();
+      tentativas++;
+    }
+
+    // Se chegou ao limite de tentativas, usar timestamp para garantir unicidade
+    const timestamp = Date.now().toString().slice(-4);
+    console.warn(`Limite de tentativas atingido, usando timestamp: ${timestamp}`);
+    return timestamp;
+  };
 
   useEffect(() => {
     carregarDados();
@@ -130,28 +260,40 @@ export function CadastroUnidades() {
     setModalAberto(true);
   };
 
-  const abrirModalNova = () => {
+  const abrirModalNova = async () => {
     setUnidadeSelecionada(null);
-    setFormData({
-      status_unidade: "",
-      nome_unidade: "",
-      codigo_unidade: "",
-      codigo_interno: "",
-      cidade: "",
-      estado: "",
-      endereco_completo: "",
-      telefone_unidade: "",
-      email_unidade: "",
-      instagram_unidade: "",
-      horario_seg_sex: "08:00 - 18:00",
-      horario_sabado: "08:00 - 14:00",
-      horario_domingo: "Fechado",
-      cep: "",
-      observacoes_unidade: "",
-      juridico_status: "regular",
-    });
-    setFranqueadoVinculo("");
-    setModalAberto(true);
+    setGerandoCodigo(true);
+    
+    try {
+      // Gerar código único automaticamente
+      const codigoUnico = await gerarCodigoUnico();
+      
+      setFormData({
+        status_unidade: "",
+        nome_unidade: "",
+        codigo_unidade: codigoUnico,
+        codigo_interno: "",
+        cidade: "",
+        estado: "",
+        endereco_completo: "",
+        telefone_unidade: "",
+        email_unidade: "",
+        instagram_unidade: "",
+        horario_seg_sex: "08:00 - 18:00",
+        horario_sabado: "08:00 - 14:00",
+        horario_domingo: "Fechado",
+        cep: "",
+        observacoes_unidade: "",
+        juridico_status: "regular",
+      });
+      setFranqueadoVinculo("");
+      setModalAberto(true);
+    } catch (error) {
+      console.error('Erro ao gerar código único:', error);
+      toast.error('Erro ao gerar código da unidade. Tente novamente.');
+    } finally {
+      setGerandoCodigo(false);
+    }
   };
 
   async function confirmarMesclaManual() {
@@ -206,6 +348,24 @@ export function CadastroUnidades() {
       toast.error("Código da unidade é obrigatório");
       return;
     }
+    
+    // Validação do CNPJ se foi fornecido
+    const cnpjDigitos = soDigitos(formData.codigo_interno || "");
+    if (cnpjDigitos.length > 0 && cnpjDigitos.length !== 14) {
+      toast.error("CNPJ deve conter exatamente 14 dígitos");
+      return;
+    }
+    
+    // Verificação adicional de permissão para CNPJ (apenas para não admin master)
+    if (!isAdminMaster() && unidadeSelecionada) {
+      const cnpjOriginal = soDigitos(unidadeSelecionada.codigo_interno || "");
+      const cnpjNovo = soDigitos(formData.codigo_interno || "");
+      if (cnpjOriginal.length === 14 && cnpjOriginal !== cnpjNovo) {
+        toast.error("Você não tem permissão para alterar o CNPJ desta unidade");
+        return;
+      }
+    }
+    
     setSalvando(true);
     try {
       let unidadeId = formData.id;
@@ -230,24 +390,81 @@ export function CadastroUnidades() {
         unidadeId = unidadeSelecionada.id;
       }
       if (unidadeId) {
-        const { error: errorDesativar } = await supabase
+        // Buscar vínculos ativos existentes
+        const { data: vinculosAtivos } = await supabase
           .from("franqueado_unidades")
-          .update({ ativo: false })
+          .select("*")
           .eq("unidade_id", unidadeId)
           .eq("ativo", true);
-        if (errorDesativar) {
-          console.warn("Erro ao desativar vínculos anteriores:", errorDesativar);
-        }
+
+        // Se há um franqueado selecionado
         if (franqueadoVinculo) {
-          const { error: errorVinculo } = await supabase
-            .from("franqueado_unidades")
-            .insert({
-              unidade_id: unidadeId,
-              franqueado_id: franqueadoVinculo,
-              ativo: true,
-            });
-          if (errorVinculo) {
-            console.warn("Erro ao criar vínculo:", errorVinculo);
+          // Verificar se já existe um vínculo ativo com este franqueado
+          const vinculoExistente = vinculosAtivos?.find(v => v.franqueado_id === franqueadoVinculo);
+          
+          if (vinculoExistente) {
+            // Já existe o vínculo correto, não precisa fazer nada
+            console.log("Vínculo já existe e está ativo, nenhuma alteração necessária");
+          } else {
+            // Desativar todos os vínculos ativos atuais
+            if (vinculosAtivos && vinculosAtivos.length > 0) {
+              const { error: errorDesativar } = await supabase
+                .from("franqueado_unidades")
+                .update({ ativo: false })
+                .eq("unidade_id", unidadeId)
+                .eq("ativo", true);
+              
+              if (errorDesativar) {
+                console.warn("Erro ao desativar vínculos anteriores:", errorDesativar);
+              }
+            }
+            
+            // Verificar se já existe um registro inativo para este franqueado/unidade
+            const { data: vinculoInativo } = await supabase
+              .from("franqueado_unidades")
+              .select("*")
+              .eq("unidade_id", unidadeId)
+              .eq("franqueado_id", franqueadoVinculo)
+              .eq("ativo", false)
+              .single();
+
+            if (vinculoInativo) {
+              // Reativar o vínculo existente
+              const { error: errorReativar } = await supabase
+                .from("franqueado_unidades")
+                .update({ ativo: true })
+                .eq("id", vinculoInativo.id);
+              
+              if (errorReativar) {
+                console.warn("Erro ao reativar vínculo:", errorReativar);
+              }
+            } else {
+              // Criar novo vínculo
+              const { error: errorVinculo } = await supabase
+                .from("franqueado_unidades")
+                .insert({
+                  unidade_id: unidadeId,
+                  franqueado_id: franqueadoVinculo,
+                  ativo: true,
+                });
+              
+              if (errorVinculo) {
+                console.warn("Erro ao criar vínculo:", errorVinculo);
+              }
+            }
+          }
+        } else {
+          // Nenhum franqueado selecionado, desativar todos os vínculos
+          if (vinculosAtivos && vinculosAtivos.length > 0) {
+            const { error: errorDesativar } = await supabase
+              .from("franqueado_unidades")
+              .update({ ativo: false })
+              .eq("unidade_id", unidadeId)
+              .eq("ativo", true);
+            
+            if (errorDesativar) {
+              console.warn("Erro ao desativar vínculos:", errorDesativar);
+            }
           }
         }
       }
@@ -428,12 +645,22 @@ export function CadastroUnidades() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={abrirModalNova}
-              className="px-4 py-2 bg-[#ff9923] text-white rounded-lg font-semibold hover:bg-[#6b3a10] transition-colors duration-300"
-            >
-              + Nova Unidade
-            </button>
+            {isAdminMaster() && (
+              <button
+                onClick={abrirModalNova}
+                disabled={gerandoCodigo}
+                className="px-4 py-2 bg-[#ff9923] text-white rounded-lg font-semibold hover:bg-[#6b3a10] transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {gerandoCodigo ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Gerando código...
+                  </>
+                ) : (
+                  "+ Nova Unidade"
+                )}
+              </button>
+            )}
           </div>
         </div>
         <div className="mt-2 text-xs text-gray-500">
@@ -492,6 +719,15 @@ export function CadastroUnidades() {
               <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusProps(formData.status_unidade).color}`}>
                 {getStatusProps(formData.status_unidade).label}
               </span>
+              {usuario && (
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                  isAdminMaster() 
+                    ? 'bg-purple-100 text-purple-800 border-purple-300' 
+                    : 'bg-blue-100 text-blue-800 border-blue-300'
+                }`}>
+                  {isAdminMaster() ? 'Admin Master' : 'Usuário Padrão'}
+                </span>
+              )}
             </div>
 
             <form
@@ -574,12 +810,22 @@ export function CadastroUnidades() {
                       type="text"
                       name="codigo_unidade"
                       value={formData.codigo_unidade || ""}
-                      disabled
-                      readOnly
-                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0 cursor-not-allowed"
+                      onChange={handleInputChange}
+                      disabled={!podeEditarCodigoUnidade()}
+                      readOnly={!podeEditarCodigoUnidade()}
+                      className={`bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0 ${
+                        !podeEditarCodigoUnidade() ? 'cursor-not-allowed opacity-80' : 'cursor-text'
+                      }`}
                       required
                     />
-                    <span className="text-xs text-gray-400 mt-1">Código não pode ser editado</span>
+                    <span className="text-xs text-gray-400 mt-1">
+                      {!unidadeSelecionada && formData.codigo_unidade 
+                        ? "Código gerado automaticamente" 
+                        : podeEditarCodigoUnidade() 
+                          ? "Código pode ser editado" 
+                          : "Código não pode ser editado (apenas admin master)"
+                      }
+                    </span>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
                     <label className="text-xs text-gray-500 font-semibold mb-1">CNPJ</label>
@@ -587,12 +833,131 @@ export function CadastroUnidades() {
                       type="text"
                       name="codigo_interno"
                       value={formatarCNPJCPF(formData.codigo_interno || "")}
-                      disabled
-                      readOnly
-                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0 opacity-80 cursor-not-allowed"
+                      onChange={(e) => {
+                        // Remove formatação e mantém apenas dígitos
+                        const cnpjSomenteDigitos = soDigitos(e.target.value);
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          codigo_interno: cnpjSomenteDigitos
+                        }));
+                      }}
+                      disabled={!podeEditarCNPJ()}
+                      readOnly={!podeEditarCNPJ()}
+                      className={`bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0 ${
+                        !podeEditarCNPJ() 
+                          ? 'opacity-80 cursor-not-allowed' 
+                          : 'cursor-text'
+                      }`}
+                      placeholder="Digite o CNPJ (apenas números)"
+                      maxLength={18}
                     />
-                    <span className="text-xs text-gray-400 mt-1">CNPJ não pode ser editado</span>
+                    <span className="text-xs text-gray-400 mt-1">
+                      {isAdminMaster() 
+                        ? "Admin master: CNPJ sempre editável" 
+                        : soDigitos(formData.codigo_interno || "").length === 14 
+                          ? "CNPJ não pode ser editado após cadastrado" 
+                          : "CNPJ pode ser cadastrado (apenas números)"
+                      }
+                    </span>
                   </div>
+                </div>
+              </section>
+
+              {/* Vínculos com Franqueados */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="w-5 h-5 text-purple-600" />
+                  <h4 className="font-semibold text-lg text-gray-800">Vínculos com Franqueados</h4>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  {unidadeSelecionada?.franqueado_unidades?.length > 0 ? (
+                    <div className="space-y-3">
+                      <div className="text-xs text-gray-500 mb-3 italic">
+                        💡 Clique em um franqueado ativo para visualizar seus detalhes
+                      </div>
+                      {unidadeSelecionada.franqueado_unidades
+                        .filter((vinculo: any) => vinculo.ativo)
+                        .map((vinculo: any, index: number) => (
+                          <div 
+                            key={`${vinculo.franqueado_id}-${index}`} 
+                            className="flex items-center justify-between bg-white rounded-lg p-3 border border-gray-200 cursor-pointer hover:border-purple-300 hover:shadow-sm transition-all duration-150"
+                            onClick={() => abrirModalFranqueado(vinculo.franqueados)}
+                            title="Clique para visualizar detalhes do franqueado"
+                          >
+                            <div className="flex items-center gap-3 flex-1">
+                              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                                <User className="w-5 h-5 text-purple-600" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-gray-800 truncate">
+                                  {vinculo.franqueados?.nome_completo || "Nome não informado"}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {vinculo.franqueados?.email || "Email não informado"}
+                                </div>
+                                {vinculo.franqueados?.telefone && (
+                                  <div className="text-sm text-gray-500">
+                                    Tel: {vinculo.franqueados.telefone}
+                                  </div>
+                                )}
+                                {vinculo.franqueados?.tipo_franqueado && (
+                                  <div className="text-xs text-purple-600 font-medium mt-1">
+                                    {vinculo.franqueados.tipo_franqueado}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="w-5 h-5 text-green-500" />
+                              <span className="text-xs text-green-600 font-medium">Ativo</span>
+                            </div>
+                          </div>
+                        ))}
+                      
+                      {/* Vínculos inativos, se houver */}
+                      {unidadeSelecionada.franqueado_unidades
+                        .filter((vinculo: any) => !vinculo.ativo)
+                        .map((vinculo: any, index: number) => (
+                          <div key={`inactive-${vinculo.franqueado_id}-${index}`} className="flex items-center justify-between bg-gray-100 rounded-lg p-3 border border-gray-300 opacity-75">
+                            <div className="flex items-center gap-3 flex-1">
+                              <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
+                                <User className="w-5 h-5 text-gray-500" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-gray-600 truncate">
+                                  {vinculo.franqueados?.nome_completo || "Nome não informado"}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {vinculo.franqueados?.email || "Email não informado"}
+                                </div>
+                                {vinculo.franqueados?.tipo_franqueado && (
+                                  <div className="text-xs text-gray-500 font-medium mt-1">
+                                    {vinculo.franqueados.tipo_franqueado}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <XCircle className="w-5 h-5 text-gray-400" />
+                              <span className="text-xs text-gray-500 font-medium">Inativo</span>
+                            </div>
+                          </div>
+                        ))}
+
+                      <div className="text-xs text-gray-500 mt-2">
+                        Total de vínculos: {unidadeSelecionada.franqueado_unidades.length} 
+                        ({unidadeSelecionada.franqueado_unidades.filter((v: any) => v.ativo).length} ativos, {unidadeSelecionada.franqueado_unidades.filter((v: any) => !v.ativo).length} inativos)
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      <User className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                      <div className="text-gray-500 font-medium">Nenhum franqueado vinculado</div>
+                      <div className="text-sm text-gray-400 mt-1">
+                        Esta unidade ainda não possui vínculos com franqueados
+                      </div>
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -813,6 +1178,159 @@ export function CadastroUnidades() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Visualização do Franqueado */}
+      {modalFranqueadoAberto && franqueadoVisualizacao && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-0 max-w-3xl w-full max-h-[95vh] overflow-y-auto shadow-2xl border border-gray-200">
+            {/* Header Modal */}
+            <div className="flex items-center justify-between px-8 pt-6 pb-2 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Users className="w-7 h-7 text-blue-600" />
+                </div>
+                <div>
+                  <div className="text-xl font-bold text-gray-800 leading-tight">
+                    {franqueadoVisualizacao.nome_completo || "Franqueado"}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    CPF/RNM: <span className="font-semibold">#{franqueadoVisualizacao.cpf_rnm || "N/A"}</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={fecharModalFranqueado}
+                className="text-gray-400 hover:text-gray-700 text-2xl px-2"
+                title="Fechar"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Badge do Tipo */}
+            <div className="flex flex-wrap items-center gap-3 px-8 pt-4 pb-2">
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getTipoBadge(franqueadoVisualizacao.tipo_franqueado).className}`}>
+                {getTipoBadge(franqueadoVisualizacao.tipo_franqueado).label}
+              </span>
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-300">
+                Apenas Visualização
+              </span>
+            </div>
+
+            <div className="px-8 py-4 space-y-8">
+              {/* Informações Básicas */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <Info className="w-5 h-5 text-blue-500" />
+                  <h4 className="font-semibold text-lg text-gray-800">Informações Básicas</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Nome Completo</label>
+                    <div className="text-base font-medium text-gray-800">
+                      {franqueadoVisualizacao.nome_completo || "Não informado"}
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">CPF/RNM</label>
+                    <div className="text-base font-medium text-gray-800">
+                      {franqueadoVisualizacao.cpf_rnm || "Não informado"}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Contato */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <Phone className="w-5 h-5 text-green-600" />
+                  <h4 className="font-semibold text-lg text-gray-800">Contato</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Telefone</label>
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      <div className="text-base font-medium text-gray-800">
+                        {franqueadoVisualizacao.telefone || "Não informado"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Email</label>
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-gray-400" />
+                      <div className="text-base font-medium text-gray-800">
+                        {franqueadoVisualizacao.email || "Não informado"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Tipo de Franqueado</label>
+                    <div className="text-base font-medium text-gray-800">
+                      {franqueadoVisualizacao.tipo_franqueado ? getTipoBadge(franqueadoVisualizacao.tipo_franqueado).label : "Não informado"}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Endereço */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className="w-5 h-5 text-red-500" />
+                  <h4 className="font-semibold text-lg text-gray-800">Endereço</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Cidade</label>
+                    <div className="text-base font-medium text-gray-800">
+                      {franqueadoVisualizacao.cidade || "Não informado"}
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Estado</label>
+                    <div className="text-base font-medium text-gray-800">
+                      {franqueadoVisualizacao.estado || "Não informado"}
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Endereço</label>
+                    <div className="text-base font-medium text-gray-800">
+                      {franqueadoVisualizacao.endereco || "Não informado"}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Observações */}
+              {franqueadoVisualizacao.observacoes && (
+                <section>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Info className="w-5 h-5 text-gray-500" />
+                    <h4 className="font-semibold text-lg text-gray-800">Observações</h4>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-base font-medium text-gray-800">
+                      {franqueadoVisualizacao.observacoes}
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              {/* Botão de fechar */}
+              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 mt-8">
+                <button
+                  type="button"
+                  onClick={fecharModalFranqueado}
+                  className="px-6 py-2 rounded-md bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
