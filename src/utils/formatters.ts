@@ -40,3 +40,51 @@ export function formatarCNPJCPF(numero: string): string {
     // Agora formata a data já corrigida
     return dataCorrigida.toLocaleDateString("pt-BR");
   };
+
+  export function formatarCEP(cep: string): string {
+    if (!cep) return '';
+    
+    // Remove qualquer caractere que não seja um dígito
+    const cepLimpo = cep.replace(/\D/g, '');
+    
+    if (cepLimpo.length === 8) {
+      // Formata como CEP: 00000-000
+      return cepLimpo.replace(/(\d{5})(\d{3})/, '$1-$2');
+    }
+    
+    // Se não tiver 8 dígitos, retorna o valor original
+    return cep;
+  }
+
+  // Interface para resposta da API do Brasil API
+  interface BrasilAPICEPResponse {
+    cep: string;
+    state: string;
+    city: string;
+    neighborhood: string;
+    street: string;
+    service: string;
+  }
+
+  export async function buscarCEP(cep: string): Promise<BrasilAPICEPResponse | null> {
+    try {
+      // Remove qualquer formatação do CEP
+      const cepLimpo = cep.replace(/\D/g, '');
+      
+      if (cepLimpo.length !== 8) {
+        throw new Error('CEP deve conter exatamente 8 dígitos');
+      }
+
+      const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${cepLimpo}`);
+      
+      if (!response.ok) {
+        throw new Error(`Erro na API: ${response.status}`);
+      }
+
+      const data: BrasilAPICEPResponse = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      return null;
+    }
+  }

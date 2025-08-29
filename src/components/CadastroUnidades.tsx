@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../services/databaseService";
 import { toast } from 'react-hot-toast';
-import { formatarCNPJCPF } from "../utils/formatters";
+import { formatarCNPJCPF, formatarCEP, buscarCEP } from "../utils/formatters";
 
 // Hook para obter informações do usuário logado
 const useUsuarioLogado = () => {
@@ -118,6 +118,46 @@ export function CadastroUnidades() {
   
   // Estado para controlar a geração do código
   const [gerandoCodigo, setGerandoCodigo] = useState(false);
+  
+  // Estados para controlar a busca de CEP
+  const [buscandoCEP, setBuscandoCEP] = useState(false);
+  const [cepError, setCepError] = useState<string>("");
+  
+  // Estados para campos de endereço separados (para melhor UX)
+  const [logradouro, setLogradouro] = useState<string>("");
+  const [bairro, setBairro] = useState<string>("");
+  const [numeroComplemento, setNumeroComplemento] = useState<string>("");
+
+  // Função para separar endereço completo em campos individuais
+  const separarEndereco = (enderecoCompleto: string) => {
+    if (!enderecoCompleto) return;
+    
+    // Tenta separar o endereço assumindo formato "Rua, Bairro, Número"
+    const partes = enderecoCompleto.split(',').map(p => p.trim());
+    
+    if (partes.length >= 2) {
+      setLogradouro(partes[0] || "");
+      setBairro(partes[1] || "");
+      setNumeroComplemento(partes.slice(2).join(', ') || "");
+    } else {
+      setLogradouro(enderecoCompleto);
+      setBairro("");
+      setNumeroComplemento("");
+    }
+  };
+
+  // Função para combinar os campos separados em endereço completo
+  const combinarEndereco = () => {
+    const partes = [logradouro, bairro, numeroComplemento].filter(p => p.trim() !== "");
+    const enderecoCompleto = partes.join(', ');
+    
+    setFormData((prev: any) => ({
+      ...prev,
+      endereco_completo: enderecoCompleto
+    }));
+    
+    return enderecoCompleto;
+  };
 
   // Função para verificar se o usuário é admin master
   const isAdminMaster = () => {
@@ -185,6 +225,62 @@ export function CadastroUnidades() {
     const timestamp = Date.now().toString().slice(-4);
     console.warn(`Limite de tentativas atingido, usando timestamp: ${timestamp}`);
     return timestamp;
+  };
+
+  // Função para buscar CEP e preencher campos automaticamente
+  const buscarDadosCEP = async (cep: string) => {
+    // Remove formatação do CEP
+    const cepLimpo = cep.replace(/\D/g, '');
+    
+    // Verifica se o CEP tem 8 dígitos
+    if (cepLimpo.length !== 8) {
+      setCepError("");
+      return;
+    }
+
+    setBuscandoCEP(true);
+    setCepError("");
+
+    try {
+      const dadosCEP = await buscarCEP(cepLimpo);
+      
+      if (dadosCEP) {
+        // Preenche os campos automaticamente
+        setFormData((prev: any) => ({
+          ...prev,
+          cidade: dadosCEP.city || prev.cidade,
+          estado: dadosCEP.state || prev.estado,
+        }));
+        
+        // Preenche os campos separados para melhor UX
+        setLogradouro(dadosCEP.street || "");
+        setBairro(dadosCEP.neighborhood || "");
+        
+        // Combina logradouro e bairro no campo endereco_completo se ambos existirem
+        if (dadosCEP.street && dadosCEP.neighborhood) {
+          setFormData((prev: any) => ({
+            ...prev,
+            endereco_completo: `${dadosCEP.street}, ${dadosCEP.neighborhood}`
+          }));
+        } else if (dadosCEP.street) {
+          setFormData((prev: any) => ({
+            ...prev,
+            endereco_completo: dadosCEP.street
+          }));
+        }
+        
+        toast.success("Endereço preenchido automaticamente!");
+      } else {
+        setCepError("CEP não encontrado");
+        toast.error("CEP não encontrado. Verifique o número digitado.");
+      }
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      setCepError("Erro ao buscar CEP");
+      toast.error("Erro ao buscar CEP. Tente novamente.");
+    } finally {
+      setBuscandoCEP(false);
+    }
   };
 
   useEffect(() => {
@@ -255,6 +351,10 @@ export function CadastroUnidades() {
       unidade.franqueado_unidades?.find((v: any) => v.ativo)?.franqueado_id ||
         ""
     );
+    
+    // Inicializar campos de endereço separados
+    separarEndereco(unidade.endereco_completo || "");
+    
     setDestinoManualId("");
     setMesclandoManual(false);
     setModalAberto(true);
@@ -287,6 +387,12 @@ export function CadastroUnidades() {
         juridico_status: "regular",
       });
       setFranqueadoVinculo("");
+      
+      // Limpar campos de endereço separados
+      setLogradouro("");
+      setBairro("");
+      setNumeroComplemento("");
+      
       setModalAberto(true);
     } catch (error) {
       console.error('Erro ao gerar código único:', error);
@@ -365,6 +471,9 @@ export function CadastroUnidades() {
         return;
       }
     }
+    
+    // Combinar campos de endereço antes de salvar
+    combinarEndereco();
     
     setSalvando(true);
     try {
@@ -794,7 +903,7 @@ export function CadastroUnidades() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
-                    <label className="text-xs text-gray-500 font-semibold mb-1">Nome do Grupo</label>
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Nome da Unidade</label>
                     <input
                       type="text"
                       name="nome_unidade"
@@ -1072,17 +1181,49 @@ export function CadastroUnidades() {
                   <h4 className="font-semibold text-lg text-gray-800">Endereço</h4>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* CEP em primeiro lugar com busca automática */}
                   <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
-                    <label className="text-xs text-gray-500 font-semibold mb-1">Endereço Completo</label>
-                    <input
-                      type="text"
-                      name="endereco_completo"
-                      value={formData.endereco_completo || ""}
-                      onChange={handleInputChange}
-                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0"
-                      placeholder="Rua, número, bairro"
-                    />
+                    <label className="text-xs text-gray-500 font-semibold mb-1">CEP</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        name="cep"
+                        value={formatarCEP(formData.cep || "")}
+                        onChange={(e) => {
+                          const cepSomenteDigitos = e.target.value.replace(/\D/g, '');
+                          setFormData((prev: any) => ({
+                            ...prev,
+                            cep: cepSomenteDigitos
+                          }));
+                          
+                          // Buscar automaticamente quando o CEP estiver completo (8 dígitos)
+                          if (cepSomenteDigitos.length === 8) {
+                            buscarDadosCEP(cepSomenteDigitos);
+                          } else {
+                            setCepError("");
+                          }
+                        }}
+                        className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0 pr-8"
+                        placeholder="00000-000"
+                        maxLength={9}
+                      />
+                      {buscandoCEP && (
+                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        </div>
+                      )}
+                    </div>
+                    {cepError && (
+                      <span className="text-xs text-red-500 mt-1">{cepError}</span>
+                    )}
+                    <span className="text-xs text-gray-400 mt-1">
+                      {formData.cep && formData.cep.length === 8 
+                        ? "✓ CEP completo - dados preenchidos automaticamente" 
+                        : "Digite o CEP para buscar automaticamente o endereço"
+                      }
+                    </span>
                   </div>
+                  
                   <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
                     <label className="text-xs text-gray-500 font-semibold mb-1">Cidade</label>
                     <input
@@ -1094,6 +1235,7 @@ export function CadastroUnidades() {
                       placeholder="Cidade"
                     />
                   </div>
+                  
                   <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
                     <label className="text-xs text-gray-500 font-semibold mb-1">Estado</label>
                     <input
@@ -1105,16 +1247,85 @@ export function CadastroUnidades() {
                       placeholder="Estado"
                     />
                   </div>
+                  
                   <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
-                    <label className="text-xs text-gray-500 font-semibold mb-1">CEP</label>
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Logradouro</label>
                     <input
                       type="text"
-                      name="cep"
-                      value={formData.cep || ""}
-                      onChange={handleInputChange}
+                      value={logradouro}
+                      onChange={(e) => {
+                        setLogradouro(e.target.value);
+                        // Atualiza o endereço completo em tempo real
+                        const enderecoCompleto = [e.target.value, bairro, numeroComplemento]
+                          .filter(p => p.trim() !== "").join(', ');
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          endereco_completo: enderecoCompleto
+                        }));
+                      }}
                       className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0"
-                      placeholder="CEP"
+                      placeholder="Nome da rua/avenida"
                     />
+                    <span className="text-xs text-gray-400 mt-1">
+                      Ex: Avenida Paulista, Rua das Flores
+                    </span>
+                  </div>
+                  
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Bairro</label>
+                    <input
+                      type="text"
+                      value={bairro}
+                      onChange={(e) => {
+                        setBairro(e.target.value);
+                        // Atualiza o endereço completo em tempo real
+                        const enderecoCompleto = [logradouro, e.target.value, numeroComplemento]
+                          .filter(p => p.trim() !== "").join(', ');
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          endereco_completo: enderecoCompleto
+                        }));
+                      }}
+                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0"
+                      placeholder="Nome do bairro"
+                    />
+                    <span className="text-xs text-gray-400 mt-1">
+                      Ex: Centro, Vila Madalena
+                    </span>
+                  </div>
+                  
+                  <div className="bg-gray-50 rounded-lg p-4 flex flex-col md:col-span-2">
+                    <label className="text-xs text-gray-500 font-semibold mb-1">Número e Complemento</label>
+                    <input
+                      type="text"
+                      value={numeroComplemento}
+                      onChange={(e) => {
+                        setNumeroComplemento(e.target.value);
+                        // Atualiza o endereço completo em tempo real
+                        const enderecoCompleto = [logradouro, bairro, e.target.value]
+                          .filter(p => p.trim() !== "").join(', ');
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          endereco_completo: enderecoCompleto
+                        }));
+                      }}
+                      className="bg-transparent text-base font-medium text-gray-800 outline-none border-none focus:ring-0"
+                      placeholder="Número, apartamento, sala, etc."
+                    />
+                    <span className="text-xs text-gray-400 mt-1">
+                      Ex: 1000, Apto 101, Sala 205
+                    </span>
+                  </div>
+                  
+                  {/* Campo oculto/readonly para mostrar o endereço completo resultante */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex flex-col md:col-span-2">
+                    <label className="text-xs text-blue-600 font-semibold mb-1">Endereço Completo (Resultado)</label>
+                    <div className="text-base font-medium text-blue-800">
+                      {formData.endereco_completo || "Preencha os campos acima para formar o endereço completo"}
+                    </div>
+                    <span className="text-xs text-blue-500 mt-1">
+                      Este é o endereço final que será salvo no sistema
+                    </span>
                   </div>
                 </div>
               </section>
