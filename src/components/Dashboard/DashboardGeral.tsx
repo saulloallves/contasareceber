@@ -3,7 +3,8 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import {
 TrendingUp, TrendingDown, Users, AlertTriangle, CheckCircle,
 RefreshCw, Clock, Mail, Calculator, Building2,
-Calendar, Zap, CircleDollarSign, Receipt, Scale, XCircle 
+Calendar, Zap, CircleDollarSign, Receipt, Scale, XCircle,
+X, Eye, Code
 } from "lucide-react";
 import { DashboardService } from "../../services/dashboardService";
 
@@ -169,6 +170,11 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
   const [carregandoMensagens, setCarregandoMensagens] = useState(true);
   const [ultimasMensagens, setUltimasMensagens] = useState<any[]>([]);
 
+  // ===== Modal de detalhes da mensagem =====
+  const [modalMensagemAberto, setModalMensagemAberto] = useState(false);
+  const [mensagemSelecionada, setMensagemSelecionada] = useState<any>(null);
+  const [emailCodigoVisivel, setEmailCodigoVisivel] = useState(false);
+
   const carregarUltimasMensagens = useCallback(async () => {
     setCarregandoMensagens(true);
     try {
@@ -228,6 +234,18 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
   useEffect(() => {
     carregarUltimasMensagens();
   }, [carregarUltimasMensagens]);
+
+  const abrirModalMensagem = (mensagem: any) => {
+    setMensagemSelecionada(mensagem);
+    setModalMensagemAberto(true);
+    setEmailCodigoVisivel(false); // Sempre começa mostrando HTML renderizado
+  };
+
+  const fecharModalMensagem = () => {
+    setModalMensagemAberto(false);
+    setMensagemSelecionada(null);
+    setEmailCodigoVisivel(false);
+  };
 
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -647,50 +665,187 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
               ultimasMensagens.map((m) => (
                 <div
                   key={`${m.canal}-${m.id}`}
-                  className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:border-gray-200 hover:shadow-md transition-all duration-200"
+                  className={`group flex items-center justify-between p-4 border rounded-xl transition-all duration-200 cursor-pointer ${
+                    m.canal === "whatsapp"
+                      ? "border-gray-200 hover:border-emerald-300 hover:shadow-lg bg-gradient-to-r from-gray-50 to-white hover:from-emerald-50 hover:to-white"
+                      : "border-gray-200 hover:border-blue-300 hover:shadow-lg bg-gradient-to-r from-gray-50 to-white hover:from-blue-50 hover:to-white"
+                  }`}
+                  onClick={() => abrirModalMensagem(m)}
                 >
-                  <div className="flex items-start">
+                  <div className="flex items-center space-x-4">
                     <div
-                      className={`p-2 rounded-full mr-4 ${
+                      className={`p-3 rounded-full transition-colors ${
                         m.canal === "whatsapp"
-                          ? "bg-emerald-50 border border-emerald-100"
-                          : "bg-blue-50 border border-blue-100"
+                          ? "bg-emerald-100 border-2 border-emerald-200 group-hover:bg-emerald-200"
+                          : "bg-blue-100 border-2 border-blue-200 group-hover:bg-blue-200"
                       }`}
                     >
                       {m.canal === "whatsapp" ? (
-                        <WhatsAppIcon className="w-5 h-5 text-emerald-600" />
+                        <WhatsAppIcon className="w-6 h-6 text-emerald-600" />
                       ) : (
-                        <Mail className="w-5 h-5 text-blue-600" />
+                        <Mail className="w-6 h-6 text-blue-600" />
                       )}
                     </div>
-                    <div>
-                      <p className="font-semibold text-gray-800">
-                        {m.canal === "whatsapp" ? "WhatsApp" : "E-mail"} •{" "}
-                        {m.destinatario}
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <h4 className="font-bold text-gray-900 text-lg">
+                          {m.canal === "whatsapp" ? "WhatsApp" : "E-mail"}
+                        </h4>
+                      </div>
+                      <p className="text-gray-600 font-medium mb-1">
+                        Para: {m.destinatario}
                       </p>
-                      <p className="text-sm text-gray-500 line-clamp-2">
-                        {m.mensagem}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-xs text-gray-500">
                         {formatarDataHora(m.data)}
                       </p>
                     </div>
                   </div>
-                  <span
-                    className={`px-3 py-1 text-xs font-medium rounded-full ${
-                      m.status === "sucesso"
-                        ? "bg-green-50 text-green-600 border border-green-200"
-                        : "bg-red-50 text-red-600 border border-red-200"
-                    }`}
-                  >
-                    {m.status === "sucesso" ? "Enviado" : "Falha"}
-                  </span>
+                  <div className={`flex items-center transition-colors ${
+                    m.canal === "whatsapp"
+                      ? "text-gray-400 group-hover:text-emerald-500"
+                      : "text-gray-400 group-hover:text-blue-500"
+                  }`}>
+                    <span className="text-sm font-medium mr-2">Ver detalhes</span>
+                    <Eye className="w-5 h-5" />
+                  </div>
                 </div>
               ))
             )}
           </div>
         </div>
       </div>
+
+      {/* Modal de Detalhes da Mensagem */}
+      {modalMensagemAberto && mensagemSelecionada && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            {/* Header do Modal */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center space-x-3">
+                <div
+                  className={`p-2 rounded-full ${
+                    mensagemSelecionada.canal === "whatsapp"
+                      ? "bg-emerald-50 border border-emerald-100"
+                      : "bg-blue-50 border border-blue-100"
+                  }`}
+                >
+                  {mensagemSelecionada.canal === "whatsapp" ? (
+                    <WhatsAppIcon className="w-5 h-5 text-emerald-600" />
+                  ) : (
+                    <Mail className="w-5 h-5 text-blue-600" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Detalhes do Envio - {mensagemSelecionada.canal === "whatsapp" ? "WhatsApp" : "E-mail"}
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    Para: {mensagemSelecionada.destinatario}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={fecharModalMensagem}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Conteúdo do Modal */}
+            <div className="p-6 max-h-[70vh] overflow-y-auto">
+              {/* Informações do Envio */}
+              <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-700 mb-2">Status do Envio</h4>
+                  <span
+                    className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${
+                      mensagemSelecionada.status === "sucesso"
+                        ? "bg-green-50 text-green-600 border border-green-200"
+                        : "bg-red-50 text-red-600 border border-red-200"
+                    }`}
+                  >
+                    {mensagemSelecionada.status === "sucesso" ? "Enviado com Sucesso" : "Falha no Envio"}
+                  </span>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-700 mb-2">Data e Hora</h4>
+                  <p className="text-sm text-gray-600">
+                    {formatarDataHora(mensagemSelecionada.data)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Conteúdo da Mensagem */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-medium text-gray-700">Conteúdo da Mensagem</h4>
+                  {mensagemSelecionada.canal === "email" && (
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setEmailCodigoVisivel(false)}
+                        className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                          !emailCodigoVisivel
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        }`}
+                      >
+                        <Eye className="w-4 h-4 inline mr-1" />
+                        Visualizar
+                      </button>
+                      <button
+                        onClick={() => setEmailCodigoVisivel(true)}
+                        className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                          emailCodigoVisivel
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        }`}
+                      >
+                        <Code className="w-4 h-4 inline mr-1" />
+                        Código
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Exibição da Mensagem */}
+                {mensagemSelecionada.canal === "whatsapp" ? (
+                  <div className="bg-white border border-gray-200 rounded-lg p-4 max-h-96 overflow-y-auto">
+                    <p className="text-gray-800 whitespace-pre-wrap">
+                      {mensagemSelecionada.mensagem}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-white border border-gray-200 rounded-lg p-4 max-h-96 overflow-y-auto">
+                    {emailCodigoVisivel ? (
+                      <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono">
+                        {mensagemSelecionada.mensagem}
+                      </pre>
+                    ) : (
+                      <div
+                        className="prose max-w-none"
+                        dangerouslySetInnerHTML={{
+                          __html: mensagemSelecionada.mensagem
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer do Modal */}
+            <div className="flex justify-end p-6 border-t border-gray-200">
+              <button
+                onClick={fecharModalMensagem}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
