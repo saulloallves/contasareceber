@@ -1,23 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  TrendingUp,
-  TrendingDown,
-  Users,
-  AlertTriangle,
-  CheckCircle,
-  RefreshCw,
-  Clock,
-  Mail,
-  MessageSquare,
-  Calculator,
-  Building2,
-  Calendar,
-  Zap,
-  CircleDollarSign,
-  Receipt,
-  Scale,
-  XCircle,
+TrendingUp, TrendingDown, Users, AlertTriangle, CheckCircle,
+RefreshCw, Clock, Mail, Calculator, Building2,
+Calendar, Zap, CircleDollarSign, Receipt, Scale, XCircle 
 } from "lucide-react";
 import { DashboardService } from "../../services/dashboardService";
 
@@ -26,6 +12,8 @@ import { formatMonetaryResponsive } from "../../utils/monetaryUtils";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "react-hot-toast";
 import logo from "../../assets/logo cresci-header.png";
+import { WhatsAppIcon } from "../ui/WhatsAppIcon";
+
 
 type DashboardGeralProps = {
   onNavigate?: (tab: string) => void;
@@ -670,7 +658,7 @@ export function DashboardGeral({ onNavigate, user }: DashboardGeralProps) {
                       }`}
                     >
                       {m.canal === "whatsapp" ? (
-                        <MessageSquare className="w-5 h-5 text-emerald-600" />
+                        <WhatsAppIcon className="w-5 h-5 text-emerald-600" />
                       ) : (
                         <Mail className="w-5 h-5 text-blue-600" />
                       )}
