@@ -9,7 +9,6 @@ import {
   DropResult,
 } from "react-beautiful-dnd";
 import {
-  MessageSquare,
   Calendar,
   DollarSign,
   AlertTriangle,
@@ -22,6 +21,7 @@ import {
   CircleDollarSign,
   Lock,
 } from "lucide-react";
+import { WhatsAppIcon } from "./ui/WhatsAppIcon";
 import { KanbanService } from "../services/kanbanService";
 import {
   CardCobranca,
@@ -2878,7 +2878,7 @@ _Mensagem Automática do Sistema_
                             disabled={processando}
                             className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                           >
-                            <MessageSquare className="w-4 h-4 mr-2" />
+                            <WhatsAppIcon size={16} className="text-white mr-2" />
                             WhatsApp
                           </button>
                           <button
@@ -3041,7 +3041,7 @@ _Mensagem Automática do Sistema_
                           disabled={processando}
                           className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                         >
-                          <MessageSquare className="w-4 h-4 mr-2" />
+                          <WhatsAppIcon size={16} className="text-white mr-2" />
                           WhatsApp
                         </button>
                         <button
@@ -3122,7 +3122,7 @@ _Mensagem Automática do Sistema_
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <div className="flex items-center mb-4">
-              <MessageSquare className="w-6 h-6 text-green-600 mr-3" />
+              <WhatsAppIcon size={24} className="text-green-600 mr-3" />
               <h3 className="text-lg font-semibold text-gray-800">
                 Confirmar Envio WhatsApp
               </h3>

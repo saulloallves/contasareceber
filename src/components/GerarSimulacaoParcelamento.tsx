@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
-import { Calculator, Search, Plus, Minus, Calendar, DollarSign, FileText, CheckCircle, AlertTriangle, RefreshCw, Building2, CreditCard, ArrowRight, ArrowLeft } from "lucide-react";
+import { Calculator, Search, Plus, Minus, Calendar, DollarSign, FileText, CheckCircle, AlertTriangle, RefreshCw, Building2, CreditCard, ArrowRight, ArrowLeft, Mail } from "lucide-react";
 import { SimulacaoParcelamentoService } from "../services/simulacaoParcelamentoService";
 import { formatarCNPJCPF, formatarMoeda, formatarData } from "../utils/formatters";
 import { toast } from "react-hot-toast";
+import { WhatsAppIcon } from './ui/WhatsAppIcon';
 
 export function GerarSimulacaoParcelamento({
   onVoltar,
@@ -38,6 +39,10 @@ export function GerarSimulacaoParcelamento({
 
   // Novo estado: lista agrupada de clientes elegíveis
   const [clientesDisponiveis, setClientesDisponiveis] = useState<any[]>([]);
+  
+  // Estados para controlar canais de envio da proposta
+  const [enviarViaWhatsApp, setEnviarViaWhatsApp] = useState(true);
+  const [enviarViaEmail, setEnviarViaEmail] = useState(true);
 
   // Ao montar, buscar todas as cobranças disponíveis e agrupar por cliente
   useEffect(() => {
@@ -181,37 +186,55 @@ export function GerarSimulacaoParcelamento({
     }
   };
 
-  const enviarWhatsApp = async () => {
+  const enviarProposta = async () => {
     if (!proposta?.id) return;
-    setProcessando(true);
-    try {
-      const sucesso = await simulacaoService.enviarPropostaWhatsApp(
-        proposta.id
-      );
-      if (sucesso) {
-        toast.success("Proposta enviada via WhatsApp!");
-      } else {
-        toast.error("Erro ao enviar via WhatsApp");
-      }
-    } catch (error) {
-      toast.error("Erro ao enviar via WhatsApp");
-    } finally {
-      setProcessando(false);
+    if (!enviarViaWhatsApp && !enviarViaEmail) {
+      toast.error("Selecione pelo menos um canal de envio");
+      return;
     }
-  };
 
-  const enviarEmail = async () => {
-    if (!proposta?.id) return;
     setProcessando(true);
+    const canaisEnviados = [];
+    const canaisFalha = [];
+
     try {
-      const sucesso = await simulacaoService.enviarPropostaEmail(proposta.id);
-      if (sucesso) {
-        toast.success("Proposta enviada via Email!");
-      } else {
-        toast.error("Erro ao enviar via Email");
+      // Enviar via WhatsApp se selecionado
+      if (enviarViaWhatsApp) {
+        try {
+          const sucessoWhatsApp = await simulacaoService.enviarPropostaWhatsApp(proposta.id);
+          if (sucessoWhatsApp) {
+            canaisEnviados.push("WhatsApp");
+          } else {
+            canaisFalha.push("WhatsApp");
+          }
+        } catch (error) {
+          canaisFalha.push("WhatsApp");
+        }
       }
-    } catch (error) {
-      toast.error("Erro ao enviar via Email");
+
+      // Enviar via Email se selecionado
+      if (enviarViaEmail) {
+        try {
+          const sucessoEmail = await simulacaoService.enviarPropostaEmail(proposta.id);
+          if (sucessoEmail) {
+            canaisEnviados.push("Email");
+          } else {
+            canaisFalha.push("Email");
+          }
+        } catch (error) {
+          canaisFalha.push("Email");
+        }
+      }
+
+      // Mostrar resultado do envio
+      if (canaisEnviados.length > 0 && canaisFalha.length === 0) {
+        toast.success(`Proposta enviada com sucesso via ${canaisEnviados.join(" e ")}!`);
+      } else if (canaisEnviados.length > 0 && canaisFalha.length > 0) {
+        toast.success(`Enviado via ${canaisEnviados.join(" e ")}`);
+        toast.error(`Erro ao enviar via ${canaisFalha.join(" e ")}`);
+      } else {
+        toast.error(`Erro ao enviar via ${canaisFalha.join(" e ")}`);
+      }
     } finally {
       setProcessando(false);
     }
@@ -227,6 +250,8 @@ export function GerarSimulacaoParcelamento({
     setErro("");
     setQuantidadeParcelas(6);
     setValorEntrada(undefined);
+    setEnviarViaWhatsApp(true);
+    setEnviarViaEmail(true);
   };
 
   const voltarEtapa = () => {
@@ -893,48 +918,101 @@ export function GerarSimulacaoParcelamento({
             </div>
 
             {/* Ações de Envio */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h4 className="font-medium text-gray-800 mb-4 flex items-center">
-                  <span className="mr-2">💬</span> Enviar via WhatsApp
-                </h4>
-                <p className="text-sm text-gray-500 mb-4">
-                  Envia a proposta diretamente para o WhatsApp do cliente via
-                  integração n8n.
-                </p>
-                <button
-                  onClick={enviarWhatsApp}
-                  disabled={processando}
-                  className="w-full px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center"
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h4 className="font-medium text-gray-800 mb-6">
+                Selecione os canais para envio da proposta:
+              </h4>
+              
+              {/* Opções de Canal */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {/* WhatsApp */}
+                <div 
+                  className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                    enviarViaWhatsApp 
+                      ? 'border-green-500 bg-green-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => setEnviarViaWhatsApp(!enviarViaWhatsApp)}
                 >
-                  {processando ? (
-                    <RefreshCw className="w-5 h-5 animate-spin mr-2" />
-                  ) : (
-                    <span className="mr-2">💬</span>
-                  )}
-                  {processando ? "Enviando..." : "Enviar WhatsApp"}
-                </button>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h4 className="font-medium text-gray-800 mb-4 flex items-center">
-                  <span className="mr-2">✉️</span> Enviar via Email
-                </h4>
-                <p className="text-sm text-gray-500 mb-4">
-                  Envia a proposta para o e-mail cadastrado do cliente.
-                </p>
-                <button
-                  onClick={enviarEmail}
-                  disabled={processando}
-                  className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 flex items-center justify-center"
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                      enviarViaWhatsApp 
+                        ? 'border-green-500 bg-green-500' 
+                        : 'border-gray-300'
+                    }`}>
+                      {enviarViaWhatsApp && (
+                        <CheckCircle className="w-4 h-4 text-white" />
+                      )}
+                    </div>
+                    <WhatsAppIcon size={24} className="text-green-600" />
+                    <div>
+                      <h5 className="font-medium text-gray-800">WhatsApp</h5>
+                      <p className="text-sm text-gray-500">Envio direto via WhatsApp</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Email */}
+                <div 
+                  className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                    enviarViaEmail 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => setEnviarViaEmail(!enviarViaEmail)}
                 >
-                  {processando ? (
-                    <RefreshCw className="w-5 h-5 animate-spin mr-2" />
-                  ) : (
-                    <span className="mr-2">✉️</span>
-                  )}
-                  {processando ? "Enviando..." : "Enviar Email"}
-                </button>
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                      enviarViaEmail 
+                        ? 'border-blue-500 bg-blue-500' 
+                        : 'border-gray-300'
+                    }`}>
+                      {enviarViaEmail && (
+                        <CheckCircle className="w-4 h-4 text-white" />
+                      )}
+                    </div>
+                    <Mail size={24} className="text-blue-600" />
+                    <div>
+                      <h5 className="font-medium text-gray-800">Email</h5>
+                      <p className="text-sm text-gray-500">Envio para o email cadastrado</p>
+                    </div>
+                  </div>
+                </div>
               </div>
+
+              {/* Botão de Envio */}
+              <button
+                onClick={enviarProposta}
+                disabled={processando || (!enviarViaWhatsApp && !enviarViaEmail)}
+                className="w-full px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+              >
+                {processando ? (
+                  <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+                ) : (
+                  <div className="flex items-center">
+                    {enviarViaWhatsApp && <WhatsAppIcon size={20} className="mr-2" />}
+                    {enviarViaEmail && <Mail size={20} className="mr-2" />}
+                  </div>
+                )}
+                {processando 
+                  ? "Enviando..." 
+                  : `Enviar Proposta${
+                      enviarViaWhatsApp && enviarViaEmail 
+                        ? " (WhatsApp + Email)"
+                        : enviarViaWhatsApp 
+                        ? " (WhatsApp)"
+                        : enviarViaEmail 
+                        ? " (Email)"
+                        : ""
+                    }`
+                }
+              </button>
+
+              {(!enviarViaWhatsApp && !enviarViaEmail) && (
+                <p className="text-center text-sm text-red-500 mt-2">
+                  Selecione pelo menos um canal de envio
+                </p>
+              )}
             </div>
 
             {/* Botões finais */}

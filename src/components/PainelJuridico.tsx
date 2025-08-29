@@ -15,9 +15,9 @@ import {
   Users,
   Settings,
   Plus,
-  Send,
   Upload,
 } from "lucide-react";
+import { WhatsAppIcon } from "./ui/WhatsAppIcon";
 import { JuridicoService } from "../services/juridicoService";
 import { FiltrosJuridico, EstatisticasJuridico } from "../types/juridico";
 import { reunioesJuridicoService } from "../services/reunioesJuridicoService";
@@ -1018,7 +1018,7 @@ export function PainelJuridico() {
                         className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
                         disabled={processando}
                       >
-                        <Send className="w-4 h-4 mr-1" /> Enviar WhatsApp
+                        <WhatsAppIcon size={16} className="text-white mr-1" /> Enviar WhatsApp
                       </button>
                     )}
                   </div>

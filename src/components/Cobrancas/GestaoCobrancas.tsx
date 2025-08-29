@@ -3,11 +3,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Plus, Edit, Eye, Upload, Receipt, CheckCircle,
   XCircle, Clock, Filter, RefreshCw, FileText,
-  ArrowUp, ArrowDown, AlertTriangle, MessageSquare,
+  ArrowUp, ArrowDown, AlertTriangle,
   Handshake, CreditCard, Split, Scale, 
   TrendingDown, CircleDollarSign, ShieldCheck
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { WhatsAppIcon } from "../ui/WhatsAppIcon";
 import { CobrancaFranqueado } from "../../types/cobranca";
 import { cobrancaService } from "../../services/cobrancaService";
 import { n8nService, N8nService } from "../../services/n8nService";
@@ -99,8 +100,10 @@ export function GestaoCobrancas() {
   const [modalHistoricoAberto, setModalHistoricoAberto] = useState(false);
   const [historicoEnvios, setHistoricoEnvios] = useState<any[]>([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+  const [abaHistoricoAtiva, setAbaHistoricoAtiva] = useState<"whatsapp" | "email">("whatsapp");
   const [carregandoAcao, setCarregandoAcao] = useState(false);
   const [viewMode, setViewMode] = useState<"cards" | "lista">("cards");
+  const [emailCodigoVisivel, setEmailCodigoVisivel] = useState<string | null>(null);
 
   // Serviços auxiliares (instâncias)
   const unidadesService = React.useMemo(() => new UnidadesService(), []);
@@ -374,6 +377,7 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
   const abrirHistoricoEnvios = useCallback(async (cobrancaId: string) => {
     setCarregandoHistorico(true);
     setModalHistoricoAberto(true);
+    setAbaHistoricoAtiva("whatsapp"); // Sempre começa na aba WhatsApp
 
     try {
       const historico = await cobrancaService.buscarHistoricoEnvios(cobrancaId);
@@ -2663,9 +2667,9 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                         {enviandoWhatsapp === cobrancaSelecionada.id ? (
                           <RefreshCw className="w-4 h-4 animate-spin text-green-600" />
                         ) : (
-                          <MessageSquare className="w-4 h-4 text-green-600" />
+                          <WhatsAppIcon className="w-4 h-4 text-green-600" />
                         )}
-                        Cobrança amigável (WhatsApp)
+                        Cobrança amigável
                       </button>
                       {cobrancaSelecionada.status === "em_aberto" && (
                         <button
@@ -3031,7 +3035,37 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+            {/* Abas */}
+            <div className="border-b border-gray-200">
+              <nav className="flex space-x-8 px-6" aria-label="Tabs">
+                <button
+                  onClick={() => setAbaHistoricoAtiva("whatsapp")}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                    abaHistoricoAtiva === "whatsapp"
+                      ? "border-green-500 text-green-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
+                >
+                  <WhatsAppIcon 
+                    size={16}
+                    className={abaHistoricoAtiva === "whatsapp" ? "text-green-600" : "text-gray-500"}
+                  />
+                  WhatsApp ({historicoEnvios.filter(e => e.canal === "whatsapp").length})
+                </button>
+                <button
+                  onClick={() => setAbaHistoricoAtiva("email")}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                    abaHistoricoAtiva === "email"
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
+                >
+                  📧 Email ({historicoEnvios.filter(e => e.canal === "email").length})
+                </button>
+              </nav>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
               {carregandoHistorico ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -3039,240 +3073,306 @@ Entre em contato conosco, telefone: (19) 99595-7880`,
                     Carregando histórico...
                   </span>
                 </div>
-              ) : historicoEnvios.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  Nenhum envio encontrado para esta cobrança.
-                </div>
               ) : (
-                <div className="space-y-4">
-                  {historicoEnvios.map((envio, index) => {
-                    // Função para determinar o tipo de envio e sua cor
-                    const getTipoEnvio = (tipo: string, canal: string) => {
-                      if (
-                        tipo?.includes("whatsapp_amigavel") ||
-                        tipo === "amigavel"
-                      ) {
-                        return {
-                          texto: "💬 Cobrança Amigável (WhatsApp)",
-                          cor: "bg-green-100 text-green-800",
-                        };
-                      } else if (
-                        tipo?.includes("whatsapp_juridico") ||
-                        tipo === "juridico"
-                      ) {
-                        return {
-                          texto: "⚖️ Acionamento Jurídico (WhatsApp)",
-                          cor: "bg-red-100 text-red-800",
-                        };
-                      } else if (
-                        tipo?.includes("whatsapp_parcelamento") ||
-                        tipo === "parcelamento"
-                      ) {
-                        return {
-                          texto: "💰 Proposta de Parcelamento (WhatsApp)",
-                          cor: "bg-blue-100 text-blue-800",
-                        };
-                      } else if (
-                        tipo?.includes("email_proposta_parcelamento")
-                      ) {
-                        return {
-                          texto: "📧💰 Proposta de Parcelamento (Email)",
-                          cor: "bg-blue-100 text-blue-800",
-                        };
-                      } else if (tipo?.includes("email_cobranca_padrao")) {
-                        return {
-                          texto: "📧 Cobrança Padrão (Email)",
-                          cor: "bg-yellow-100 text-yellow-800",
-                        };
-                      } else if (tipo?.includes("email_cobranca_formal")) {
-                        return {
-                          texto: "📧 Cobrança Formal (Email)",
-                          cor: "bg-orange-100 text-orange-800",
-                        };
-                      } else if (tipo?.includes("email_cobranca_urgente")) {
-                        return {
-                          texto: "📧🚨 Cobrança Urgente (Email)",
-                          cor: "bg-red-100 text-red-800",
-                        };
-                      } else if (
-                        tipo?.includes("email_escalonamento_juridico") ||
-                        tipo?.includes("email_notificacao_extrajudicial")
-                      ) {
-                        return {
-                          texto: "📧⚖️ Notificação Extrajudicial (Email)",
-                          cor: "bg-red-100 text-red-800",
-                        };
-                      } else if (
-                        tipo?.includes("sistema_escalonamento_juridico")
-                      ) {
-                        return {
-                          texto: "🎯 Escalonamento para Jurídico",
-                          cor: "bg-purple-100 text-purple-800",
-                        };
-                      } else if (canal === "Email" || canal === "email") {
-                        return {
-                          texto: "📧 Email",
-                          cor: "bg-blue-100 text-blue-800",
-                        };
-                      } else if (canal === "WhatsApp" || canal === "whatsapp") {
-                        return {
-                          texto: "💬 WhatsApp",
-                          cor: "bg-green-100 text-green-800",
-                        };
-                      } else {
-                        return {
-                          texto: "📋 Sistema",
-                          cor: "bg-gray-100 text-gray-800",
-                        };
-                      }
-                    };
-
-                    const tipoInfo = getTipoEnvio(
-                      envio.tipo_envio || envio.tipo,
-                      envio.canal
-                    );
-
+                (() => {
+                  const enviosFiltrados = historicoEnvios.filter(e => e.canal === abaHistoricoAtiva);
+                  
+                  if (enviosFiltrados.length === 0) {
                     return (
-                      <div
-                        key={index}
-                        className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-3">
-                            <span
-                              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${tipoInfo.cor}`}
-                            >
-                              {tipoInfo.texto}
-                            </span>
-                            {envio.status_envio && (
-                              <span
-                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  envio.status_envio === "sucesso" ||
-                                  envio.status === "sucesso"
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-red-100 text-red-800"
-                                }`}
-                              >
-                                {envio.status_envio === "sucesso" ||
-                                envio.status === "sucesso"
-                                  ? "✅ Enviado"
-                                  : "❌ Falha"}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-sm text-gray-500 font-medium">
-                            {new Date(
-                              envio.data_envio || envio.data
-                            ).toLocaleString("pt-BR", {
-                              day: "2-digit",
-                              month: "2-digit",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        </div>
-
-                        {/* Informações do destinatário */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                          <div className="text-sm">
-                            <span className="font-medium text-gray-600">
-                              Destinatário:
-                            </span>
-                            <div className="text-gray-900 mt-1">
-                              {envio.destinatario ||
-                                envio.numero_telefone ||
-                                "Não informado"}
-                            </div>
-                          </div>
-                          <div className="text-sm">
-                            <span className="font-medium text-gray-600">
-                              Enviado por:
-                            </span>
-                            <div className="text-gray-900 mt-1">
-                              {envio.usuario || "Sistema"}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Assunto do email, se houver */}
-                        {envio.assunto && (
-                          <div className="text-sm mb-3">
-                            <span className="font-medium text-gray-600">
-                              Assunto:
-                            </span>
-                            <div className="text-gray-900 mt-1 font-medium">
-                              {envio.assunto}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Metadados importantes */}
-                        {envio.metadados &&
-                          Object.keys(envio.metadados).length > 0 && (
-                            <div className="text-sm mb-3">
-                              <span className="font-medium text-gray-600">
-                                Informações:
-                              </span>
-                              <div className="mt-1 text-gray-700 space-y-1">
-                                {envio.metadados.valor_cobrado && (
-                                  <div>
-                                    💰 Valor:{" "}
-                                    {new Intl.NumberFormat("pt-BR", {
-                                      style: "currency",
-                                      currency: "BRL",
-                                    }).format(envio.metadados.valor_cobrado)}
-                                  </div>
-                                )}
-                                {envio.metadados.dias_atraso && (
-                                  <div>
-                                    📅 Dias em atraso:{" "}
-                                    {envio.metadados.dias_atraso}
-                                  </div>
-                                )}
-                                {envio.metadados.codigo_unidade && (
-                                  <div>
-                                    🏢 Unidade: {envio.metadados.codigo_unidade}
-                                  </div>
-                                )}
-                                {envio.metadados.escalonamento_juridico && (
-                                  <div className="text-red-600 font-medium">
-                                    ⚖️ Escalonamento Jurídico
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                        {/* Mensagem */}
-                        <div className="text-sm">
-                          <span className="font-medium text-gray-600">
-                            Mensagem:
-                          </span>
-                          <div className="mt-2 p-3 bg-white border border-gray-200 rounded-md">
-                            <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
-                              {envio.mensagem ||
-                                envio.mensagem_enviada ||
-                                "Conteúdo não disponível"}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Erro, se houver */}
-                        {envio.erro_detalhes && (
-                          <div className="text-sm mt-3">
-                            <span className="font-medium text-red-600">
-                              Detalhes do erro:
-                            </span>
-                            <div className="mt-1 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
-                              {envio.erro_detalhes}
-                            </div>
-                          </div>
-                        )}
+                      <div className="text-center py-12 text-gray-500">
+                        {abaHistoricoAtiva === "whatsapp" 
+                          ? "Nenhum envio de WhatsApp encontrado para esta cobrança."
+                          : "Nenhum envio de Email encontrado para esta cobrança."
+                        }
                       </div>
                     );
-                  })}
-                </div>
+                  }
+
+                  return (
+                    <div className="space-y-4">
+                      {enviosFiltrados.map((envio, index) => {
+                        // Função para determinar o tipo de envio e sua cor
+                        const getTipoEnvio = (tipo: string, canal: string) => {
+                          if (
+                            tipo?.includes("whatsapp_amigavel") ||
+                            tipo === "amigavel"
+                          ) {
+                            return {
+                              texto: "Cobrança Amigável",
+                              cor: "bg-green-100 text-green-800",
+                            };
+                          } else if (
+                            tipo?.includes("whatsapp_juridico") ||
+                            tipo === "juridico"
+                          ) {
+                            return {
+                              texto: "⚖️ Acionamento Jurídico",
+                              cor: "bg-red-100 text-red-800",
+                            };
+                          } else if (
+                            tipo?.includes("whatsapp_parcelamento") ||
+                            tipo === "parcelamento"
+                          ) {
+                            return {
+                              texto: "💰 Proposta de Parcelamento",
+                              cor: "bg-blue-100 text-blue-800",
+                            };
+                          } else if (
+                            tipo?.includes("email_proposta_parcelamento")
+                          ) {
+                            return {
+                              texto: "💰 Proposta de Parcelamento",
+                              cor: "bg-blue-100 text-blue-800",
+                            };
+                          } else if (tipo?.includes("email_cobranca_padrao")) {
+                            return {
+                              texto: "� Cobrança Padrão",
+                              cor: "bg-yellow-100 text-yellow-800",
+                            };
+                          } else if (tipo?.includes("email_cobranca_formal")) {
+                            return {
+                              texto: "� Cobrança Formal",
+                              cor: "bg-orange-100 text-orange-800",
+                            };
+                          } else if (tipo?.includes("email_cobranca_urgente")) {
+                            return {
+                              texto: "🚨 Cobrança Urgente",
+                              cor: "bg-red-100 text-red-800",
+                            };
+                          } else if (
+                            tipo?.includes("email_escalonamento_juridico") ||
+                            tipo?.includes("email_notificacao_extrajudicial")
+                          ) {
+                            return {
+                              texto: "⚖️ Notificação Extrajudicial",
+                              cor: "bg-red-100 text-red-800",
+                            };
+                          } else if (
+                            tipo?.includes("sistema_escalonamento_juridico")
+                          ) {
+                            return {
+                              texto: "🎯 Escalonamento para Jurídico",
+                              cor: "bg-purple-100 text-purple-800",
+                            };
+                          } else if (canal === "email") {
+                            return {
+                              texto: "📧 Email",
+                              cor: "bg-blue-100 text-blue-800",
+                            };
+                          } else if (canal === "whatsapp") {
+                            return {
+                              texto: "WhatsApp",
+                              cor: "bg-green-100 text-green-800",
+                            };
+                          } else {
+                            return {
+                              texto: "📋 Sistema",
+                              cor: "bg-gray-100 text-gray-800",
+                            };
+                          }
+                        };
+
+                        const tipoInfo = getTipoEnvio(
+                          envio.tipo_envio || envio.tipo,
+                          envio.canal
+                        );
+
+                        return (
+                          <div
+                            key={index}
+                            className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center space-x-3">
+                                <span
+                                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${tipoInfo.cor}`}
+                                >
+                                  {tipoInfo.texto}
+                                </span>
+                                {envio.status_envio && (
+                                  <span
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                      envio.status_envio === "sucesso" ||
+                                      envio.status === "sucesso"
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-red-100 text-red-800"
+                                    }`}
+                                  >
+                                    {envio.status_envio === "sucesso" ||
+                                    envio.status === "sucesso"
+                                      ? "✅ Enviado"
+                                      : "❌ Falha"}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-sm text-gray-500 font-medium">
+                                {new Date(
+                                  envio.data_envio || envio.data
+                                ).toLocaleString("pt-BR", {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                            </div>
+
+                            {/* Informações do destinatário */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                              <div className="text-sm">
+                                <span className="font-medium text-gray-600">
+                                  Destinatário:
+                                </span>
+                                <div className="text-gray-900 mt-1">
+                                  {envio.destinatario ||
+                                    envio.numero_telefone ||
+                                    "Não informado"}
+                                </div>
+                              </div>
+                              <div className="text-sm">
+                                <span className="font-medium text-gray-600">
+                                  Enviado por:
+                                </span>
+                                <div className="text-gray-900 mt-1">
+                                  {envio.usuario || "Sistema"}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Assunto do email, se houver */}
+                            {envio.assunto && (
+                              <div className="text-sm mb-3">
+                                <span className="font-medium text-gray-600">
+                                  Assunto:
+                                </span>
+                                <div className="text-gray-900 mt-1 font-medium">
+                                  {envio.assunto}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Metadados importantes */}
+                            {envio.metadados &&
+                              Object.keys(envio.metadados).length > 0 && (
+                                <div className="text-sm mb-3">
+                                  <span className="font-medium text-gray-600">
+                                    Informações:
+                                  </span>
+                                  <div className="mt-1 text-gray-700 space-y-1">
+                                    {envio.metadados.valor_cobrado && (
+                                      <div>
+                                        💰 Valor:{" "}
+                                        {new Intl.NumberFormat("pt-BR", {
+                                          style: "currency",
+                                          currency: "BRL",
+                                        }).format(envio.metadados.valor_cobrado)}
+                                      </div>
+                                    )}
+                                    {envio.metadados.dias_atraso && (
+                                      <div>
+                                        📅 Dias em atraso:{" "}
+                                        {envio.metadados.dias_atraso}
+                                      </div>
+                                    )}
+                                    {envio.metadados.codigo_unidade && (
+                                      <div>
+                                        🏢 Unidade: {envio.metadados.codigo_unidade}
+                                      </div>
+                                    )}
+                                    {envio.metadados.escalonamento_juridico && (
+                                      <div className="text-red-600 font-medium">
+                                        ⚖️ Escalonamento Jurídico
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                            {/* Mensagem */}
+                            <div className="text-sm">
+                              <span className="font-medium text-gray-600">
+                                Mensagem:
+                              </span>
+                              {envio.canal === "email" ? (
+                                <div className="mt-2 space-y-2">
+                                  {/* Abas para alternar entre HTML renderizado e código fonte */}
+                                  <div className="flex space-x-2">
+                                    <button
+                                      onClick={() => setEmailCodigoVisivel(emailCodigoVisivel === envio.id ? null : envio.id)}
+                                      className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                                        emailCodigoVisivel === envio.id
+                                          ? "bg-blue-100 text-blue-800"
+                                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                      }`}
+                                    >
+                                      {emailCodigoVisivel === envio.id ? "️ Visualizar HTML" : "📝 Ver Código"}
+                                    </button>
+                                  </div>
+                                  
+                                  {emailCodigoVisivel === envio.id ? (
+                                    /* Código fonte */
+                                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                                      <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto">
+                                        {envio.mensagem ||
+                                          envio.mensagem_enviada ||
+                                          "Conteúdo não disponível"}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    /* Visualizador HTML */
+                                    <div className="border border-gray-300 rounded-md overflow-hidden">
+                                      <div className="bg-gray-50 px-3 py-2 border-b border-gray-300">
+                                        <span className="text-xs font-medium text-gray-600">📧 Visualização do Email</span>
+                                      </div>
+                                      <div className="bg-white">
+                                        <iframe
+                                          srcDoc={envio.mensagem || envio.mensagem_enviada || "Conteúdo não disponível"}
+                                          className="w-full min-h-[300px] border-none"
+                                          style={{ height: "auto" }}
+                                          onLoad={(e) => {
+                                            const iframe = e.target as HTMLIFrameElement;
+                                            if (iframe.contentDocument) {
+                                              const height = iframe.contentDocument.documentElement.scrollHeight;
+                                              iframe.style.height = Math.max(300, height) + "px";
+                                            }
+                                          }}
+                                          sandbox="allow-same-origin"
+                                          title={`Preview do email ${envio.id}`}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                /* Para WhatsApp, mantém o formato original */
+                                <div className="mt-2 p-3 bg-white border border-gray-200 rounded-md">
+                                  <div className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
+                                    {envio.mensagem ||
+                                      envio.mensagem_enviada ||
+                                      "Conteúdo não disponível"}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Erro, se houver */}
+                            {envio.erro_detalhes && (
+                              <div className="text-sm mt-3">
+                                <span className="font-medium text-red-600">
+                                  Detalhes do erro:
+                                </span>
+                                <div className="mt-1 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+                                  {envio.erro_detalhes}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()
               )}
             </div>
 

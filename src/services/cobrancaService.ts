@@ -521,8 +521,37 @@ export class CobrancaService {
       console.warn("Erro ao buscar logs de WhatsApp:", error);
     }
 
-    // 2) Busca logs de email se houver implementação futura
-    // TODO: Implementar busca de logs de email quando necessário
+    // 2) Logs de Email via n8n em 'logs_envio_email'
+    try {
+      const { data, error } = await supabase
+        .from("logs_envio_email")
+        .select("*") // Busca todos os campos
+        .eq("cobranca_id", cobrancaId)
+        .order("data_envio", { ascending: false });
+
+      if (!error && data) {
+        historico.push(
+          ...data.map((row: any): HistoricoEnvio => ({
+            id: row.id,
+            canal: "email",
+            tipo: "email_n8n",
+            destinatario: row.destinatario,
+            assunto: row.assunto || "Sem assunto",
+            mensagem: row.mensagem || "Mensagem não capturada",
+            status_envio: row.sucesso ? "sucesso" : "falha",
+            erro_detalhes: row.erro_detalhes,
+            data_envio: row.data_envio || row.created_at,
+            usuario: row.usuario || "Sistema",
+            metadados: {
+              assunto: row.assunto,
+              message_id: row.message_id,
+            },
+          }))
+        );
+      }
+    } catch (error) {
+      console.warn("Erro ao buscar logs de Email:", error);
+    }
 
     return historico.sort((a, b) => new Date(b.data_envio).getTime() - new Date(a.data_envio).getTime());
   }
