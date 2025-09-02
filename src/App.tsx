@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "./components/Auth/AuthProvider";
 import { SimpleAuth } from "./components/Auth/SimpleAuth";
 const DashboardGeral = lazy(() => import("./components/Dashboard/DashboardGeral").then(m => ({ default: m.DashboardGeral })));
 const GestaoCobrancas = lazy(() => import("./components/Cobrancas/GestaoCobrancas").then(m => ({ default: m.GestaoCobrancas })));
+const PainelAutomacaoNotificacoes = lazy(() => import("./components/Cobrancas/PainelAutomacaoNotificacoes").then(m => ({ default: m.PainelAutomacaoNotificacoes })));
 const CadastroUnidades = lazy(() => import("./components/CadastroUnidades").then(m => ({ default: m.CadastroUnidades })));
 const GestaoReunioes = lazy(() => import("./components/GestaoReunioes").then(m => ({ default: m.GestaoReunioes })));
 const GestaoAcordos = lazy(() => import("./components/GestaoAcordos").then(m => ({ default: m.GestaoAcordos })));
@@ -18,9 +19,12 @@ const KanbanCobranca = lazy(() => import("./components/KanbanCobranca").then(m =
 const SimulacaoParcelamento = lazy(() => import("./components/SimulacaoParcelamento").then(m => ({ default: m.SimulacaoParcelamento })));
 const Franqueados = lazy(() => import("./components/Franqueados").then(m => ({ default: m.Franqueados })));
 const PainelIndicadoresEstrategicos = lazy(() => import("./components/PainelIndicadoresEstrategicos").then(m => ({ default: m.PainelIndicadoresEstrategicos })));
+const GerenciadorTemplates = lazy(() => import("./components/GerenciadorTemplates"));
 import { Layout } from "./components/Layout/Layout";
 import { useUserProfile } from "./hooks/useUserProfile";
 import { connectionService } from "./services/connectionService";
+import { cronJobService } from "./services/cronJobService";
+import "./utils/testeAutomacao"; // Importa função de teste global
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -36,6 +40,19 @@ function AppContent() {
     });
     
     return removeListener;
+  }, []);
+
+  // Inicializa o sistema de automação de notificações
+  useEffect(() => {
+    // Inicia o agendador automático
+    cronJobService.iniciar();
+    console.log('🤖 Sistema de automação de notificações inicializado');
+    
+    // Limpa ao desmontar o componente
+    return () => {
+      cronJobService.parar();
+      console.log('🤖 Sistema de automação de notificações parado');
+    };
   }, []);
 
   // Mapeia o nível de permissão do usuário para as permissões do sistema
@@ -105,6 +122,10 @@ function AppContent() {
         return <KanbanCobranca />;
       case "cobrancas-lista":
         return <GestaoCobrancas />;
+      case "automacao-notificacoes":
+        return <PainelAutomacaoNotificacoes />;
+      case "gerenciador-templates":
+        return <GerenciadorTemplates />;
       case "usuarios":
         return <GestaoUsuarios />;
       case "simulacao-parcelamento":

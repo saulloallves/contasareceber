@@ -1,3 +1,11 @@
+// Interface para controle de marcos de notificação automática
+export interface MarcosNotificacao {
+  "3": boolean;
+  "7": boolean;
+  "15": boolean;
+  "30": boolean;
+}
+
 export interface CobrancaFranqueado {
   id?: string;
   cnpj: string;
@@ -23,6 +31,9 @@ export interface CobrancaFranqueado {
   unidade_id_fk?: string;    // FK para a unidade vinculada à cobrança
   franqueado_id_fk?: string; // FK para franqueado quando vínculo for via CPF
   importacao_id_fk?: string; // FK para a tabela importacoes_planilha
+  notificacao_automatica_whatsapp?: MarcosNotificacao; // Controle de envios automáticos WhatsApp
+  notificacao_automatica_email?: MarcosNotificacao;    // Controle de envios automáticos Email
+  ultimo_disparo_dia?: number; // Último dia de disparo realizado
   unidades_franqueadas?: {
     id: string;
     codigo_unidade: string;
