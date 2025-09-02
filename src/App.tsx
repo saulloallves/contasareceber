@@ -20,6 +20,7 @@ const SimulacaoParcelamento = lazy(() => import("./components/SimulacaoParcelame
 const Franqueados = lazy(() => import("./components/Franqueados").then(m => ({ default: m.Franqueados })));
 const PainelIndicadoresEstrategicos = lazy(() => import("./components/PainelIndicadoresEstrategicos").then(m => ({ default: m.PainelIndicadoresEstrategicos })));
 const GerenciadorTemplates = lazy(() => import("./components/GerenciadorTemplates"));
+const CentralAutomacoes = lazy(() => import("./components/CentralAutomacoes"));
 import { Layout } from "./components/Layout/Layout";
 import { useUserProfile } from "./hooks/useUserProfile";
 import { connectionService } from "./services/connectionService";
@@ -126,6 +127,8 @@ function AppContent() {
         return <PainelAutomacaoNotificacoes />;
       case "gerenciador-templates":
         return <GerenciadorTemplates />;
+      case "central-automacoes":
+        return <CentralAutomacoes />;
       case "usuarios":
         return <GestaoUsuarios />;
       case "simulacao-parcelamento":

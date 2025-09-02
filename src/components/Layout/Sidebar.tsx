@@ -12,7 +12,7 @@ import {
   Calculator,
   Users,
   Bell,
-  MessageSquare,
+  Cog,
   MoreHorizontal,
   LogOut,
   CheckCircle,
@@ -227,16 +227,9 @@ export function Sidebar({
     ...(isAdminMaster
       ? [
           {
-            id: "automacao-notificacoes",
-            label: "Automação de Notificações",
-            icon: Bell,
-            permissions: ["admin"],
-            badge: null,
-          },
-          {
-            id: "gerenciador-templates",
-            label: "Templates de Mensagens",
-            icon: MessageSquare,
+            id: "central-automacoes",
+            label: "Central de Automações",
+            icon: Cog,
             permissions: ["admin"],
             badge: null,
           },

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { Clock, Play, Pause, Zap, TestTube, CheckCircle, AlertCircle, MessageSquare, Mail, PlayCircle } from 'lucide-react';
 import { automacaoNotificacaoService } from '../services/automacaoNotificacaoService';
 import { cronJobService } from '../services/cronJobService';
+import WhatsAppIcon from './ui/WhatsAppIcon';
 
 interface ResultadoExecucao {
   total_processadas: number;
@@ -80,313 +82,259 @@ export default function TesteNotificacoesAutomaticas() {
   };
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '8px' }}>
-          🧪 Teste de Notificações Automáticas
-        </h1>
-        <p style={{ color: '#666', marginBottom: '16px' }}>
-          Teste o sistema integrado de WhatsApp e Email com n8nService e emailService
-        </p>
-      </div>
-
+    <div className="space-y-6">
       {/* Controles do Cron Job */}
-      <div style={{ 
-        border: '1px solid #ddd', 
-        borderRadius: '8px', 
-        padding: '20px', 
-        marginBottom: '24px',
-        backgroundColor: '#f9f9f9'
-      }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '8px' }}>
-          ⏰ Agendador Automático (Cron Job)
-        </h2>
-        <p style={{ color: '#666', marginBottom: '16px' }}>
-          Controle a execução automática diária das notificações (padrão: 9h da manhã)
-        </p>
+      <div className="bg-gray-50 rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center mb-4">
+          <Clock className="w-6 h-6 text-orange-600 mr-3" />
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800">Agendador Automático</h3>
+            <p className="text-sm text-gray-600">Controle a execução automática diária das notificações (padrão: 9h da manhã)</p>
+          </div>
+        </div>
 
-        <div style={{ marginBottom: '16px' }}>
-          <span style={{
-            padding: '4px 12px',
-            borderRadius: '16px',
-            fontSize: '0.875rem',
-            backgroundColor: cronInfo?.estaAtivo ? '#22c55e' : '#6b7280',
-            color: 'white',
-            marginRight: '16px'
-          }}>
-            {cronInfo?.estaAtivo ? "✅ Ativo" : "⏸️ Inativo"}
+        <div className="mb-4 flex items-center gap-4">
+          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+            cronInfo?.estaAtivo 
+              ? 'bg-green-100 text-green-800' 
+              : 'bg-gray-100 text-gray-800'
+          }`}>
+            {cronInfo?.estaAtivo ? (
+              <>
+                <CheckCircle className="w-4 h-4 mr-1" />
+                Ativo
+              </>
+            ) : (
+              <>
+                <Pause className="w-4 h-4 mr-1" />
+                Inativo
+              </>
+            )}
           </span>
           
           {cronInfo?.estaAtivo && cronInfo?.proximaExecucao && (
-            <span style={{ fontSize: '0.875rem', color: '#666' }}>
-              Próxima execução em: <strong>{cronInfo.tempoRestante}</strong>
-              <br />
-              Data/Hora: <strong>{new Date(cronInfo.proximaExecucao).toLocaleString('pt-BR')}</strong>
-            </span>
+            <div className="text-sm text-gray-600">
+              <div>Próxima execução em: <span className="font-semibold">{cronInfo.tempoRestante}</span></div>
+              <div>Data/Hora: <span className="font-semibold">{new Date(cronInfo.proximaExecucao).toLocaleString('pt-BR')}</span></div>
+            </div>
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <div className="flex flex-wrap gap-3">
           <button 
             onClick={iniciarCron}
             disabled={cronInfo?.estaAtivo}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '4px',
-              border: 'none',
-              backgroundColor: cronInfo?.estaAtivo ? '#ccc' : '#22c55e',
-              color: 'white',
-              cursor: cronInfo?.estaAtivo ? 'not-allowed' : 'pointer'
-            }}
+            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
-            🚀 Iniciar Agendador
+            <Play className="w-4 h-4 mr-2" />
+            Iniciar Agendador
           </button>
           
           <button 
             onClick={pararCron}
             disabled={!cronInfo?.estaAtivo}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '4px',
-              border: '1px solid #ddd',
-              backgroundColor: !cronInfo?.estaAtivo ? '#f5f5f5' : 'white',
-              color: !cronInfo?.estaAtivo ? '#999' : '#333',
-              cursor: !cronInfo?.estaAtivo ? 'not-allowed' : 'pointer'
-            }}
+            className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
-            ⏸️ Parar Agendador
+            <Pause className="w-4 h-4 mr-2" />
+            Parar Agendador
           </button>
           
           <button 
             onClick={executarCronManual}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '4px',
-              border: '1px solid #ddd',
-              backgroundColor: '#f8f9fa',
-              color: '#333',
-              cursor: 'pointer'
-            }}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            ⚡ Executar Agora (Manual)
+            <Zap className="w-4 h-4 mr-2" />
+            Executar Agora
           </button>
         </div>
       </div>
 
       {/* Teste Direto */}
-      <div style={{ 
-        border: '1px solid #ddd', 
-        borderRadius: '8px', 
-        padding: '20px', 
-        marginBottom: '24px' 
-      }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '8px' }}>
-          🧪 Teste Direto do Sistema
-        </h2>
-        <p style={{ color: '#666', marginBottom: '16px' }}>
-          Executa o fluxo completo de notificações (análise + envio WhatsApp/Email)
-        </p>
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center mb-4">
+          <TestTube className="w-6 h-6 text-blue-600 mr-3" />
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800">Teste Direto do Sistema</h3>
+            <p className="text-sm text-gray-600">Executa o fluxo completo de notificações (análise + envio WhatsApp/Email)</p>
+          </div>
+        </div>
         
         <button 
           onClick={executarTeste}
           disabled={executando}
-          style={{
-            width: '100%',
-            padding: '12px 24px',
-            fontSize: '1rem',
-            borderRadius: '6px',
-            border: 'none',
-            backgroundColor: executando ? '#ccc' : '#3b82f6',
-            color: 'white',
-            cursor: executando ? 'not-allowed' : 'pointer',
-            fontWeight: 'bold'
-          }}
+          className="w-full flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
         >
-          {executando ? '⏳ Executando...' : '🚀 Executar Teste Completo'}
+          {executando ? (
+            <>
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+              Executando...
+            </>
+          ) : (
+            <>
+              <PlayCircle className="w-5 h-5 mr-2" />
+              Executar Teste Completo
+            </>
+          )}
         </button>
       </div>
 
       {/* Erro */}
       {erro && (
-        <div style={{ 
-          border: '1px solid #dc2626', 
-          borderRadius: '8px', 
-          padding: '16px', 
-          marginBottom: '24px',
-          backgroundColor: '#fef2f2'
-        }}>
-          <h3 style={{ color: '#dc2626', marginBottom: '8px' }}>❌ Erro</h3>
-          <p style={{ color: '#dc2626' }}>{erro}</p>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+            <h3 className="text-red-800 font-medium">Erro</h3>
+          </div>
+          <p className="text-red-700 mt-2">{erro}</p>
         </div>
       )}
 
       {/* Resultados */}
       {resultado && (
-        <div style={{ 
-          border: '1px solid #ddd', 
-          borderRadius: '8px', 
-          padding: '20px', 
-          marginBottom: '24px' 
-        }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '16px' }}>
-            📊 Resultado da Execução
-          </h2>
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-6">Resultado da Execução</h3>
 
           {/* Resumo Geral */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-            gap: '16px',
-            marginBottom: '24px'
-          }}>
-            <div style={{ textAlign: 'center', padding: '16px', backgroundColor: '#eff6ff', borderRadius: '8px' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#2563eb' }}>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+              <div className="text-3xl font-bold text-blue-600 mb-1">
                 {resultado.total_processadas}
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#1d4ed8' }}>Total Analisadas</div>
+              <div className="text-sm text-blue-700">Total Analisadas</div>
             </div>
             
-            <div style={{ textAlign: 'center', padding: '16px', backgroundColor: '#f0fdf4', borderRadius: '8px' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#16a34a' }}>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+              <div className="text-3xl font-bold text-green-600 mb-1">
                 {resultado.whatsapp_enviados}
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#15803d' }}>📱 WhatsApp Enviados</div>
+              <div className="text-sm text-green-700 flex items-center justify-center">
+                <WhatsAppIcon className="w-4 h-4 mr-1" />
+                WhatsApp Enviados
+              </div>
             </div>
             
-            <div style={{ textAlign: 'center', padding: '16px', backgroundColor: '#faf5ff', borderRadius: '8px' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#9333ea' }}>
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
+              <div className="text-3xl font-bold text-purple-600 mb-1">
                 {resultado.emails_enviados}
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#7c3aed' }}>📧 Emails Enviados</div>
+              <div className="text-sm text-purple-700 flex items-center justify-center">
+                <Mail className="w-4 h-4 mr-1" />
+                Emails Enviados
+              </div>
             </div>
             
-            <div style={{ textAlign: 'center', padding: '16px', backgroundColor: '#fef2f2', borderRadius: '8px' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#dc2626' }}>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+              <div className="text-3xl font-bold text-red-600 mb-1">
                 {resultado.erros.length}
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#b91c1c' }}>Erros</div>
+              <div className="text-sm text-red-700">Erros</div>
             </div>
           </div>
 
           {/* Detalhes das Notificações */}
           {resultado.detalhes && resultado.detalhes.length > 0 && (
-            <>
-              <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid #ddd' }} />
-              <div>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 'bold', marginBottom: '12px' }}>
-                  📋 Detalhes das Notificações Enviadas
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {resultado.detalhes.map((detalhe, index) => (
-                    <div key={index} style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center', 
-                      padding: '12px', 
-                      backgroundColor: '#f8f9fa', 
-                      borderRadius: '6px' 
-                    }}>
-                      <div>
-                        <div style={{ fontWeight: 'bold' }}>
-                          {detalhe.nome_franqueado}
-                        </div>
-                        <div style={{ fontSize: '0.875rem', color: '#666' }}>
-                          {detalhe.unidade} • Marco: {detalhe.marco} dias
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <span style={{
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          fontSize: '0.75rem',
-                          backgroundColor: detalhe.whatsapp_enviado ? '#22c55e' : '#6b7280',
-                          color: 'white'
-                        }}>
-                          📱 WhatsApp {detalhe.whatsapp_enviado ? "✅" : "❌"}
-                        </span>
-                        <span style={{
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          fontSize: '0.75rem',
-                          backgroundColor: detalhe.email_enviado ? '#9333ea' : '#6b7280',
-                          color: 'white'
-                        }}>
-                          📧 Email {detalhe.email_enviado ? "✅" : "❌"}
-                        </span>
+            <div className="mb-6">
+              <h4 className="text-base font-semibold text-gray-800 mb-3">Detalhes das Notificações Enviadas</h4>
+              <div className="space-y-3">
+                {resultado.detalhes.map((detalhe, index) => (
+                  <div key={index} className="bg-gray-50 rounded-lg p-4 flex justify-between items-center">
+                    <div>
+                      <div className="font-semibold text-gray-800">{detalhe.nome_franqueado}</div>
+                      <div className="text-sm text-gray-600">
+                        {detalhe.unidade} • Marco: {detalhe.marco} dias
                       </div>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex gap-2">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        detalhe.whatsapp_enviado 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        <MessageSquare className="w-3 h-3 mr-1" />
+                        WhatsApp {detalhe.whatsapp_enviado ? "✅" : "❌"}
+                      </span>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        detalhe.email_enviado 
+                          ? 'bg-purple-100 text-purple-800' 
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        <Mail className="w-3 h-3 mr-1" />
+                        Email {detalhe.email_enviado ? "✅" : "❌"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </>
+            </div>
           )}
 
           {/* Erros */}
           {resultado.erros && resultado.erros.length > 0 && (
-            <>
-              <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid #ddd' }} />
-              <div>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 'bold', marginBottom: '12px', color: '#dc2626' }}>
-                  ❌ Erros Encontrados
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {resultado.erros.map((erro, index) => (
-                    <div key={index} style={{ 
-                      padding: '12px', 
-                      backgroundColor: '#fef2f2', 
-                      borderRadius: '6px',
-                      border: '1px solid #fecaca'
-                    }}>
-                      <strong>Cobrança {erro.cobranca_id}</strong> ({erro.canal}): {erro.erro}
-                    </div>
-                  ))}
-                </div>
+            <div className="mb-6">
+              <h4 className="text-base font-semibold text-red-800 mb-3">Erros Encontrados</h4>
+              <div className="space-y-2">
+                {resultado.erros.map((erro, index) => (
+                  <div key={index} className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <span className="font-semibold">Cobrança {erro.cobranca_id}</span> ({erro.canal}): {erro.erro}
+                  </div>
+                ))}
               </div>
-            </>
+            </div>
           )}
 
           {/* Mensagem quando não há cobranças */}
           {resultado.total_processadas === 0 && (
-            <div style={{ 
-              padding: '16px', 
-              backgroundColor: '#f0fdf4', 
-              borderRadius: '6px',
-              border: '1px solid #bbf7d0'
-            }}>
-              ✅ Nenhuma cobrança precisa de notificação no momento. Sistema funcionando corretamente!
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+                <span className="text-green-800">
+                  Nenhuma cobrança precisa de notificação no momento. Sistema funcionando corretamente!
+                </span>
+              </div>
             </div>
           )}
         </div>
       )}
 
       {/* Instruções */}
-      <div style={{ 
-        border: '1px solid #ddd', 
-        borderRadius: '8px', 
-        padding: '20px',
-        backgroundColor: '#f8f9fa'
-      }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '16px' }}>
-          📖 Como usar
-        </h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.875rem' }}>
-          <div>
-            <strong>🤖 Agendador Automático:</strong> Liga/desliga a execução diária automática (padrão: 9h da manhã)
+      <div className="bg-gray-50 rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Como usar</h3>
+        <div className="space-y-3 text-sm text-gray-700">
+          <div className="flex items-start">
+            <Clock className="w-4 h-4 mr-2 mt-0.5 text-orange-600" />
+            <div>
+              <span className="font-semibold">Agendador Automático:</span> Liga/desliga a execução diária automática (padrão: 9h da manhã)
+            </div>
           </div>
-          <div>
-            <strong>⚡ Executar Agora:</strong> Roda o cron job manualmente para testes imediatos
+          <div className="flex items-start">
+            <Zap className="w-4 h-4 mr-2 mt-0.5 text-blue-600" />
+            <div>
+              <span className="font-semibold">Executar Agora:</span> Roda o cron job manualmente para testes imediatos
+            </div>
           </div>
-          <div>
-            <strong>🧪 Teste Direto:</strong> Executa o fluxo completo e mostra resultados detalhados
+          <div className="flex items-start">
+            <TestTube className="w-4 h-4 mr-2 mt-0.5 text-purple-600" />
+            <div>
+              <span className="font-semibold">Teste Direto:</span> Executa o fluxo completo e mostra resultados detalhados
+            </div>
           </div>
-          <div>
-            <strong>📅 Marcos de Notificação:</strong> Sistema notifica aos 3, 7, 15 e 30 dias após criação da cobrança
+          <div className="flex items-start">
+            <div className="w-4 h-4 mr-2 mt-0.5 text-white text-xs font-bold">📅</div>
+            <div>
+              <span className="font-semibold">Marcos de Notificação:</span> Sistema notifica aos 3, 7, 15 e 30 dias após criação da cobrança
+            </div>
           </div>
-          <div>
-            <strong>🔗 Integração Completa:</strong> WhatsApp via n8nService + Email via emailService + Templates dinâmicos
+          <div className="flex items-start">
+            <div className="w-4 h-4 mr-2 mt-0.5 text-white text-xs font-bold">🔗</div>
+            <div>
+              <span className="font-semibold">Integração Completa:</span> WhatsApp via n8nService + Email via emailService + Templates dinâmicos
+            </div>
           </div>
-          <div>
-            <strong>👥 Franqueados:</strong> Para CNPJs busca automaticamente o nome do franqueado principal da unidade
+          <div className="flex items-start">
+            <div className="w-4 h-4 mr-2 mt-0.5 text-white text-xs font-bold">👥</div>
+            <div>
+              <span className="font-semibold">Franqueados:</span> Para CNPJs busca automaticamente o nome do franqueado principal da unidade
+            </div>
           </div>
         </div>
       </div>

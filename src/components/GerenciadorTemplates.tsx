@@ -39,11 +39,6 @@ const GerenciadorTemplates: React.FC = () => {
         editaveis[template.id] = { ...template };
       });
       setTemplatesEditaveis(editaveis);
-      
-      toast.success('Templates carregados com sucesso!', {
-        duration: 2000,
-        position: 'top-right',
-      });
     } catch (error) {
       console.error('Erro ao carregar templates:', error);
       toast.error('Erro ao carregar templates. Verifique sua conexão.', {
@@ -195,7 +190,7 @@ const GerenciadorTemplates: React.FC = () => {
     const isEmail = template.tipo.includes('email');
 
     return (
-      <div key={template.id} className="border rounded-lg p-6 bg-gray-50">
+      <div key={template.id} className="border rounded-lg p-6 bg-gray-50 mt-5">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
             <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -291,20 +286,21 @@ const GerenciadorTemplates: React.FC = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">Gerenciador de Templates de Notificação</h1>
-        <button 
-          onClick={carregarTemplates} 
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          🔄 Recarregar
-        </button>
-      </div>
-
+    <div className="space-y-8">
       {/* Informações sobre variáveis */}
       <div className="bg-white p-6 rounded-lg shadow-md border">
-        <h2 className="text-xl font-semibold mb-4">📝 Variáveis Disponíveis</h2>
+        <div className="flex justify-between items-start mb-4">
+          <h2 className="text-xl font-semibold">📝 Variáveis Disponíveis</h2>
+          <button 
+            onClick={carregarTemplates} 
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Recarregar
+          </button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[
             { var: '{nomeFranqueado}', desc: 'Nome completo do franqueado' },
