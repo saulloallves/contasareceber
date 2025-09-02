@@ -82,7 +82,8 @@ export class AutomacaoNotificacaoService {
         ultimo_disparo_dia,
         franqueado_id_fk,
         unidade_id_fk,
-        status
+        status,
+        tipo_cobranca
       `)
       .eq('status', 'em_aberto')
       .order('created_at', { ascending: true });
@@ -401,7 +402,7 @@ export class AutomacaoNotificacaoService {
           nomeFranqueado: cobranca.franqueado_principal?.nome_completo || 
                           cobranca.cliente.split(' ')[0] || 'Franqueado',
           nomeUnidade: cobranca.unidade?.nome_unidade || cobranca.cliente,
-          tipoCobranca: cobranca.tipo_cobranca || 'Cobrança',
+          tipoCobranca: cobranca.tipo_cobranca || 'Pendência Financeira',
           valorFormatado: cobranca.valor_original.toLocaleString('pt-BR', { 
             style: 'currency', 
             currency: 'BRL' 
@@ -434,7 +435,7 @@ export class AutomacaoNotificacaoService {
       currency: 'BRL' 
     });
     
-    const tipoCobranca = cobranca.tipo_cobranca || 'Cobrança';
+    const tipoCobranca = cobranca.tipo_cobranca || 'Pendência Financeira';
     const isCPF = !!cobranca.cpf && !cobranca.cnpj;
     
     // Template genérico simples
@@ -484,7 +485,7 @@ _Mensagem Automática_`;
           nomeFranqueado: cobranca.franqueado_principal?.nome_completo || 
                           cobranca.cliente.split(' ')[0] || 'Franqueado',
           nomeUnidade: cobranca.unidade?.nome_unidade || cobranca.cliente,
-          tipoCobranca: cobranca.tipo_cobranca || 'Cobrança',
+          tipoCobranca: cobranca.tipo_cobranca || 'Pendência Financeira',
           valorFormatado: cobranca.valor_original.toLocaleString('pt-BR', { 
             style: 'currency', 
             currency: 'BRL' 
@@ -525,7 +526,7 @@ _Mensagem Automática_`;
       style: 'currency', 
       currency: 'BRL' 
     });
-    const tipoCobranca = cobranca.tipo_cobranca || 'Cobrança';
+    const tipoCobranca = cobranca.tipo_cobranca || 'Pendência Financeira';
 
     const assuntos = {
       3: `Lembrete de Cobrança - ${nomeUnidade} - 3 dias`,
