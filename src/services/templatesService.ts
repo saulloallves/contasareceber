@@ -2,7 +2,7 @@ import supabaseClient from '../lib/supabaseClient';
 
 export interface TemplateNotificacao {
   id: string;
-  tipo: 'whatsapp' | 'email';
+  tipo: 'whatsapp' | 'email' | 'whatsapp_cpf' | 'whatsapp_cnpj' | 'email_cpf' | 'email_cnpj';
   marco: number; // 3, 7, 15, 30 dias
   assunto?: string; // Para email
   conteudo: string;
@@ -56,6 +56,32 @@ class TemplatesService {
       return this.getTemplateDefault(tipo, marco);
     }
 
+    return data;
+  }
+
+  /**
+   * Busca template específico considerando CPF vs CNPJ
+   */
+  async buscarTemplateEspecifico(canal: 'whatsapp' | 'email', marco: number, isCPF: boolean): Promise<TemplateNotificacao | null> {
+    const tipoTemplate = isCPF ? `${canal}_cpf` : `${canal}_cnpj`;
+    
+    console.log(`🔍 Buscando template: ${tipoTemplate} - marco ${marco}`);
+    
+    const { data, error } = await supabaseClient
+      .from('templates_notificacao')
+      .select('*')
+      .eq('tipo', tipoTemplate)
+      .eq('marco', marco)
+      .eq('ativo', true)
+      .single();
+
+    if (error || !data) {
+      console.warn(`⚠️ Template não encontrado: ${tipoTemplate} - marco ${marco}`);
+      // Fallback para template genérico se específico não for encontrado
+      return this.buscarTemplate(canal, marco);
+    }
+
+    console.log(`✅ Template encontrado: ${tipoTemplate} - marco ${marco}`);
     return data;
   }
 

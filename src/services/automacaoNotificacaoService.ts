@@ -382,8 +382,18 @@ export class AutomacaoNotificacaoService {
    */
   async gerarMensagemWhatsApp(cobranca: CobrancaParaProcessamento, marco: number): Promise<string> {
     try {
-      // Busca template do banco ou usa o padrão
-      const template = await templatesService.buscarTemplate('whatsapp', marco);
+      // Verifica se é CPF ou CNPJ baseado na presença dos campos
+      const isCPF = !!cobranca.cpf && !cobranca.cnpj;
+      
+      console.log(`🔍 DEBUG gerarMensagemWhatsApp:`, {
+        cobranca_id: cobranca.id,
+        cpf: cobranca.cpf,
+        cnpj: cobranca.cnpj,
+        isCPF: isCPF
+      });
+
+      // Busca template específico para CPF ou CNPJ
+      const template = await templatesService.buscarTemplateEspecifico('whatsapp', marco, isCPF);
       
       if (template) {
         // Prepara variáveis para o template
@@ -399,6 +409,8 @@ export class AutomacaoNotificacaoService {
           diasEmAberto: cobranca.dias_desde_criacao
         };
 
+        console.log(`📤 Usando template específico: ${template.tipo} para marco ${marco}`);
+        
         return templatesService.processarTemplate(template.conteudo, variaveis);
       }
     } catch (error) {
@@ -406,18 +418,16 @@ export class AutomacaoNotificacaoService {
     }
 
     // Fallback para templates hardcoded se houver erro
+    console.warn('⚠️ Usando template hardcoded como fallback');
     return this.gerarMensagemWhatsAppFallback(cobranca, marco);
   }
 
   /**
-   * Método fallback com templates hardcoded
+   * Método fallback simplificado (caso não encontre no banco)
    */
   private gerarMensagemWhatsAppFallback(cobranca: CobrancaParaProcessamento, marco: number): string {
-    // Usa o nome do franqueado direto para CPF ou nome do franqueado principal para CNPJ
     const nomeFranqueado = cobranca.franqueado_principal?.nome_completo || 
                           cobranca.cliente.split(' ')[0] || 'Franqueado';
-    
-    const nomeUnidade = cobranca.unidade?.nome_unidade || cobranca.cliente;
     
     const valorFormatado = cobranca.valor_original.toLocaleString('pt-BR', { 
       style: 'currency', 
@@ -425,56 +435,29 @@ export class AutomacaoNotificacaoService {
     });
     
     const tipoCobranca = cobranca.tipo_cobranca || 'Cobrança';
+    const isCPF = !!cobranca.cpf && !cobranca.cnpj;
+    
+    // Template genérico simples
+    if (isCPF) {
+      return `Olá ${nomeFranqueado}!
 
-    const templates = {
-      3: `Olá ${nomeFranqueado}!
-
-Identificamos que há uma cobrança em aberto há 3 dias referente à sua unidade *${nomeUnidade}*.
-
-📄 Tipo: ${tipoCobranca}  
-💰 Valor: ${valorFormatado}
-
-Se o pagamento já foi feito, por favor, desconsidere esta mensagem.  
-Obrigado pela atenção!
-
-_Mensagem Automática_`,
-
-      7: `Olá ${nomeFranqueado}! ⚠️
-
-Sua cobrança referente à unidade *${nomeUnidade}* está em aberto há 7 dias.
+Identificamos uma cobrança em aberto há ${marco} dias.
 
 📄 Tipo: ${tipoCobranca}  
 💰 Valor: ${valorFormatado}
 
-Pedimos que regularize o pagamento para evitar transtornos.  
-Se já pagou, por favor, ignore esta mensagem.
+_Mensagem Automática_`;
+    } else {
+      const nomeUnidade = cobranca.unidade?.nome_unidade || cobranca.cliente;
+      return `Olá ${nomeFranqueado}!
 
-_Mensagem Automática_`,
-
-      15: `Olá ${nomeFranqueado}! �
-
-A cobrança da sua unidade *${nomeUnidade}* está em aberto há 15 dias.
+Identificamos uma cobrança em aberto há ${marco} dias referente à unidade *${nomeUnidade}*.
 
 📄 Tipo: ${tipoCobranca}  
 💰 Valor: ${valorFormatado}
 
-Pedimos sua atenção para a regularização do valor o quanto antes, evitando medidas adicionais.
-
-_Mensagem Automática_`,
-
-      30: `*⚠️ URGENTE – ${nomeFranqueado}! ⚠️*
-
-O débito da sua unidade *${nomeUnidade}* está em aberto há 30 dias.
-
-📄 Tipo: ${tipoCobranca}  
-💰 Valor: ${valorFormatado}
-
-Efetue o pagamento imediatamente para evitar acionamento jurídico e restrições.
-
-_Mensagem Automática_`
-    };
-
-    return templates[marco as keyof typeof templates] || templates[3];
+_Mensagem Automática_`;
+    }
   }
 
   /**
@@ -482,8 +465,18 @@ _Mensagem Automática_`
    */
   async gerarEmailHTML(cobranca: CobrancaParaProcessamento, marco: number): Promise<{assunto: string, conteudo: string}> {
     try {
-      // Busca template do banco ou usa o padrão
-      const template = await templatesService.buscarTemplate('email', marco);
+      // Verifica se é CPF ou CNPJ baseado na presença dos campos
+      const isCPF = !!cobranca.cpf && !cobranca.cnpj;
+      
+      console.log(`🔍 DEBUG gerarEmailHTML:`, {
+        cobranca_id: cobranca.id,
+        cpf: cobranca.cpf,
+        cnpj: cobranca.cnpj,
+        isCPF: isCPF
+      });
+
+      // Busca template específico para CPF ou CNPJ
+      const template = await templatesService.buscarTemplateEspecifico('email', marco, isCPF);
       
       if (template) {
         // Prepara variáveis para o template
@@ -501,9 +494,11 @@ _Mensagem Automática_`
 
         const assuntoProcessado = template.assunto ? 
           templatesService.processarTemplate(template.assunto, variaveis) : 
-          `Cobrança Pendente - ${variaveis.nomeUnidade}`;
+          `Cobrança Pendente - ${variaveis.nomeFranqueado}`;
 
         const conteudoProcessado = templatesService.processarTemplate(template.conteudo, variaveis);
+
+        console.log(`📧 Usando template específico: ${template.tipo} para marco ${marco}`);
 
         return {
           assunto: assuntoProcessado,
@@ -515,6 +510,7 @@ _Mensagem Automática_`
     }
 
     // Fallback para email simples se houver erro
+    console.warn('⚠️ Usando template de email hardcoded como fallback');
     return this.gerarEmailFallback(cobranca, marco);
   }
 
