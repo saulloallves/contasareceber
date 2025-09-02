@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Clock, Play, Pause, Zap, TestTube, CheckCircle, AlertCircle, MessageSquare, Mail, PlayCircle } from 'lucide-react';
+import { Clock, Play, Pause, Zap, TestTube, CheckCircle, AlertCircle, MessageSquare, Mail, PlayCircle, Settings } from 'lucide-react';
 import { automacaoNotificacaoService } from '../services/automacaoNotificacaoService';
-import { cronJobService } from '../services/cronJobService';
+import { cronJobService, ConfiguracaoCron } from '../services/cronJobService';
 import WhatsAppIcon from './ui/WhatsAppIcon';
+import ModalConfiguracaoAgendador from './ui/ModalConfiguracaoAgendador';
+import { toast } from 'react-hot-toast';
 
 interface ResultadoExecucao {
   total_processadas: number;
@@ -23,6 +25,7 @@ interface CronInfo {
   proximaExecucao: Date | null;
   tempoRestante: string;
   estaAtivo: boolean;
+  configuracao: ConfiguracaoCron;
 }
 
 export default function TesteNotificacoesAutomaticas() {
@@ -30,6 +33,7 @@ export default function TesteNotificacoesAutomaticas() {
   const [resultado, setResultado] = useState<ResultadoExecucao | null>(null);
   const [cronInfo, setCronInfo] = useState<CronInfo | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [modalConfigAberto, setModalConfigAberto] = useState(false);
 
   // Atualiza informações do cron
   React.useEffect(() => {
@@ -74,11 +78,36 @@ export default function TesteNotificacoesAutomaticas() {
   const iniciarCron = () => {
     cronJobService.iniciar();
     setCronInfo(cronJobService.obterProximoAgendamento());
+    toast.success('Agendador iniciado com sucesso!');
   };
 
   const pararCron = () => {
     cronJobService.parar();
     setCronInfo(cronJobService.obterProximoAgendamento());
+    toast.success('Agendador parado com sucesso!');
+  };
+
+  const handleSalvarConfiguracao = (novaConfig: ConfiguracaoCron) => {
+    try {
+      cronJobService.configurarAgendamento(novaConfig);
+      setCronInfo(cronJobService.obterProximoAgendamento());
+      toast.success('Configurações salvas com sucesso!');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao salvar configurações');
+    }
+  };
+
+  const obterFrequenciaTexto = (config: ConfiguracaoCron) => {
+    switch (config.frequencia) {
+      case 'diario':
+        return 'Diário';
+      case 'semanal':
+        return 'Semanal';
+      case 'mensal':
+        return 'Mensal';
+      default:
+        return 'Não configurado';
+    }
   };
 
   return (
@@ -93,32 +122,54 @@ export default function TesteNotificacoesAutomaticas() {
           </div>
         </div>
 
-        <div className="mb-4 flex items-center gap-4">
-          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-            cronInfo?.estaAtivo 
-              ? 'bg-green-100 text-green-800' 
-              : 'bg-gray-100 text-gray-800'
-          }`}>
-            {cronInfo?.estaAtivo ? (
-              <>
-                <CheckCircle className="w-4 h-4 mr-1" />
-                Ativo
-              </>
-            ) : (
-              <>
-                <Pause className="w-4 h-4 mr-1" />
-                Inativo
-              </>
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+              cronInfo?.estaAtivo 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-gray-100 text-gray-800'
+            }`}>
+              {cronInfo?.estaAtivo ? (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-1" />
+                  Ativo
+                </>
+              ) : (
+                <>
+                  <Pause className="w-4 h-4 mr-1" />
+                  Inativo
+                </>
+              )}
+            </span>
+            
+            {cronInfo?.configuracao && (
+              <span className="text-sm text-gray-600">
+                {obterFrequenciaTexto(cronInfo.configuracao)} • {
+                  cronInfo.configuracao.hora.toString().padStart(2, '0')
+                }:{
+                  cronInfo.configuracao.minuto.toString().padStart(2, '0')
+                }
+              </span>
             )}
-          </span>
-          
-          {cronInfo?.estaAtivo && cronInfo?.proximaExecucao && (
-            <div className="text-sm text-gray-600">
+          </div>
+
+          <button
+            onClick={() => setModalConfigAberto(true)}
+            className="flex items-center px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+          >
+            <Settings className="w-4 h-4 mr-1" />
+            Configurar
+          </button>
+        </div>
+
+        {cronInfo?.estaAtivo && cronInfo?.proximaExecucao && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="text-sm text-blue-800">
               <div>Próxima execução em: <span className="font-semibold">{cronInfo.tempoRestante}</span></div>
               <div>Data/Hora: <span className="font-semibold">{new Date(cronInfo.proximaExecucao).toLocaleString('pt-BR')}</span></div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-3">
           <button 
@@ -338,6 +389,16 @@ export default function TesteNotificacoesAutomaticas() {
           </div>
         </div>
       </div>
+
+      {/* Modal de Configuração */}
+      {modalConfigAberto && cronInfo?.configuracao && (
+        <ModalConfiguracaoAgendador
+          isOpen={modalConfigAberto}
+          onClose={() => setModalConfigAberto(false)}
+          onSave={handleSalvarConfiguracao}
+          configuracaoAtual={cronInfo.configuracao}
+        />
+      )}
     </div>
   );
 }
