@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState } from 'react';
 
-const N8N_WEBHOOK_URL = 'http://localhost:5678/webhook/atualizar-site';
+const N8N_WEBHOOK_URL = 'https://n8n.girabot.com.br/webhook/atualizar-site';
 
 const UploadAtualizacao: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
