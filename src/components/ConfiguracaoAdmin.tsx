@@ -3,31 +3,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import {
-  Settings, Save, RotateCcw, Download, CheckCircle,
-  AlertCircle, Info, DollarSign, MessageSquare,
-  Bug, Users, Shield, Bell, Mail,
+  Settings, 
+  Users, Shield, Bell,
   AlertTriangle, Globe, RefreshCw, XCircle,
 } from "lucide-react";
 import { ConfiguracaoService } from "../services/configuracaoService";
-import { ConfiguracaoCobranca, LogSistema } from "../types/configuracao";
+import { LogSistema } from "../types/configuracao";
 import { GestaoUsuarios } from "./Usuarios/GestaoUsuarios";
-import { NotificacaoAutomaticaService } from "../services/notificacaoAutomaticaService";
+import { toast } from "react-hot-toast";
 
 export function ConfiguracaoAdmin() {
   const [abaSelecionada, setAbaSelecionada] = useState<
-    "configuracoes" | "usuarios" | "logs" | "seguranca" | "notificacoes"
-  >("configuracoes");
-  const [config, setConfig] = useState<ConfiguracaoCobranca | null>(null);
-  const [configOriginal, setConfigOriginal] =
-    useState<ConfiguracaoCobranca | null>(null);
+  "usuarios" | "logs" | "seguranca"
+  >("usuarios");
   const [logs, setLogs] = useState<LogSistema[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [salvando, setSalvando] = useState(false);
-  const [mensagem, setMensagem] = useState<{
-    tipo: "sucesso" | "erro" | "info";
-    texto: string;
-  } | null>(null);
-  const [alteracoesPendentes, setAlteracoesPendentes] = useState(false);
   const [filtrosLogs, setFiltrosLogs] = useState({
     usuario: "",
     acao: "",
@@ -36,58 +26,23 @@ export function ConfiguracaoAdmin() {
   });
   const [configSeguranca, setConfigSeguranca] = useState<any>(null);
   const [tentativasLogin, setTentativasLogin] = useState<any[]>([]);
-  const [configNotificacao, setConfigNotificacao] = useState({
-    whatsapp_ativo: true,
-    email_ativo: true,
-    enviar_apenas_em_atraso: false,
-    valor_minimo_notificacao: 0,
-    template_whatsapp: "",
-    template_email_assunto: "",
-    template_email_corpo: "",
-  });
   const [ipsBloqueados, setIpsBloqueados] = useState<any[]>([]);
   const [alertasSeguranca, setAlertasSeguranca] = useState<any[]>([]);
   const [novoIP, setNovoIP] = useState({ ip: '', motivo: '' });
   const [salvandoSeguranca, setSalvandoSeguranca] = useState(false);
 
   const configuracaoService = new ConfiguracaoService();
-  const notificacaoAutomaticaService = new NotificacaoAutomaticaService();
 
   useEffect(() => {
-    if (abaSelecionada === "configuracoes") {
-      carregarConfiguracao();
+    if (abaSelecionada === "usuarios") {
+      // Para a aba de usuários, apenas definir como não carregando
+      setCarregando(false);
     } else if (abaSelecionada === "logs") {
       carregarLogs();
-    } else if (abaSelecionada === "notificacoes") {
-      carregarConfiguracaoNotificacao();
     } else if (abaSelecionada === "seguranca") {
       carregarDadosSeguranca();
     }
   }, [abaSelecionada]);
-
-  useEffect(() => {
-    // Verifica se há alterações pendentes
-    if (config && configOriginal) {
-      const temAlteracoes =
-        JSON.stringify(config) !== JSON.stringify(configOriginal);
-      setAlteracoesPendentes(temAlteracoes);
-    }
-  }, [config, configOriginal]);
-
-  const carregarConfiguracao = async () => {
-    setCarregando(true);
-    try {
-      const dados = await configuracaoService.buscarConfiguracao();
-      if (dados) {
-        setConfig(dados);
-        setConfigOriginal(JSON.parse(JSON.stringify(dados))); // Deep copy
-      }
-    } catch (error) {
-      mostrarMensagem("erro", "Erro ao carregar configurações");
-    } finally {
-      setCarregando(false);
-    }
-  };
 
   const carregarLogs = async () => {
     setCarregando(true);
@@ -98,85 +53,6 @@ export function ConfiguracaoAdmin() {
       mostrarMensagem("erro", "Erro ao carregar logs");
     } finally {
       setCarregando(false);
-    }
-  };
-
-  const carregarConfiguracaoNotificacao = async () => {
-    setCarregando(true);
-    try {
-      const dados = await notificacaoAutomaticaService.buscarConfiguracaoNotificacao();
-      setConfigNotificacao(dados);
-    } catch (error) {
-      mostrarMensagem("erro", "Erro ao carregar configurações de notificação");
-    } finally {
-      setCarregando(false);
-    }
-  };
-
-  const salvarConfiguracaoNotificacao = async () => {
-    setSalvando(true);
-    try {
-      await notificacaoAutomaticaService.salvarConfiguracaoNotificacao(configNotificacao, "usuario_atual");
-      mostrarMensagem("sucesso", "Configurações de notificação salvas com sucesso!");
-    } catch (error) {
-      mostrarMensagem("erro", `Erro ao salvar configurações de notificação: ${error}`);
-    } finally {
-      setSalvando(false);
-    }
-  };
-
-  const salvarConfiguracao = async () => {
-    if (!config) return;
-
-    setSalvando(true);
-    try {
-      await configuracaoService.atualizarConfiguracao(config, "usuario_atual");
-      setConfigOriginal(JSON.parse(JSON.stringify(config))); // Atualiza original
-      mostrarMensagem("sucesso", "Configurações salvas com sucesso!");
-    } catch (error) {
-      mostrarMensagem("erro", `Erro ao salvar: ${error}`);
-    } finally {
-      setSalvando(false);
-    }
-  };
-
-  const resetarConfiguracao = async () => {
-    if (
-      !confirm(
-        "Tem certeza que deseja resetar todas as configurações para os valores padrão?"
-      )
-    ) {
-      return;
-    }
-
-    setSalvando(true);
-    try {
-      await configuracaoService.resetarConfiguracao();
-      await carregarConfiguracao();
-      mostrarMensagem("info", "Configurações resetadas para valores padrão");
-    } catch (error) {
-      mostrarMensagem("erro", "Erro ao resetar configurações");
-    } finally {
-      setSalvando(false);
-    }
-  };
-
-  const exportarConfiguracao = async () => {
-    try {
-      const blob = await configuracaoService.exportarConfiguracao();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `configuracao-cobranca-${
-        new Date().toISOString().split("T")[0]
-      }.json`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      mostrarMensagem("sucesso", "Configuração exportada com sucesso!");
-    } catch (error) {
-      mostrarMensagem("erro", "Erro ao exportar configuração");
     }
   };
 
@@ -266,28 +142,24 @@ export function ConfiguracaoAdmin() {
     tipo: "sucesso" | "erro" | "info",
     texto: string
   ) => {
-    setMensagem({ tipo, texto });
-    setTimeout(() => setMensagem(null), 5000);
-  };
-
-  const atualizarCampo = (campo: keyof ConfiguracaoCobranca, valor: any) => {
-    if (!config) return;
-    setConfig({ ...config, [campo]: valor });
-  };
-
-  const previewMensagem = () => {
-    if (!config) return "";
-
-    return configuracaoService.gerarPreviewMensagem(
-      config.texto_padrao_mensagem
-    );
+    switch (tipo) {
+      case "sucesso":
+        toast.success(texto);
+        break;
+      case "erro":
+        toast.error(texto);
+        break;
+      case "info":
+        toast(texto);
+        break;
+    }
   };
 
   const formatarData = (data: string) => {
     return new Date(data).toLocaleString("pt-BR");
   };
 
-  if (carregando && abaSelecionada === "configuracoes") {
+  if (carregando && (abaSelecionada === "logs" || abaSelecionada === "seguranca")) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -315,74 +187,15 @@ export function ConfiguracaoAdmin() {
               </p>
             </div>
           </div>
-
-          {abaSelecionada === "configuracoes" && config && (
-            <div className="flex space-x-3">
-              <button
-                onClick={exportarConfiguracao}
-                className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Exportar
-              </button>
-              <button
-                onClick={resetarConfiguracao}
-                className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Resetar
-              </button>
-              <button
-                onClick={salvarConfiguracao}
-                disabled={salvando || !alteracoesPendentes}
-                className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {salvando ? "Salvando..." : "Salvar Alterações"}
-              </button>
-            </div>
-          )}
         </div>
-
-        {/* Mensagem de feedback */}
-        {mensagem && (
-          <div
-            className={`mb-6 p-4 rounded-lg flex items-center ${
-              mensagem.tipo === "sucesso"
-                ? "bg-green-50 border border-green-200 text-green-800"
-                : mensagem.tipo === "erro"
-                ? "bg-red-50 border border-red-200 text-red-800"
-                : "bg-blue-50 border border-blue-200 text-blue-800"
-            }`}
-          >
-            {mensagem.tipo === "sucesso" ? (
-              <CheckCircle className="w-5 h-5 mr-2" />
-            ) : mensagem.tipo === "erro" ? (
-              <AlertCircle className="w-5 h-5 mr-2" />
-            ) : (
-              <Info className="w-5 h-5 mr-2" />
-            )}
-            {mensagem.texto}
-          </div>
-        )}
 
         {/* Navegação por abas */}
         <div className="border-b border-gray-200 mb-8">
           <nav className="-mb-px flex space-x-8">
             {[
-              {
-                id: "configuracoes",
-                label: "Configurações do Sistema",
-                icon: Settings,
-              },
               { id: "usuarios", label: "Gestão de Usuários", icon: Users },
               { id: "logs", label: "Logs e Auditoria", icon: Shield },
               { id: "seguranca", label: "Segurança", icon: Shield },
-              {
-                id: "notificacoes",
-                label: "Notificações Automáticas",
-                icon: Bell,
-              },
             ].map((aba) => {
               const Icon = aba.icon;
               return (
@@ -402,304 +215,6 @@ export function ConfiguracaoAdmin() {
             })}
           </nav>
         </div>
-
-        {/* Conteúdo das abas */}
-        {abaSelecionada === "configuracoes" && config && (
-          <div>
-            {/* Indicador de alterações pendentes */}
-            {alteracoesPendentes && (
-              <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="flex items-center text-yellow-800">
-                  <AlertCircle className="w-5 h-5 mr-2" />
-                  <span className="font-medium">
-                    Você tem alterações não salvas
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Parâmetros Financeiros */}
-              <div className="space-y-6 bg-gray-50 p-6 rounded-lg border border-gray-200">
-                <div className="flex items-center mb-4">
-                  <DollarSign className="w-6 h-6 text-green-600 mr-2" />
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    Parâmetros Financeiros
-                  </h3>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Percentual de Multa (%)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="100"
-                    value={config.percentual_multa}
-                    onChange={(e) =>
-                      atualizarCampo(
-                        "percentual_multa",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Percentual de multa aplicado sobre o valor original
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Juros Diário (%)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    max="10"
-                    value={config.percentual_juros_dia}
-                    onChange={(e) =>
-                      atualizarCampo(
-                        "percentual_juros_dia",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Percentual de juros aplicado por dia de atraso
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tempo de Tolerância (dias)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="30"
-                    value={config.tempo_tolerancia_dias}
-                    onChange={(e) =>
-                      atualizarCampo(
-                        "tempo_tolerancia_dias",
-                        parseInt(e.target.value) || 0
-                      )
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Dias após vencimento antes de iniciar cobrança
-                  </p>
-                </div>
-              </div>
-
-              {/* Parâmetros de Envio */}
-              <div className="space-y-6 bg-gray-50 p-6 rounded-lg border border-gray-200">
-                <div className="flex items-center mb-4">
-                  <MessageSquare className="w-6 h-6 text-blue-600 mr-2" />
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    Parâmetros de Envio
-                  </h3>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Dia do Disparo Mensal
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={config.dia_disparo_mensal}
-                    onChange={(e) =>
-                      atualizarCampo(
-                        "dia_disparo_mensal",
-                        parseInt(e.target.value) || 1
-                      )
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Dia do mês para disparo automático de cobranças
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Canal de Envio
-                  </label>
-                  <select
-                    value={config.canal_envio}
-                    onChange={(e) =>
-                      atualizarCampo("canal_envio", e.target.value)
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="whatsapp">WhatsApp</option>
-                    <option value="email">E-mail</option>
-                    <option value="ambos">Ambos</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Link de Agendamento
-                  </label>
-                  <input
-                    type="url"
-                    value={config.link_base_agendamento}
-                    onChange={(e) =>
-                      atualizarCampo("link_base_agendamento", e.target.value)
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="https://calendly.com/sua-empresa/negociacao"
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    URL base para agendamento de negociações
-                  </p>
-                </div>
-
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="modo_debug"
-                    checked={config.modo_debug}
-                    onChange={(e) =>
-                      atualizarCampo("modo_debug", e.target.checked)
-                    }
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <label
-                    htmlFor="modo_debug"
-                    className="ml-2 text-sm font-medium text-gray-700"
-                  >
-                    Modo Debug
-                  </label>
-                  <Bug className="w-4 h-4 text-gray-400 ml-2" />
-                </div>
-              </div>
-            </div>
-
-            {/* Template da Mensagem */}
-            <div className="mt-8 bg-gray-50 p-6 rounded-lg border border-gray-200">
-              <div className="flex items-center mb-4">
-                <MessageSquare className="w-6 h-6 text-purple-600 mr-2" />
-                <h3 className="text-lg font-semibold text-gray-800">
-                  Template da Mensagem Padrão
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Texto Padrão da Mensagem
-                  </label>
-                  <textarea
-                    value={config.texto_padrao_mensagem}
-                    onChange={(e) =>
-                      atualizarCampo("texto_padrao_mensagem", e.target.value)
-                    }
-                    rows={8}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Digite o template da mensagem..."
-                  />
-                  <div className="mt-4">
-                    <p className="text-sm text-gray-600 mb-2">
-                      Variáveis que você pode usar no texto:
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        "{{cliente}}",
-                        "{{codigo_unidade}}",
-                        "{{cnpj}}",
-                        "{{valor_original}}",
-                        "{{valor_atualizado}}",
-                        "{{data_vencimento}}",
-                        "{{dias_atraso}}",
-                        "{{tipo_cobranca}}",
-                        "{{data_atual}}",
-                        "{{link_negociacao}}",
-                      ].map((variavel) => (
-                        <code
-                          key={variavel}
-                          className="bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs font-mono"
-                        >
-                          {variavel}
-                        </code>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Preview da Mensagem (Exemplo)
-                  </label>
-                  <div className="bg-white border border-gray-300 rounded-lg p-4 h-full">
-                    <div className="bg-green-100 rounded-lg p-3 max-w-sm shadow-sm">
-                      <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans">
-                        {previewMensagem()}
-                      </pre>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Esta é uma simulação de como a mensagem aparecerá no
-                      WhatsApp.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Informações do Sistema */}
-            <div className="mt-8 bg-gray-50 rounded-lg p-6 border border-gray-200">
-              <div className="flex items-center mb-4">
-                <Info className="w-6 h-6 text-gray-600 mr-2" />
-                <h3 className="text-lg font-semibold text-gray-800">
-                  Informações do Sistema
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="font-medium text-gray-700">
-                    Última Atualização:
-                  </span>
-                  <p className="text-gray-600">
-                    {config.updated_at
-                      ? new Date(config.updated_at).toLocaleString("pt-BR")
-                      : "N/A"}
-                  </p>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-700">
-                    Última Importação:
-                  </span>
-                  <p className="text-gray-600">
-                    {config.ultima_data_importacao
-                      ? new Date(config.ultima_data_importacao).toLocaleString(
-                          "pt-BR"
-                        )
-                      : "Nenhuma importação realizada"}
-                  </p>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-700">Status:</span>
-                  <p
-                    className={`font-medium ${
-                      config.modo_debug ? "text-yellow-600" : "text-green-600"
-                    }`}
-                  >
-                    {config.modo_debug ? "Modo Debug Ativo" : "Produção"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {abaSelecionada === "usuarios" && <GestaoUsuarios />}
 
@@ -1281,337 +796,6 @@ export function ConfiguracaoAdmin() {
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {abaSelecionada === "notificacoes" && (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-800">
-              Configurações de Notificação Automática
-            </h3>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-              <div className="flex items-center">
-                <Bell className="w-6 h-6 text-blue-600 mr-3" />
-                <div>
-                  <h4 className="font-semibold text-blue-800">
-                    Notificação Automática de Novas Cobranças
-                  </h4>
-                  <p className="text-blue-700 text-sm mt-1">
-                    O sistema enviará automaticamente WhatsApp e/ou Email quando
-                    uma nova cobrança for registrada
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h4 className="font-semibold text-gray-800 mb-4">
-                  Configurações Gerais
-                </h4>
-
-                <div className="space-y-4">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="whatsapp_ativo"
-                      checked={configNotificacao.whatsapp_ativo}
-                      onChange={(e) =>
-                        setConfigNotificacao({
-                          ...configNotificacao,
-                          whatsapp_ativo: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <label
-                      htmlFor="whatsapp_ativo"
-                      className="ml-2 text-sm font-medium text-gray-700"
-                    >
-                      Enviar notificação via WhatsApp
-                    </label>
-                  </div>
-
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="email_ativo"
-                      checked={configNotificacao.email_ativo}
-                      onChange={(e) =>
-                        setConfigNotificacao({
-                          ...configNotificacao,
-                          email_ativo: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <label
-                      htmlFor="email_ativo"
-                      className="ml-2 text-sm font-medium text-gray-700"
-                    >
-                      Enviar notificação via Email
-                    </label>
-                  </div>
-
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="apenas_em_atraso"
-                      checked={configNotificacao.enviar_apenas_em_atraso}
-                      onChange={(e) =>
-                        setConfigNotificacao({
-                          ...configNotificacao,
-                          enviar_apenas_em_atraso: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <label
-                      htmlFor="apenas_em_atraso"
-                      className="ml-2 text-sm font-medium text-gray-700"
-                    >
-                      Enviar apenas para cobranças em atraso
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Valor mínimo para notificação (R$)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={configNotificacao.valor_minimo_notificacao}
-                      onChange={(e) =>
-                        setConfigNotificacao({
-                          ...configNotificacao,
-                          valor_minimo_notificacao:
-                            parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="0,00"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-8">
-                {/* Configurações Gerais */}
-                <h4 className="font-semibold text-gray-800 mb-4">
-                  Variáveis Disponíveis
-                </h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  {[
-                    "{{cliente}}",
-                    "{{codigo_unidade}}",
-                    "{{cnpj}}",
-                    "{{valor_original}}",
-                    "{{valor_atualizado}}",
-                    "{{data_vencimento}}",
-                    "{{dias_atraso}}",
-                    "{{tipo_cobranca}}",
-                    "{{data_atual}}",
-                    "{{link_negociacao}}",
-                  ].map((variavel) => (
-                    <code
-                      key={variavel}
-                      className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs"
-                    >
-                      {variavel}
-                    </code>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Template WhatsApp */}
-            <div className="bg-white border border-gray-200 rounded-lg p-6">
-              <h4 className="font-semibold text-gray-800 mb-4 flex items-center">
-                <MessageSquare className="w-5 h-5 text-green-600 mr-2" />
-                Template WhatsApp
-              </h4>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Mensagem do WhatsApp
-                  </label>
-                  <textarea
-                    value={
-                      configNotificacao.template_whatsapp ||
-                      `Olá, {{cliente}}! 👋
- 
- Uma nova cobrança foi registrada para sua unidade {{codigo_unidade}}.
- 
- 📋 *Detalhes:*
- • Valor: {{valor_atualizado}}
- • Vencimento: {{data_vencimento}}
- • Tipo: {{tipo_cobranca}}
- 
- Para negociar ou esclarecer dúvidas, entre em contato conosco.
- 
- _Mensagem automática do sistema de cobrança_`
-                    }
-                    onChange={(e) =>
-                      setConfigNotificacao({
-                        ...configNotificacao,
-                        template_whatsapp: e.target.value,
-                      })
-                    }
-                    rows={12}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                    placeholder="Digite a mensagem do WhatsApp..."
-                  />
-                </div>
-
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h5 className="font-medium text-green-800 mb-2">
-                    Preview WhatsApp:
-                  </h5>
-                  <div className="bg-white rounded-lg p-3 border border-green-300 max-w-sm">
-                    <div className="text-sm text-gray-800 whitespace-pre-line">
-                      {(
-                        configNotificacao.template_whatsapp ||
-                        `Olá, João Silva! 👋
- 
- Uma nova cobrança foi registrada para sua unidade CP001.
- 
- 📋 *Detalhes:*
- • Valor: R$ 1.250,00
- • Vencimento: 15/02/2024
- • Tipo: Royalties
- 
- Para negociar ou esclarecer dúvidas, entre em contato conosco.
- 
- _Mensagem automática do sistema de cobrança_`
-                      )
-                        .replace(/\{\{cliente\}\}/g, "João Silva")
-                        .replace(/\{\{codigo_unidade\}\}/g, "CP001")
-                        .replace(/\{\{valor_atualizado\}\}/g, "R$ 1.250,00")
-                        .replace(/\{\{data_vencimento\}\}/g, "15/02/2024")
-                        .replace(/\{\{tipo_cobranca\}\}/g, "Royalties")
-                        .replace(/\{\{cnpj\}\}/g, "12.345.678/0001-99")
-                        .replace(/\{\{dias_atraso\}\}/g, "5")
-                        .replace(
-                          /\{\{data_atual\}\}/g,
-                          new Date().toLocaleDateString("pt-BR")
-                        )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Template Email */}
-            <div className="bg-white border border-gray-200 rounded-lg p-6">
-              <h4 className="font-semibold text-gray-800 mb-4 flex items-center">
-                <Mail className="w-5 h-5 text-blue-600 mr-2" />
-                Template Email
-              </h4>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Assunto do Email
-                  </label>
-                  <input
-                    type="text"
-                    value={
-                      configNotificacao.template_email_assunto ||
-                      "Nova Cobrança Registrada - {{codigo_unidade}}"
-                    }
-                    onChange={(e) =>
-                      setConfigNotificacao({
-                        ...configNotificacao,
-                        template_email_assunto: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Assunto do email..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Corpo do Email
-                  </label>
-                  <textarea
-                    value={
-                      configNotificacao.template_email_corpo ||
-                      `Prezado(a) {{cliente}},
- 
- Informamos que foi registrada uma nova cobrança para sua unidade {{codigo_unidade}}.
- 
- Detalhes da Cobrança:
- - Valor: {{valor_atualizado}}
- - Data de Vencimento: {{data_vencimento}}
- - Tipo: {{tipo_cobranca}}
- 
- Para esclarecimentos ou negociação, entre em contato através dos nossos canais oficiais.
- 
- Atenciosamente,
- Equipe Financeira`
-                    }
-                    onChange={(e) =>
-                      setConfigNotificacao({
-                        ...configNotificacao,
-                        template_email_corpo: e.target.value,
-                      })
-                    }
-                    rows={10}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Digite o corpo do email..."
-                  />
-                </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h5 className="font-medium text-blue-800 mb-2">
-                    Preview Email:
-                  </h5>
-                  <div className="bg-white rounded-lg p-4 border border-blue-300">
-                    <div className="border-b border-gray-200 pb-2 mb-3">
-                      <strong>Assunto:</strong>{" "}
-                      {(
-                        configNotificacao.template_email_assunto ||
-                        "Nova Cobrança Registrada - {{codigo_unidade}}"
-                      ).replace(/\{\{codigo_unidade\}\}/g, "CP001")}
-                    </div>
-                    <div className="text-sm text-gray-800 whitespace-pre-line">
-                      {(
-                        configNotificacao.template_email_corpo ||
-                        `Prezado(a) {{cliente}},
- 
- Informamos que foi registrada uma nova cobrança para sua unidade {{codigo_unidade}}.
- 
- Detalhes da Cobrança:
- - Valor: {{valor_atualizado}}
- - Data de Vencimento: {{data_vencimento}}
- - Tipo: {{tipo_cobranca}}
- 
- Para esclarecimentos ou negociação, entre em contato através dos nossos canais oficiais.
- 
- Atenciosamente,
- Equipe Financeira`
-                      )
-                        .replace(/\{\{cliente\}\}/g, "João Silva")
-                        .replace(/\{\{codigo_unidade\}\}/g, "CP001")
-                        .replace(/\{\{valor_atualizado\}\}/g, "R$ 1.250,00")
-                        .replace(/\{\{data_vencimento\}\}/g, "15/02/2024")
-                        .replace(/\{\{tipo_cobranca\}\}/g, "Royalties")}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <button
-              className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              disabled={salvando}
-              onClick={salvarConfiguracaoNotificacao}
-            >
-              {salvando ? "Salvando..." : "Salvar Configurações de Notificação"}
-            </button>
           </div>
         )}
       </div>

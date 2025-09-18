@@ -1142,23 +1142,20 @@ export function KanbanCobranca() {
 
     const destinationColumnId = destination.droppableId;
 
-    // Impede que cards sejam arrastados para as colunas "Parcelado" ou "Parcelas"
-    if (
-      destinationColumnId === "parcelado" ||
-      destinationColumnId === "parcelas"
-    ) {
+    // Impede que cards sejam arrastados para a coluna "Parcelas" apenas
+    if (destinationColumnId === "parcelas") {
       toast(
-        "O parcelamento deve ser feito pela tela de Central de Parcelamento.",
+        "A criação de parcelas deve ser feita pela tela de Central de Parcelamento.",
         { icon: "⚠️" }
       );
       return; // Cancela a movimentação
     }
 
-    // Impede que cards das colunas "Parcelado" e "Parcelas" sejam movidos para outras colunas
+    // Impede que cards das colunas "Parcelas" sejam movidos para outras colunas
     const sourceColumnId = source.droppableId;
-    if (sourceColumnId === "parcelado" || sourceColumnId === "parcelas") {
+    if (sourceColumnId === "parcelas") {
       toast(
-        'Não é possível mover cards de "Parcelado" ou "Parcelas" para outras colunas.',
+        'Não é possível mover cards de "Parcelas" para outras colunas.',
         { icon: "🚫" }
       );
       return; // Cancela a movimentação
@@ -1252,23 +1249,20 @@ export function KanbanCobranca() {
 
     const destinationColumnId = destination.droppableId;
 
-    // Impede que cards sejam arrastados para as colunas "Parcelado" ou "Parcelas"
-    if (
-      destinationColumnId === "parcelado" ||
-      destinationColumnId === "parcelas"
-    ) {
+    // Impede que cards sejam arrastados para a coluna "Parcelas" apenas
+    if (destinationColumnId === "parcelas") {
       toast(
-        "O parcelamento deve ser feito pela tela de Central de Parcelamento.",
+        "A criação de parcelas deve ser feita pela tela de Central de Parcelamento.",
         { icon: "⚠️" }
       );
       return; // Cancela a movimentação
     }
 
-    // Impede que cards das colunas "Parcelado" e "Parcelas" sejam movidos para outras colunas
+    // Impede que cards das colunas "Parcelas" sejam movidos para outras colunas
     const sourceColumnId = source.droppableId;
-    if (sourceColumnId === "parcelado" || sourceColumnId === "parcelas") {
+    if (sourceColumnId === "parcelas") {
       toast(
-        'Não é possível mover cards de "Parcelado" ou "Parcelas" para outras colunas.',
+        'Não é possível mover cards de "Parcelas" para outras colunas.',
         { icon: "🚫" }
       );
       return; // Cancela a movimentação
